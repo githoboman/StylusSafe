@@ -1,0 +1,103 @@
+name: Deploy StylusSafe to Arbitrum Sepolia
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'testnet'
+        type: choice
+        options:
+          - testnet
+          - mainnet
+
+jobs:
+  deploy:
+    name: Compile WASM + Deploy Contracts
+    runs-on: ubuntu-latest
+
+    env:
+      PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+      RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
+      CARGO_TARGET_DIR: /tmp/cargo-target
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust + WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            /tmp/cargo-target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-stylus
+        run: |
+          cargo install cargo-stylus --locked
+        env:
+          CARGO_TARGET_DIR: /tmp/cargo-target-install
+
+      - name: Check Stylus contract
+        working-directory: contracts
+        run: |
+          cargo stylus check \
+            --endpoint https://sepolia-rollup.arbitrum.io/rpc
+        env:
+          CARGO_TARGET_DIR: /tmp/cargo-target
+
+      - name: Deploy Stylus (WASM) contract
+        id: deploy_wasm
+        working-directory: contracts
+        run: |
+          OUTPUT=$(cargo stylus deploy \
+            --endpoint $RPC_URL \
+            --private-key $PRIVATE_KEY \
+            --no-verify 2>&1)
+          echo "$OUTPUT"
+          # Extract the deployed address from the output
+          WASM_ADDRESS=$(echo "$OUTPUT" | grep -oP '(?<=contract address: )0x[0-9a-fA-F]+')
+          echo "wasm_address=$WASM_ADDRESS" >> $GITHUB_OUTPUT
+          echo "Deployed WASM at: $WASM_ADDRESS"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: contracts/package.json
+
+      - name: Install contract deploy deps
+        working-directory: contracts
+        run: npm install ethers
+
+      - name: Deploy StylusSafeFactory (Solidity)
+        working-directory: contracts
+        run: |
+          node scripts/deploy_factory.mjs \
+            --rpc "$RPC_URL" \
+            --key "$PRIVATE_KEY" \
+            --impl "${{ steps.deploy_wasm.outputs.wasm_address }}"
+        env:
+          WASM_IMPLEMENTATION: ${{ steps.deploy_wasm.outputs.wasm_address }}
+
+      - name: Record deployment addresses
+        if: success()
+        run: |
+          echo "## Deployment Successful 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "| Contract | Address |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| StylusSafe WASM | ${{ steps.deploy_wasm.outputs.wasm_address }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View on [Arbiscan Sepolia](https://sepolia.arbiscan.io/address/${{ steps.deploy_wasm.outputs.wasm_address }})" >> $GITHUB_STEP_SUMMARY

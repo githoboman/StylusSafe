@@ -1,0 +1,292 @@
+stylus-safe v0.1.0 (C:\Users\OWNER\.gemini\antigravity-ide\scratch\StylusSafe\contracts)
+├── alloy-primitives v1.7.3
+│   ├── bytes v1.12.1
+│   ├── cfg-if v1.0.5
+│   ├── const-hex v1.19.3
+│   │   └── cfg-if v1.0.5
+│   ├── derive_more v2.1.1
+│   │   └── derive_more-impl v2.1.1 (proc-macro)
+│   │       ├── convert_case v0.10.0
+│   │       │   └── unicode-segmentation v1.13.3
+│   │       ├── proc-macro2 v1.0.107
+│   │       │   └── unicode-ident v1.0.26
+│   │       ├── quote v1.0.47
+│   │       │   └── proc-macro2 v1.0.107 (*)
+│   │       ├── syn v2.0.119
+│   │       │   ├── proc-macro2 v1.0.107 (*)
+│   │       │   ├── quote v1.0.47 (*)
+│   │       │   └── unicode-ident v1.0.26
+│   │       └── unicode-xid v0.2.6
+│   │       [build-dependencies]
+│   │       └── rustc_version v0.4.1
+│   │           └── semver v1.0.28
+│   ├── itoa v1.0.18
+│   ├── paste v1.0.15 (proc-macro)
+│   ├── ruint v1.16.0
+│   │   └── ruint-macro v1.2.1 (proc-macro)
+│   ├── sha3 v0.11.0
+│   │   ├── digest v0.11.3
+│   │   │   ├── block-buffer v0.12.1
+│   │   │   │   └── hybrid-array v0.4.15
+│   │   │   │       └── typenum v1.20.1
+│   │   │   └── crypto-common v0.2.2
+│   │   │       └── hybrid-array v0.4.15 (*)
+│   │   └── keccak v0.2.2
+│   │       └── cfg-if v1.0.5
+│   └── tiny-keccak v2.0.2
+│       └── crunchy v0.2.4
+├── alloy-sol-types v1.7.3
+│   ├── alloy-primitives v1.7.3 (*)
+│   └── alloy-sol-macro v1.7.3 (proc-macro)
+│       ├── alloy-sol-macro-expander v1.7.3
+│       │   ├── alloy-sol-macro-input v1.7.3
+│       │   │   ├── const-hex v1.19.3
+│       │   │   │   ├── cfg-if v1.0.5
+│       │   │   │   └── cpufeatures v0.2.17
+│       │   │   ├── dunce v1.0.5
+│       │   │   ├── heck v0.5.0
+│       │   │   ├── macro-string v0.2.0
+│       │   │   │   ├── proc-macro2 v1.0.107 (*)
+│       │   │   │   ├── quote v1.0.47 (*)
+│       │   │   │   └── syn v2.0.119 (*)
+│       │   │   ├── proc-macro2 v1.0.107 (*)
+│       │   │   ├── quote v1.0.47 (*)
+│       │   │   ├── syn v2.0.119 (*)
+│       │   │   └── syn-solidity v1.7.3
+│       │   │       ├── paste v1.0.15 (proc-macro)
+│       │   │       ├── proc-macro2 v1.0.107 (*)
+│       │   │       ├── quote v1.0.47 (*)
+│       │   │       └── syn v2.0.119 (*)
+│       │   ├── const-hex v1.19.3 (*)
+│       │   ├── heck v0.5.0
+│       │   ├── indexmap v2.14.2
+│       │   │   ├── equivalent v1.0.2
+│       │   │   └── hashbrown v0.17.1
+│       │   ├── proc-macro-error3 v3.0.1
+│       │   │   ├── proc-macro-error-attr3 v3.0.1 (proc-macro)
+│       │   │   │   ├── proc-macro2 v1.0.107 (*)
+│       │   │   │   └── quote v1.0.47 (*)
+│       │   │   ├── proc-macro2 v1.0.107 (*)
+│       │   │   ├── quote v1.0.47 (*)
+│       │   │   └── syn v2.0.119 (*)
+│       │   ├── proc-macro2 v1.0.107 (*)
+│       │   ├── quote v1.0.47 (*)
+│       │   ├── sha3 v0.11.0
+│       │   │   ├── digest v0.11.3
+│       │   │   │   ├── block-buffer v0.12.1
+│       │   │   │   │   └── hybrid-array v0.4.15
+│       │   │   │   │       └── typenum v1.20.1
+│       │   │   │   └── crypto-common v0.2.2
+│       │   │   │       └── hybrid-array v0.4.15 (*)
+│       │   │   └── keccak v0.2.2
+│       │   │       └── cfg-if v1.0.5
+│       │   ├── syn v2.0.119 (*)
+│       │   └── syn-solidity v1.7.3 (*)
+│       ├── alloy-sol-macro-input v1.7.3 (*)
+│       ├── proc-macro-error3 v3.0.1 (*)
+│       ├── proc-macro2 v1.0.107 (*)
+│       ├── quote v1.0.47 (*)
+│       └── syn v2.0.119 (*)
+├── p256 v0.13.2
+│   ├── ecdsa v0.16.9
+│   │   ├── der v0.7.10
+│   │   │   ├── const-oid v0.9.6
+│   │   │   └── zeroize v1.9.0
+│   │   ├── digest v0.10.7
+│   │   │   ├── block-buffer v0.10.4
+│   │   │   │   └── generic-array v0.14.9
+│   │   │   │       ├── typenum v1.20.1
+│   │   │   │       └── zeroize v1.9.0
+│   │   │   │       [build-dependencies]
+│   │   │   │       └── version_check v0.9.5
+│   │   │   ├── const-oid v0.9.6
+│   │   │   ├── crypto-common v0.1.6
+│   │   │   │   ├── generic-array v0.14.9 (*)
+│   │   │   │   └── typenum v1.20.1
+│   │   │   └── subtle v2.6.1
+│   │   ├── elliptic-curve v0.13.8
+│   │   │   ├── base16ct v0.2.0
+│   │   │   ├── crypto-bigint v0.5.5
+│   │   │   │   ├── generic-array v0.14.9 (*)
+│   │   │   │   ├── rand_core v0.6.4
+│   │   │   │   ├── subtle v2.6.1
+│   │   │   │   └── zeroize v1.9.0
+│   │   │   ├── digest v0.10.7 (*)
+│   │   │   ├── ff v0.13.1
+│   │   │   │   ├── rand_core v0.6.4
+│   │   │   │   └── subtle v2.6.1
+│   │   │   ├── generic-array v0.14.9 (*)
+│   │   │   ├── group v0.13.0
+│   │   │   │   ├── ff v0.13.1 (*)
+│   │   │   │   ├── rand_core v0.6.4
+│   │   │   │   └── subtle v2.6.1
+│   │   │   ├── rand_core v0.6.4
+│   │   │   ├── sec1 v0.7.3
+│   │   │   │   ├── base16ct v0.2.0
+│   │   │   │   ├── der v0.7.10 (*)
+│   │   │   │   ├── generic-array v0.14.9 (*)
+│   │   │   │   ├── subtle v2.6.1
+│   │   │   │   └── zeroize v1.9.0
+│   │   │   ├── subtle v2.6.1
+│   │   │   └── zeroize v1.9.0
+│   │   ├── rfc6979 v0.4.0
+│   │   │   ├── hmac v0.12.1
+│   │   │   │   └── digest v0.10.7 (*)
+│   │   │   └── subtle v2.6.1
+│   │   └── signature v2.2.0
+│   │       ├── digest v0.10.7 (*)
+│   │       └── rand_core v0.6.4
+│   ├── elliptic-curve v0.13.8 (*)
+│   ├── primeorder v0.13.6
+│   │   └── elliptic-curve v0.13.8 (*)
+│   └── sha2 v0.10.9
+│       ├── cfg-if v1.0.5
+│       └── digest v0.10.7 (*)
+├── sha2 v0.10.9 (*)
+└── stylus-sdk v0.10.9
+    ├── alloy-primitives v1.7.3 (*)
+    ├── alloy-sol-types v1.7.3 (*)
+    ├── branches v0.4.6
+    │   [build-dependencies]
+    │   └── rustc_version v0.4.1 (*)
+    ├── cfg-if v1.0.5
+    ├── clap v4.6.7
+    │   ├── clap_builder v4.6.7
+    │   │   ├── anstream v1.0.0
+    │   │   │   ├── anstyle v1.0.14
+    │   │   │   ├── anstyle-parse v1.0.0
+    │   │   │   │   └── utf8parse v0.2.2
+    │   │   │   ├── anstyle-query v1.1.5
+    │   │   │   ├── colorchoice v1.0.5
+    │   │   │   ├── is_terminal_polyfill v1.70.2
+    │   │   │   └── utf8parse v0.2.2
+    │   │   ├── anstyle v1.0.14
+    │   │   ├── clap_lex v1.1.1
+    │   │   └── strsim v0.11.1
+    │   └── clap_derive v4.6.7 (proc-macro)
+    │       ├── heck v0.5.0
+    │       ├── proc-macro2 v1.0.107 (*)
+    │       ├── quote v1.0.47 (*)
+    │       └── syn v3.0.6
+    │           ├── proc-macro2 v1.0.107 (*)
+    │           ├── quote v1.0.47 (*)
+    │           └── unicode-ident v1.0.26
+    ├── derivative v2.2.0 (proc-macro)
+    │   ├── proc-macro2 v1.0.107 (*)
+    │   ├── quote v1.0.47 (*)
+    │   └── syn v1.0.109
+    │       ├── proc-macro2 v1.0.107 (*)
+    │       ├── quote v1.0.47 (*)
+    │       └── unicode-ident v1.0.26
+    ├── hex v0.4.3
+    ├── keccak v0.1.6
+    ├── keccak-const v0.2.0
+    ├── mini-alloc v1.0.0
+    │   └── cfg-if v1.0.5
+    ├── rclite v0.4.1
+    │   └── branches v0.4.6 (*)
+    ├── ruint v1.16.0 (*)
+    ├── stylus-core v0.10.9
+    │   ├── alloy-primitives v1.7.3 (*)
+    │   ├── alloy-sol-types v1.7.3 (*)
+    │   ├── cfg-if v1.0.5
+    │   ├── dyn-clone v1.0.20
+    │   ├── lazy_static v1.5.0
+    │   └── regex v1.13.1
+    │       ├── aho-corasick v1.1.5
+    │       │   └── memchr v2.8.3
+    │       ├── memchr v2.8.3
+    │       ├── regex-automata v0.4.18
+    │       │   ├── aho-corasick v1.1.5 (*)
+    │       │   ├── memchr v2.8.3
+    │       │   └── regex-syntax v0.8.11
+    │       └── regex-syntax v0.8.11
+    └── stylus-proc v0.10.9 (proc-macro)
+        ├── alloy-primitives v1.7.3
+        │   ├── bytes v1.12.1
+        │   ├── cfg-if v1.0.5
+        │   ├── const-hex v1.19.3 (*)
+        │   ├── derive_more v2.1.1
+        │   │   └── derive_more-impl v2.1.1 (proc-macro) (*)
+        │   ├── itoa v1.0.18
+        │   ├── paste v1.0.15 (proc-macro)
+        │   ├── ruint v1.16.0
+        │   │   └── ruint-macro v1.2.1 (proc-macro)
+        │   └── sha3 v0.11.0 (*)
+        ├── alloy-sol-types v1.7.3
+        │   ├── alloy-primitives v1.7.3 (*)
+        │   └── alloy-sol-macro v1.7.3 (proc-macro) (*)
+        ├── cfg-if v1.0.5
+        ├── convert_case v0.6.0
+        │   └── unicode-segmentation v1.13.3
+        ├── lazy_static v1.5.0
+        ├── proc-macro-error v1.0.4
+        │   ├── proc-macro-error-attr v1.0.4 (proc-macro)
+        │   │   ├── proc-macro2 v1.0.107 (*)
+        │   │   └── quote v1.0.47 (*)
+        │   │   [build-dependencies]
+        │   │   └── version_check v0.9.5
+        │   ├── proc-macro2 v1.0.107 (*)
+        │   ├── quote v1.0.47 (*)
+        │   └── syn v1.0.109 (*)
+        │   [build-dependencies]
+        │   └── version_check v0.9.5
+        ├── proc-macro2 v1.0.107 (*)
+        ├── quote v1.0.47 (*)
+        ├── regex v1.13.1
+        │   ├── aho-corasick v1.1.5
+        │   │   └── memchr v2.8.3
+        │   ├── memchr v2.8.3
+        │   ├── regex-automata v0.4.18
+        │   │   ├── aho-corasick v1.1.5 (*)
+        │   │   ├── memchr v2.8.3
+        │   │   └── regex-syntax v0.8.11
+        │   └── regex-syntax v0.8.11
+        ├── sha3 v0.10.9
+        │   ├── digest v0.10.7
+        │   │   ├── block-buffer v0.10.4
+        │   │   │   └── generic-array v0.14.9
+        │   │   │       └── typenum v1.20.1
+        │   │   │       [build-dependencies]
+        │   │   │       └── version_check v0.9.5
+        │   │   └── crypto-common v0.1.6
+        │   │       ├── generic-array v0.14.9 (*)
+        │   │       └── typenum v1.20.1
+        │   └── keccak v0.1.6
+        ├── stylus-core v0.10.9
+        │   ├── alloy-primitives v1.7.3 (*)
+        │   ├── alloy-sol-types v1.7.3 (*)
+        │   ├── cfg-if v1.0.5
+        │   ├── dyn-clone v1.0.20
+        │   ├── lazy_static v1.5.0
+        │   └── regex v1.13.1 (*)
+        ├── syn v2.0.119 (*)
+        ├── syn-solidity v1.7.3 (*)
+        └── trybuild v1.0.121
+            ├── glob v0.3.4
+            ├── serde v1.0.229
+            │   └── serde_core v1.0.229
+            ├── serde_derive v1.0.229 (proc-macro)
+            │   ├── proc-macro2 v1.0.107 (*)
+            │   ├── quote v1.0.47 (*)
+            │   └── syn v3.0.6 (*)
+            ├── serde_json v1.0.151
+            │   ├── itoa v1.0.18
+            │   ├── memchr v2.8.3
+            │   ├── serde_core v1.0.229
+            │   └── zmij v1.0.23
+            ├── target-tuple v1.0.2
+            ├── termcolor v1.4.1
+            │   └── winapi-util v0.1.11
+            │       └── windows-sys v0.61.2
+            │           └── windows-link v0.2.1
+            └── toml v1.1.6+spec-1.1.0
+                ├── serde_core v1.0.229
+                ├── serde_spanned v1.1.1
+                │   └── serde_core v1.0.229
+                ├── toml_datetime v1.1.1+spec-1.1.0
+                │   └── serde_core v1.0.229
+                ├── toml_parser v1.1.3+spec-1.1.0
+                │   └── winnow v1.0.4
+                ├── toml_writer v1.1.2+spec-1.1.0
+                └── winnow v1.0.4
