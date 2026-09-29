@@ -452,9 +452,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         if (!webauthnSig) throw new Error('Failed to sign UserOperation.');
 
         // Encode WebAuthnSignature tuple for Stylus validateUserOp
-        const { encodeAbiParameters, parseAbiParameters, keccak256 } = await import('viem');
-        const encoded = encodeAbiParameters(
-            parseAbiParameters('(bytes authData, string clientDataJSON, bytes rawSignature)'),
+        const viem = await import('viem');
+        const encoded = viem.encodeAbiParameters(
+            viem.parseAbiParameters('(bytes authData, string clientDataJSON, bytes rawSignature)'),
             [{
                 authData: toHex(webauthnSig.authData),
                 clientDataJSON: new TextDecoder().decode(webauthnSig.clientDataJSON),

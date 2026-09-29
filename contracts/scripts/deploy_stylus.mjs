@@ -17,6 +17,7 @@ import { ethers } from 'ethers';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
+import { brotliCompressSync, constants } from 'zlib';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -89,20 +90,40 @@ async function main() {
   }
 
   // Step 1: Deploy WASM bytecode
-  // Stylus programs are deployed by sending the raw WASM bytes as a transaction
-  // with no `to` (contract creation), or to the Stylus deployment helper.
+  // 1. Brotli compress the WASM
+  console.log('\n📦 Compressing WASM using Brotli (Level 11)...');
+  const compressedWasm = brotliCompressSync(wasmBytes, {
+    [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY
+  });
+  console.log(`   Compressed size: ${(compressedWasm.length / 1024).toFixed(1)} KB`);
+
+  // 2. Prefix with EOF magic bytes for Stylus (0xEFF00000)
+  const STYLUS_MAGIC = Buffer.from('eff00000', 'hex');
+  const runtimeCode = Buffer.concat([STYLUS_MAGIC, compressedWasm]);
+
+  // 3. Construct EVM Init Code to return the runtime code
+  // 61 <len_high> <len_low> 80 60 0c 60 00 39 60 00 f3
+  const lenHigh = (runtimeCode.length >> 8) & 0xff;
+  const lenLow = runtimeCode.length & 0xff;
+  const initCode = Buffer.from([
+      0x61, lenHigh, lenLow,
+      0x80,
+      0x60, 0x0c,
+      0x60, 0x00,
+      0x39,
+      0x60, 0x00,
+      0xf3
+  ]);
+  
+  const deployPayload = Buffer.concat([initCode, runtimeCode]);
+  console.log(`   Final transaction payload size: ${(deployPayload.length / 1024).toFixed(1)} KB`);
+
   console.log('\n📤 Step 1: Deploying WASM bytecode...');
-  
   const feeData = await provider.getFeeData();
-  
-  // Prefix with Stylus magic bytes (EVM_REVERT_PREFIX + STYLUS_MAGIC)
-  // The actual Stylus deployment uses a specific byte sequence
-  const STYLUS_MAGIC = Buffer.from('eff000', 'hex');
-  const deployPayload = Buffer.concat([STYLUS_MAGIC, wasmBytes]);
   
   const deployTx = await wallet.sendTransaction({
     data: '0x' + deployPayload.toString('hex'),
-    gasLimit: 10_000_000n,
+    gasLimit: 15_000_000n,
     maxFeePerGas: feeData.maxFeePerGas,
     maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
   });
