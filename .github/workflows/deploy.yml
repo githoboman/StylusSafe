@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: Target environment
         required: true
-        default: 'testnet'
+        default: testnet
         type: choice
         options:
           - testnet
@@ -16,7 +16,6 @@ jobs:
   deploy:
     name: Compile WASM + Deploy Contracts
     runs-on: ubuntu-latest
-
     env:
       PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
       RPC_URL: ${{ secrets.ARBITRUM_SEPOLIA_RPC_URL }}
@@ -48,39 +47,38 @@ jobs:
         env:
           CARGO_TARGET_DIR: /tmp/cargo-target-install
 
-      - name: Write Stylus.toml
-        working-directory: contracts
-        run: python3 -c "open('Stylus.toml','w',newline='\n').write('[workspace]\nmembers=[\".\"]\\ndefault-member=\".\"\\n\\n[workspace.networks.arbitrum-sepolia]\\nendpoint=\"https://sepolia-rollup.arbitrum.io/rpc\"\\n')"
-
       - name: Show Stylus.toml
         working-directory: contracts
         run: cat Stylus.toml
 
-      - name: Deploy Stylus (WASM) contract
+      - name: Deploy Stylus WASM contract
         id: deploy_wasm
         working-directory: contracts
         run: |
           set +e
-          cargo stylus deploy --endpoint $RPC_URL --private-key $PRIVATE_KEY --no-verify 2>&1 | tee /tmp/deploy.log
+          cargo stylus deploy \
+            --endpoint "$RPC_URL" \
+            --private-key "$PRIVATE_KEY" \
+            --no-verify 2>&1 | tee /tmp/deploy.log
           EXIT_CODE=${PIPESTATUS[0]}
           cat /tmp/deploy.log
           ADDR=$(grep -oP '(?<=contract address: )0x[0-9a-fA-F]+' /tmp/deploy.log || true)
           echo "wasm_address=$ADDR" >> $GITHUB_OUTPUT
-          echo "Contract: $ADDR"
+          echo "Contract deployed at: $ADDR"
           exit $EXIT_CODE
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: contracts/package.json
 
       - name: Install contract deploy deps
         working-directory: contracts
         run: npm install ethers
 
-      - name: Deploy StylusSafeFactory (Solidity)
+      - name: Deploy StylusSafeFactory
         working-directory: contracts
         run: |
           node scripts/deploy_factory.mjs \
@@ -88,10 +86,9 @@ jobs:
             --key "$PRIVATE_KEY" \
             --impl "${{ steps.deploy_wasm.outputs.wasm_address }}"
 
-      - name: Record deployment addresses
+      - name: Record deployment
         if: success()
         run: |
           echo "## Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "| Contract | Address |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| StylusSafe WASM | ${{ steps.deploy_wasm.outputs.wasm_address }} |" >> $GITHUB_STEP_SUMMARY
+          echo "StylusSafe WASM: ${{ steps.deploy_wasm.outputs.wasm_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "https://sepolia.arbiscan.io/address/${{ steps.deploy_wasm.outputs.wasm_address }}" >> $GITHUB_STEP_SUMMARY

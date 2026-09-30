@@ -2,5 +2,5 @@
 members = ["."]
 default-member = "."
 
-[networks.arbitrum-sepolia]
+[workspace.networks.arbitrum-sepolia]
 endpoint = "https://sepolia-rollup.arbitrum.io/rpc"
