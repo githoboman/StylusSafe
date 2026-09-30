@@ -49,18 +49,17 @@ jobs:
         env:
           CARGO_TARGET_DIR: /tmp/cargo-target-install
 
-      - name: Check Stylus contract
-        working-directory: contracts
-        run: |
-          cargo stylus check \
-            --endpoint https://sepolia-rollup.arbitrum.io/rpc || true
-        env:
-          CARGO_TARGET_DIR: /tmp/cargo-target
-
       - name: Deploy Stylus (WASM) contract
         id: deploy_wasm
         working-directory: contracts
         run: |
+          # Write a fresh Stylus.toml via heredoc (avoids Windows CRLF issues)
+          printf '[workspace]\nmembers = ["."]\ndefault-member = "."\n\n[networks.arbitrum-sepolia]\nendpoint = "https://sepolia-rollup.arbitrum.io/rpc"\n' > Stylus.toml
+          echo "=== Stylus.toml (hex dump first 200 bytes) ==="
+          xxd Stylus.toml | head -20
+          echo "=== Stylus.toml (raw) ==="
+          cat Stylus.toml
+          echo "========================="
           set +e
           cargo stylus deploy \
             --endpoint $RPC_URL \
