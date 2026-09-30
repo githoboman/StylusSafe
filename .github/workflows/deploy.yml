@@ -44,31 +44,44 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install cargo-stylus
-        run: |
-          cargo install cargo-stylus --locked
+        run: cargo install cargo-stylus --locked
         env:
           CARGO_TARGET_DIR: /tmp/cargo-target-install
+
+      - name: Write Stylus.toml
+        working-directory: contracts
+        run: |
+          python3 - << 'PYEOF'
+          content = (
+              "[workspace]\n"
+              "members = [\".\"]\n"
+              "default-member = \".\"\n"
+              "\n"
+              "[networks.arbitrum-sepolia]\n"
+              "endpoint = \"https://sepolia-rollup.arbitrum.io/rpc\"\n"
+          )
+          with open("Stylus.toml", "w", newline="\n") as f:
+              f.write(content)
+          print("Written Stylus.toml:")
+          print(content)
+          PYEOF
 
       - name: Deploy Stylus (WASM) contract
         id: deploy_wasm
         working-directory: contracts
         run: |
-          # Write a fresh Stylus.toml via heredoc (avoids Windows CRLF issues)
-          printf '[workspace]\nmembers = ["."]\ndefault-member = "."\n\n[networks.arbitrum-sepolia]\nendpoint = "https://sepolia-rollup.arbitrum.io/rpc"\n' > Stylus.toml
-          echo "=== Stylus.toml (hex dump first 200 bytes) ==="
-          xxd Stylus.toml | head -20
-          echo "=== Stylus.toml (raw) ==="
+          echo "=== Stylus.toml ==="
           cat Stylus.toml
-          echo "========================="
+          echo "==================="
           set +e
           cargo stylus deploy \
             --endpoint $RPC_URL \
             --private-key $PRIVATE_KEY \
             --no-verify 2>&1 | tee /tmp/stylus-deploy.log
           EXIT_CODE=${PIPESTATUS[0]}
-          echo "--- Full deploy output ---"
+          echo "--- deploy output ---"
           cat /tmp/stylus-deploy.log
-          WASM_ADDRESS=$(cat /tmp/stylus-deploy.log | grep -oP '(?<=contract address: )0x[0-9a-fA-F]+')
+          WASM_ADDRESS=$(grep -oP '(?<=contract address: )0x[0-9a-fA-F]+' /tmp/stylus-deploy.log || true)
           echo "wasm_address=$WASM_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed WASM at: $WASM_ADDRESS"
           exit $EXIT_CODE
@@ -97,9 +110,8 @@ jobs:
       - name: Record deployment addresses
         if: success()
         run: |
-          echo "## Deployment Successful 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "| Contract | Address |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| StylusSafe WASM | ${{ steps.deploy_wasm.outputs.wasm_address }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View on [Arbiscan Sepolia](https://sepolia.arbiscan.io/address/${{ steps.deploy_wasm.outputs.wasm_address }})" >> $GITHUB_STEP_SUMMARY
+          echo "View on Arbiscan: https://sepolia.arbiscan.io/address/${{ steps.deploy_wasm.outputs.wasm_address }}" >> $GITHUB_STEP_SUMMARY
