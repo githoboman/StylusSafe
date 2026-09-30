@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["lib", "cdylib"]
 
+[[bin]]
+name = "stylus-safe"
+path = "src/main.rs"
+
 [dependencies]
 alloy-primitives = { version = "=1.7.3", default-features = false }
 alloy-sol-types = { version = "=1.7.3", default-features = false }
