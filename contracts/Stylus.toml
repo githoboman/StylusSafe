@@ -1,1 +1,3 @@
-[stylus]
+[workspace]
+members = ["."]
+default-member = "."
