@@ -50,40 +50,23 @@ jobs:
 
       - name: Write Stylus.toml
         working-directory: contracts
-        run: |
-          python3 - << 'PYEOF'
-          content = (
-              "[workspace]\n"
-              "members = [\".\"]\n"
-              "default-member = \".\"\n"
-              "\n"
-              "[networks.arbitrum-sepolia]\n"
-              "endpoint = \"https://sepolia-rollup.arbitrum.io/rpc\"\n"
-          )
-          with open("Stylus.toml", "w", newline="\n") as f:
-              f.write(content)
-          print("Written Stylus.toml:")
-          print(content)
-          PYEOF
+        run: python3 -c "open('Stylus.toml','w',newline='\n').write('[workspace]\nmembers=[\".\"]\\ndefault-member=\".\"\\n\\n[workspace.networks.arbitrum-sepolia]\\nendpoint=\"https://sepolia-rollup.arbitrum.io/rpc\"\\n')"
+
+      - name: Show Stylus.toml
+        working-directory: contracts
+        run: cat Stylus.toml
 
       - name: Deploy Stylus (WASM) contract
         id: deploy_wasm
         working-directory: contracts
         run: |
-          echo "=== Stylus.toml ==="
-          cat Stylus.toml
-          echo "==================="
           set +e
-          cargo stylus deploy \
-            --endpoint $RPC_URL \
-            --private-key $PRIVATE_KEY \
-            --no-verify 2>&1 | tee /tmp/stylus-deploy.log
+          cargo stylus deploy --endpoint $RPC_URL --private-key $PRIVATE_KEY --no-verify 2>&1 | tee /tmp/deploy.log
           EXIT_CODE=${PIPESTATUS[0]}
-          echo "--- deploy output ---"
-          cat /tmp/stylus-deploy.log
-          WASM_ADDRESS=$(grep -oP '(?<=contract address: )0x[0-9a-fA-F]+' /tmp/stylus-deploy.log || true)
-          echo "wasm_address=$WASM_ADDRESS" >> $GITHUB_OUTPUT
-          echo "Deployed WASM at: $WASM_ADDRESS"
+          cat /tmp/deploy.log
+          ADDR=$(grep -oP '(?<=contract address: )0x[0-9a-fA-F]+' /tmp/deploy.log || true)
+          echo "wasm_address=$ADDR" >> $GITHUB_OUTPUT
+          echo "Contract: $ADDR"
           exit $EXIT_CODE
 
       - name: Setup Node
@@ -104,8 +87,6 @@ jobs:
             --rpc "$RPC_URL" \
             --key "$PRIVATE_KEY" \
             --impl "${{ steps.deploy_wasm.outputs.wasm_address }}"
-        env:
-          WASM_IMPLEMENTATION: ${{ steps.deploy_wasm.outputs.wasm_address }}
 
       - name: Record deployment addresses
         if: success()
@@ -114,4 +95,3 @@ jobs:
           echo "| Contract | Address |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| StylusSafe WASM | ${{ steps.deploy_wasm.outputs.wasm_address }} |" >> $GITHUB_STEP_SUMMARY
-          echo "View on Arbiscan: https://sepolia.arbiscan.io/address/${{ steps.deploy_wasm.outputs.wasm_address }}" >> $GITHUB_STEP_SUMMARY
