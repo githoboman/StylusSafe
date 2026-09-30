@@ -51,7 +51,7 @@ jobs:
         working-directory: contracts
         run: |
           RUST_VERSION=$(rustc --version | grep -oP '\d+\.\d+\.\d+')
-          printf '[toolchain]\nchannel = "%s"\n' "$RUST_VERSION" > rust-toolchain.toml
+          printf '[toolchain]\nchannel = "%s"\ntargets = ["wasm32-unknown-unknown"]\n' "$RUST_VERSION" > rust-toolchain.toml
           cat rust-toolchain.toml
 
       - name: Show Stylus.toml
