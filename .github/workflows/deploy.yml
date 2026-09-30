@@ -66,6 +66,7 @@ jobs:
           cargo stylus deploy \
             --endpoint "$RPC_URL" \
             --private-key "$PRIVATE_KEY" \
+            --max-fee-per-gas-gwei 1 \
             --no-verify 2>&1 | tee /tmp/deploy.log
           EXIT_CODE=${PIPESTATUS[0]}
           cat /tmp/deploy.log
