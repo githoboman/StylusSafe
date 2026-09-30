@@ -61,15 +61,18 @@ jobs:
         id: deploy_wasm
         working-directory: contracts
         run: |
-          OUTPUT=$(cargo stylus deploy \
+          set +e
+          cargo stylus deploy \
             --endpoint $RPC_URL \
             --private-key $PRIVATE_KEY \
-            --no-verify 2>&1)
-          echo "$OUTPUT"
-          # Extract the deployed address from the output
-          WASM_ADDRESS=$(echo "$OUTPUT" | grep -oP '(?<=contract address: )0x[0-9a-fA-F]+')
+            --no-verify 2>&1 | tee /tmp/stylus-deploy.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "--- Full deploy output ---"
+          cat /tmp/stylus-deploy.log
+          WASM_ADDRESS=$(cat /tmp/stylus-deploy.log | grep -oP '(?<=contract address: )0x[0-9a-fA-F]+')
           echo "wasm_address=$WASM_ADDRESS" >> $GITHUB_OUTPUT
           echo "Deployed WASM at: $WASM_ADDRESS"
+          exit $EXIT_CODE
 
       - name: Setup Node
         uses: actions/setup-node@v4
