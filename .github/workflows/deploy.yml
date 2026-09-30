@@ -47,6 +47,13 @@ jobs:
         env:
           CARGO_TARGET_DIR: /tmp/cargo-target-install
 
+      - name: Write rust-toolchain.toml
+        working-directory: contracts
+        run: |
+          RUST_VERSION=$(rustc --version | grep -oP '\d+\.\d+\.\d+')
+          printf '[toolchain]\nchannel = "%s"\n' "$RUST_VERSION" > rust-toolchain.toml
+          cat rust-toolchain.toml
+
       - name: Show Stylus.toml
         working-directory: contracts
         run: cat Stylus.toml
