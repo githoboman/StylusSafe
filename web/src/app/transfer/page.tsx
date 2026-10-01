@@ -33,6 +33,8 @@ export default function TransferPage() {
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(TOKENS[1]); // Default source USDC
   const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[0]); // Default dest ETH
+  const [customSourceToken, setCustomSourceToken] = useState('');
+  const [customDestToken, setCustomDestToken] = useState('');
   const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
   const [selectedChain, setSelectedChain] = useState(CHAINS[0]); // Default dest chain same as source
   const [customChainId, setCustomChainId] = useState('');
@@ -59,8 +61,9 @@ export default function TransferPage() {
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       if (!chainId) return;
-      const toToken = selectedDestToken.symbol;
-      const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${selectedToken.symbol}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
+      const fromToken = customSourceToken || selectedToken.symbol;
+      const toToken = customDestToken || selectedDestToken.symbol;
+      const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
       const data = await resp.json();
@@ -73,7 +76,7 @@ export default function TransferPage() {
     } finally {
       setFeeLoading(false);
     }
-  }, [amount, selectedToken, selectedDestToken, selectedSourceChain, selectedChain, customChainId, address]);
+  }, [amount, selectedToken, selectedDestToken, customSourceToken, customDestToken, selectedSourceChain, selectedChain, customChainId, address]);
 
   useEffect(() => {
     const timer = setTimeout(fetchLifiQuote, 600);
@@ -98,11 +101,12 @@ export default function TransferPage() {
     try {
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
-      const toToken = selectedDestToken.symbol;
+      const fromToken = customSourceToken || selectedToken.symbol;
+      const toToken = customDestToken || selectedDestToken.symbol;
       const result = await executeCrossChainSwap(
         selectedSourceChain.id,
         chainId,
-        selectedToken.symbol,
+        fromToken,
         toToken,
         amountRaw,
         recipient as `0x${string}`,
@@ -219,6 +223,16 @@ export default function TransferPage() {
                   </button>
                 ))}
               </div>
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
+                  <input
+                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
+                    placeholder="Or paste 0x token address"
+                    type="text"
+                    value={customSourceToken}
+                    onChange={(e) => setCustomSourceToken(e.target.value)}
+                  />
+              </div>
             </div>
 
             {/* Amount */}
@@ -318,6 +332,16 @@ export default function TransferPage() {
                     {t.symbol}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
+                  <input
+                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
+                    placeholder="Or paste 0x token address"
+                    type="text"
+                    value={customDestToken}
+                    onChange={(e) => setCustomDestToken(e.target.value)}
+                  />
               </div>
             </div>
           </div>
