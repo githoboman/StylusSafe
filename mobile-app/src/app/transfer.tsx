@@ -5,12 +5,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius } from '@/constants/theme';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 const SUPPORTED_TOKENS = [
-  { symbol: 'ETH', name: 'Ether', color: Colors.primary },
-  { symbol: 'USDC', name: 'USD Coin', color: Colors.secondary },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', color: '#F7931A' },
-  { symbol: 'ARB', name: 'Arbitrum', color: '#12AAFF' },
+  { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Ether', color: Colors.primary },
+  { symbol: 'USDC', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', decimals: 6, name: 'USD Coin', color: Colors.secondary },
+  { symbol: 'WBTC', address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 8, name: 'Wrapped Bitcoin', color: '#F7931A' },
 ];
 
 const SUPPORTED_CHAINS = [
@@ -25,16 +25,29 @@ export default function TransferScreen() {
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
   const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[1]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customToToken, setCustomToToken] = useState('');
+  const { executeCrossChainSwap, isPending } = useInvisibleWallet();
 
   const handleTransfer = async () => {
     if (!amount || !recipient) return;
     setIsSubmitting(true);
     try {
-      // Calls to useInvisibleWallet executeCrossChainSwap would go here.
-      await new Promise(r => setTimeout(r, 1500)); // Simulate pending
+      const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
+      const toToken = customToToken || selectedToken.address;
+      await executeCrossChainSwap(
+        selectedChain.id,
+        selectedToken.address as `0x${string}`,
+        toToken as `0x${string}`,
+        amountRaw,
+        recipient as `0x${string}`,
+      );
       setAmount('');
       setRecipient('');
+      setCustomToToken('');
+      alert('Swap successfully executed!');
+    } catch (e) {
+      console.error(e);
+      alert('Swap failed. ' + String(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -67,6 +80,16 @@ export default function TransferScreen() {
               ))}
             </View>
           </ScrollView>
+
+          <View style={[styles.inputRow, { marginTop: Spacing.sm }]}>
+            <TextInput
+              style={[styles.amountInput, { fontSize: 14 }]}
+              placeholder="Custom Destination Token (Optional)"
+              placeholderTextColor={Colors.textMuted + '60'}
+              value={customToToken}
+              onChangeText={setCustomToToken}
+            />
+          </View>
 
           {/* Amount input */}
           <View style={[styles.inputRow, { marginTop: Spacing.md }]}>
@@ -127,7 +150,7 @@ export default function TransferScreen() {
           <View style={{ gap: Spacing.md, marginTop: Spacing.xs }}>
             {[
               { label: 'Network Fee', value: 'Sponsored', valueColor: Colors.primary },
-              { label: 'Bridge Protocol', value: 'Across Protocol' },
+              { label: 'Routing Protocol', value: 'Li.Fi / DEX Aggregator' },
               { label: 'Est. Time', value: '~45 seconds' },
             ].map(row => (
               <View key={row.label} style={styles.summaryRow}>

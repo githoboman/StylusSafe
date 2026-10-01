@@ -7,8 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@/constants/theme';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
-// ── Inline hooks for mobile (no crypto.subtle in RN — use native passkey API) ─
+// ── Inline hooks for mobile ───────────────────────────────────────────────────
 
 function useBalanceMobile(address: string | null) {
   const [ethBalance, setEthBalance] = useState('0.00');
@@ -57,28 +58,15 @@ function useBalanceMobile(address: string | null) {
 
 export default function PortfolioScreen() {
   const router = useRouter();
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const { address: walletAddress, register, isPending: isRegistering } = useInvisibleWallet();
   const { ethBalance, usdcBalance, isFetching } = useBalanceMobile(walletAddress);
 
-  // On mount, attempt to restore wallet from SecureStore / AsyncStorage
-  useEffect(() => {
-    // In a production app, use expo-secure-store to persist the credential ID.
-    // For now we read from a simple key we'll set after registration.
-    const stored = null; // Placeholder: AsyncStorage.getItem('stylussafe_address')
-    if (stored) setWalletAddress(stored as string);
-  }, []);
-
   const handleCreateWallet = async () => {
-    setIsRegistering(true);
     try {
-      // expo-local-authentication + expo-passkeys would trigger FaceID here.
-      // For now we simulate a successful registration.
-      const mockAddress = '0x' + Math.random().toString(16).slice(2, 42).padEnd(40, '0');
-      setWalletAddress(mockAddress);
-      // AsyncStorage.setItem('stylussafe_address', mockAddress);
-    } finally {
-      setIsRegistering(false);
+      await register('MobileUser');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to register passkey. ' + String(e));
     }
   };
 
