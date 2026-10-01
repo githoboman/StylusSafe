@@ -9,11 +9,12 @@ export default function TradingPage() {
   const { createSessionKey } = useInvisibleWallet();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [status, setStatus] = useState<'idle' | 'authorizing' | 'success'>('idle');
+  const [duration, setDuration] = useState<number>(4);
 
   const handleAuthorize = async (pin: string) => {
     setStatus('authorizing');
     try {
-      await createSessionKey(4, pin);
+      await createSessionKey(duration, pin);
       setStatus('success');
     } catch (e) {
       console.error(e);
@@ -80,7 +81,11 @@ export default function TradingPage() {
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-text-primary">Session Expiry</label>
-                  <select defaultValue="4" className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors font-mono">
+                  <select 
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                    className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors font-mono"
+                  >
                     <option value="1">1 Hour</option>
                     <option value="4">4 Hours</option>
                     <option value="24">24 Hours</option>
