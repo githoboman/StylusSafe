@@ -127,10 +127,10 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4">
                 <button
                   onClick={() => setIsFundModalOpen(true)}
-                  className="h-14 px-4 flex-1 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  className="h-14 px-4 flex-1 min-w-[100px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
                   type="button"
                 >
                   <span className="material-symbols-outlined text-[20px]">qr_code</span>
@@ -138,7 +138,7 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => setIsSendModalOpen(true)}
-                  className="h-14 px-4 flex-1 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  className="h-14 px-4 flex-1 min-w-[100px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
                   type="button"
                 >
                   <span className="material-symbols-outlined text-[20px]">send</span>
@@ -150,7 +150,7 @@ export default function Dashboard() {
                     setIsSigningIn(false);
                     setIsSignModalOpen(true);
                   }}
-                  className="h-14 px-4 flex-[2] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  className="h-14 px-4 flex-[2] min-w-[180px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
                   type="button"
                 >
                   <span className="relative flex h-2 w-2">
