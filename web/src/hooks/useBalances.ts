@@ -9,9 +9,9 @@ const CHAIN_CONFIGS: Record<number, { rpc: string, usdc: `0x${string}` }> = {
   // Optimism
   10: { rpc: 'https://mainnet.optimism.io', usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
   // Polygon
-  137: { rpc: 'https://polygon-rpc.com', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+  137: { rpc: 'https://polygon.llamarpc.com', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
   // Ethereum
-  1: { rpc: 'https://eth.llamarpc.com', usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+  1: { rpc: 'https://cloudflare-eth.com', usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
 };
 
 const ERC20_ABI = [

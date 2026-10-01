@@ -7,7 +7,7 @@ import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 
 const TOKENS = [
-  { symbol: 'ETH', name: 'Ether', address: '0x4200000000000000000000000000000000000006' as `0x${string}`, decimals: 18, color: '#0284c7' },
+  { symbol: 'ETH', name: 'Ether', address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, color: '#0284c7' },
   { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA' },
 ];
 
@@ -26,11 +26,11 @@ export default function TransferPage() {
   const { address, executeCrossChainSwap, isPending } = useInvisibleWallet();
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
-  const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
+  const [selectedToken, setSelectedToken] = useState(TOKENS[1]); // Default source USDC
+  const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[0]); // Default dest ETH
   const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
-  const [selectedChain, setSelectedChain] = useState(CHAINS[1]);
+  const [selectedChain, setSelectedChain] = useState(CHAINS[0]); // Default dest chain same as source
   const [customChainId, setCustomChainId] = useState('');
-  const [customToToken, setCustomToToken] = useState('');
 
   const { ethBalance, usdcBalance } = useBalances(address, selectedSourceChain.id);
 
@@ -54,7 +54,7 @@ export default function TransferPage() {
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       if (!chainId) return;
-      const toToken = customToToken || selectedToken.address;
+      const toToken = selectedDestToken.address;
       const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${selectedToken.address}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
@@ -68,7 +68,7 @@ export default function TransferPage() {
     } finally {
       setFeeLoading(false);
     }
-  }, [amount, selectedToken, selectedSourceChain, selectedChain, customChainId, customToToken, address]);
+  }, [amount, selectedToken, selectedDestToken, selectedSourceChain, selectedChain, customChainId, address]);
 
   useEffect(() => {
     const timer = setTimeout(fetchLifiQuote, 600);
@@ -93,7 +93,7 @@ export default function TransferPage() {
     try {
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
-      const toToken = customToToken || selectedToken.address;
+      const toToken = selectedDestToken.address;
       const result = await executeCrossChainSwap(
         selectedSourceChain.id,
         chainId,
@@ -198,9 +198,9 @@ export default function TransferPage() {
               </div>
             </div>
 
-            {/* Token */}
+            {/* Source Asset */}
             <div className="flex flex-col gap-2">
-              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Asset</label>
+              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Source Asset</label>
               <div className="flex gap-2">
                 {TOKENS.map(t => (
                   <button
@@ -213,16 +213,6 @@ export default function TransferPage() {
                     {t.symbol}
                   </button>
                 ))}
-              </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
-                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
-                  <input
-                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
-                    placeholder="Custom Destination Token (Optional)"
-                    type="text"
-                    value={customToToken}
-                    onChange={(e) => setCustomToToken(e.target.value)}
-                  />
               </div>
             </div>
 
@@ -277,13 +267,13 @@ export default function TransferPage() {
               </div>
             </div>
 
-            {/* Chain */}
+            {/* Target Chain */}
             <div className="flex flex-col gap-2">
-              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Target Chain</label>
+              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Network</label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {CHAINS.map(c => (
                   <button
-                    key={c.id}
+                    key={'dest-' + c.id}
                     onClick={() => setSelectedChain(c)}
                     className={`flex items-center gap-2 px-3 h-10 rounded-[4px] border text-sm transition-all ${selectedChain.id === c.id ? 'text-text-primary' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                     style={selectedChain.id === c.id ? { borderColor: c.color + '80', backgroundColor: c.color + '18', color: c.color } : {}}
@@ -306,6 +296,24 @@ export default function TransferPage() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Destination Asset */}
+            <div className="flex flex-col gap-2">
+              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Asset</label>
+              <div className="flex gap-2">
+                {TOKENS.map(t => (
+                  <button
+                    key={'dest-' + t.symbol}
+                    onClick={() => setSelectedDestToken(t)}
+                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedDestToken.symbol === t.symbol ? 'border-accent-azure/50 bg-accent-azure/10 text-accent-azure' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                    type="button"
+                  >
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                    {t.symbol}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

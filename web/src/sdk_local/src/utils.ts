@@ -10,7 +10,7 @@ export function bufferToHex(input: Uint8Array | ArrayBuffer): string {
 }
 
 export function hexToUint8Array(hex: string): Uint8Array {
-    let cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+    const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
     if (cleanHex.length % 2 !== 0) throw new Error('Invalid hex string');
     const array = new Uint8Array(cleanHex.length / 2);
     for (let i = 0; i < cleanHex.length; i += 2) {
@@ -32,7 +32,7 @@ export async function sha256(data: Uint8Array): Promise<Uint8Array> {
 // ── PIN-Based Software Passkey Implementation (P-256) ─────────────────────────
 
 export async function deriveAesKey(pin: string): Promise<CryptoKey> {
-    let saltHex = localStorage.getItem('invisible_wallet_pin_salt');
+    const saltHex = localStorage.getItem('invisible_wallet_pin_salt');
     let salt: Uint8Array;
     if (saltHex) {
         salt = hexToUint8Array(saltHex);
