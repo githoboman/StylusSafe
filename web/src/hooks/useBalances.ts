@@ -22,11 +22,34 @@ const ERC20_ABI = [
     outputs: [{ name: 'balance', type: 'uint256' }],
     type: 'function',
   },
+  {
+    constant: true,
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', type: 'string' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', type: 'uint8' }],
+    type: 'function',
+  }
 ] as const;
+
+export type CustomTokenBalance = {
+  address: string;
+  symbol: string;
+  decimals: number;
+  balance: string;
+  chainId: number;
+};
 
 export function useBalances(walletAddress: string | null, chainId: number = 421614) {
   const [ethBalance, setEthBalance] = useState('0.00');
   const [usdcBalance, setUsdcBalance] = useState('0.00');
+  const [customTokens, setCustomTokens] = useState<CustomTokenBalance[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,8 +81,29 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         }).catch(() => 0n), // fallback if USDC doesn't exist on this chain
       ]);
 
+      const savedTokens = JSON.parse(localStorage.getItem('custom_tokens') || '[]') as { address: string, chainId: number }[];
+      const chainTokens = savedTokens.filter(t => t.chainId === chainId);
+
+      const customResults = await Promise.all(chainTokens.map(async (t) => {
+        try {
+          const [symbol, decimals, bal] = await Promise.all([
+            publicClient.readContract({ address: t.address as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }),
+            publicClient.readContract({ address: t.address as `0x${string}`, abi: ERC20_ABI, functionName: 'decimals' }),
+            publicClient.readContract({ address: t.address as `0x${string}`, abi: ERC20_ABI, functionName: 'balanceOf', args: [walletAddress as `0x${string}`] }),
+          ]);
+          return {
+            address: t.address,
+            symbol: symbol as string,
+            decimals: decimals as number,
+            balance: Number(formatUnits(bal as bigint, decimals as number)).toLocaleString(undefined, { maximumFractionDigits: 4 }),
+            chainId
+          };
+        } catch(e) { return null; }
+      }));
+
       setEthBalance(Number(formatEther(eth)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
       setUsdcBalance(Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
     } catch (err: any) {
       console.error('Failed to fetch balances:', err);
       setError(err.message || 'Failed to fetch balances');
@@ -75,5 +119,14 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
     return () => clearInterval(interval);
   }, [walletAddress, chainId]); 
 
-  return { ethBalance, usdcBalance, isFetching, error, refetch: fetchBalances };
+  const addCustomToken = (address: string) => {
+    const saved = JSON.parse(localStorage.getItem('custom_tokens') || '[]');
+    if (!saved.find((t: any) => t.address.toLowerCase() === address.toLowerCase() && t.chainId === chainId)) {
+      saved.push({ address, chainId });
+      localStorage.setItem('custom_tokens', JSON.stringify(saved));
+      fetchBalances();
+    }
+  };
+
+  return { ethBalance, usdcBalance, customTokens, isFetching, error, refetch: fetchBalances, addCustomToken };
 }

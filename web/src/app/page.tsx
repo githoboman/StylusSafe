@@ -18,8 +18,16 @@ export default function Dashboard() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
+  const [selectedChain, setSelectedChain] = useState(421614);
   const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, isFetching } = useBalances(address);
+  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
+
+  const handleImportToken = () => {
+    const addr = window.prompt('Enter token contract address (0x...):');
+    if (addr && addr.startsWith('0x')) {
+      addCustomToken(addr);
+    }
+  };
 
   // Calculate Net Worth
   const ethValue = parseFloat(ethBalance.replace(/,/g, '')) * 3000;
@@ -49,11 +57,24 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 bg-surface-container px-3 py-1.5 rounded-[4px] shrink-0 border border-border-whisper self-start md:self-auto">
-          <span className={`w-2 h-2 rounded-full ${address ? 'bg-accent-azure' : 'bg-error'}`}></span>
-          <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">
-            {address ? '3 of 5 Policy Active' : 'Unregistered'}
-          </span>
+        <div className="flex flex-col gap-2 self-start md:self-auto">
+          <div className="flex items-center gap-1.5 bg-surface-container px-3 py-1.5 rounded-[4px] border border-border-whisper">
+            <span className={`w-2 h-2 rounded-full ${address ? 'bg-accent-azure' : 'bg-error'}`}></span>
+            <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">
+              {address ? '3 of 5 Policy Active' : 'Unregistered'}
+            </span>
+          </div>
+          <select 
+            value={selectedChain} 
+            onChange={e => setSelectedChain(Number(e.target.value))}
+            className="bg-surface-container border border-border-whisper text-text-primary font-mono text-[11px] uppercase tracking-wider px-2 py-1 rounded-[4px] outline-none hover:border-accent-azure transition-colors"
+          >
+            <option value={421614}>Arbitrum Sepolia</option>
+            <option value={8453}>Base</option>
+            <option value={10}>Optimism</option>
+            <option value={137}>Polygon</option>
+            <option value={1}>Ethereum</option>
+          </select>
         </div>
       </div>
 
@@ -85,6 +106,18 @@ export default function Dashboard() {
                 <span className="w-3 h-3 rounded-[2px] bg-text-muted"></span>
                 <span className="font-mono text-base text-text-primary">{address ? usdcBalance : '0.00'} USDC</span>
               </div>
+              {customTokens.map(t => (
+                <div key={t.address} className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-[2px] border border-text-muted/30"></span>
+                  <span className="font-mono text-base text-text-primary" title={t.address}>{t.balance} {t.symbol}</span>
+                </div>
+              ))}
+              <button 
+                onClick={handleImportToken}
+                className="font-mono text-[11px] text-text-muted hover:text-text-primary uppercase tracking-wider underline underline-offset-2 ml-auto"
+              >
+                + Import Token
+              </button>
             </div>
           </div>
 
