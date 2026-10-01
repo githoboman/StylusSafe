@@ -101,12 +101,15 @@ type InvisibleWallet = {
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useInvisibleWallet(config: Partial<WalletConfig> = {}): InvisibleWallet {
+    // Determine Project ID (fallback to default if undefined)
+    const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+    
     const { 
         factoryAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`,
-        rpcUrl = process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_URL || 'https://rpc.zerodev.app/api/v2/bundler/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3', 
+        rpcUrl = process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_URL || `https://rpc.zerodev.app/api/v2/bundler/${projectId}`, 
         chainId = 421614, 
         initCodeHash = '0x0000000000000000000000000000000000000000' as `0x${string}`, 
-        paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || 'https://rpc.zerodev.app/api/v2/paymaster/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3' 
+        paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || `https://rpc.zerodev.app/api/v2/paymaster/${projectId}` 
     } = config;
 
     const [address, setAddress] = useState<string | null>(() => {
