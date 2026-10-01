@@ -62,14 +62,28 @@ export default function ActivityPage() {
   const [filter, setFilter] = useState<TxType | 'all'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const [localHistory, setLocalHistory] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+      const parsed = existing.map((tx: any) => ({
+        ...tx,
+        timestamp: new Date(tx.timestamp)
+      }));
+      setLocalHistory(parsed);
+    } catch(e) {}
+  }, []);
+
   const filtered = useMemo(() => {
-    const f = filter === 'all' ? TX_DATA : TX_DATA.filter(t => t.type === filter);
+    const combined = [...localHistory, ...TX_DATA];
+    const f = filter === 'all' ? combined : combined.filter(t => t.type === filter);
     return f.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [filter]);
+  }, [filter, localHistory]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
-  const allTypes = Array.from(new Set(TX_DATA.map(t => t.type)));
+  const allTypes = Array.from(new Set([...localHistory, ...TX_DATA].map(t => t.type)));
 
   return (
     <div className="p-4 md:p-10 w-full max-w-5xl mx-auto flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-400">

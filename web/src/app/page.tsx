@@ -7,12 +7,14 @@ import { SessionKeyCard } from '@/components/SessionKeyCard';
 import { SubscriptionCard } from '@/components/SubscriptionCard';
 import { IntentBatchCard } from '@/components/IntentBatchCard';
 import { FundWalletModal } from '@/components/FundWalletModal';
+import { SendModal } from '@/components/SendModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 
 export default function Dashboard() {
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
@@ -133,6 +135,14 @@ export default function Dashboard() {
                 >
                   <span className="material-symbols-outlined text-[20px]">qr_code</span>
                   Fund
+                </button>
+                <button
+                  onClick={() => setIsSendModalOpen(true)}
+                  className="h-14 px-4 flex-1 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[20px]">send</span>
+                  Send
                 </button>
                 <button
                   onClick={() => {
@@ -257,6 +267,16 @@ export default function Dashboard() {
             await signAuthEntry(dummyPayload, pin);
           }
         }}
+      />
+      <FundWalletModal 
+        isOpen={isFundModalOpen} 
+        onClose={() => setIsFundModalOpen(false)} 
+        address={address} 
+      />
+
+      <SendModal
+        isOpen={isSendModalOpen}
+        onClose={() => setIsSendModalOpen(false)}
       />
     </div>
   );

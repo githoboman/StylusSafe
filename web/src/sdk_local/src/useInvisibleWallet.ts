@@ -85,7 +85,8 @@ type InvisibleWallet = {
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
     login: () => Promise<void>;
     disconnect: () => void;
-    executeCrossChainSwap: (destChainId: number, tokenAddress: `0x${string}`, amount: bigint, recipient: `0x${string}`) => Promise<{ userOpHash: string } | null>;
+    executeCrossChainSwap: (destChainId: number, tokenAddress: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
+    sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number) => Promise<{ sessionKey: string } | null>;
     setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number) => Promise<boolean>;
     executeIntentBatch: (intents: any[]) => Promise<{ userOpHash: string } | null>;
@@ -498,13 +499,90 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         return bundlerJson.result as string; // userOpHash
     };
 
+    // ── sendTransaction (Standard ETH / ERC20) ────────────────────────────────
+
+    const sendTransaction = async (
+        tokenAddress: `0x${string}` | null,
+        amount: bigint,
+        recipient: `0x${string}`,
+        pin?: string
+    ): Promise<{ userOpHash: string } | null> => {
+        setIsPending(true);
+        setError(null);
+        try {
+            if (!address) throw new Error("Wallet not initialized.");
+            
+            let dest: `0x${string}`;
+            let value: bigint;
+            let func: `0x${string}`;
+
+            if (!tokenAddress) {
+                // Native ETH transfer
+                dest = recipient;
+                value = amount;
+                func = '0x';
+            } else {
+                // ERC20 transfer
+                dest = tokenAddress;
+                value = 0n;
+                func = encodeFunctionData({
+                    abi: [{
+                        constant: false,
+                        inputs: [
+                            { name: '_to', type: 'address' },
+                            { name: '_value', type: 'uint256' }
+                        ],
+                        name: 'transfer',
+                        outputs: [{ name: '', type: 'bool' }],
+                        type: 'function'
+                    }],
+                    functionName: 'transfer',
+                    args: [recipient, amount]
+                });
+            }
+
+            const walletCallData = encodeFunctionData({
+                abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'execute',
+                args: [dest, value, func]
+            });
+
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (userOpHash) {
+                try {
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+                    existing.unshift({
+                        id: Date.now().toString(),
+                        type: 'send',
+                        title: 'Send',
+                        subtitle: `To ${recipient.slice(0, 6)}...${recipient.slice(-4)}`,
+                        amount: tokenAddress ? 'Token Transfer' : `-${(Number(amount) / 1e18).toFixed(4)} ETH`,
+                        amountPositive: false,
+                        status: 'pending',
+                        timestamp: new Date().toISOString(),
+                        icon: 'north_east',
+                        txHash: userOpHash
+                    });
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                } catch (e) {}
+            }
+            return { userOpHash };
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
+            return null;
+        } finally {
+            setIsPending(false);
+        }
+    };
+
     // ── executeCrossChainSwap (ZeroDev + Across) ──────────────────────────────
 
     const executeCrossChainSwap = async (
         destChainId: number,
         tokenAddress: `0x${string}`,
         amount: bigint,
-        recipient: `0x${string}`
+        recipient: `0x${string}`,
+        pin?: string
     ): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
@@ -586,7 +664,25 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             // 5. Submit via shared UserOp helper
-            const userOpHash = await submitUserOp(walletCallData);
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (userOpHash) {
+                try {
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+                    existing.unshift({
+                        id: Date.now().toString(),
+                        type: 'swap',
+                        title: 'Cross-Chain Swap',
+                        subtitle: `Arbitrum Sepolia → Chain ${destChainId}`,
+                        amount: `-${(Number(amount) / 1e18).toFixed(4)} ETH`, // Approximation
+                        amountPositive: false,
+                        status: 'pending',
+                        timestamp: new Date().toISOString(),
+                        icon: 'swap_horiz',
+                        txHash: userOpHash
+                    });
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                } catch (e) {}
+            }
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
@@ -702,6 +798,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     return { 
         address, isPending, error, hasMounted,
         register, deploy, signAuthEntry, login, disconnect,
-        executeCrossChainSwap, createSessionKey, setupDCA, executeIntentBatch
+        sendTransaction, executeCrossChainSwap, createSessionKey, setupDCA, executeIntentBatch
     };
 }
