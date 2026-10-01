@@ -394,11 +394,17 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     const submitUserOp = async (
         callData: `0x${string}`,
-        pin?: string
+        pin?: string,
+        overrideChainId?: number
     ): Promise<string> => {
         if (!address) throw new Error('Wallet not initialized.');
 
-        const publicClient = createPublicClient({ chain: { id: chainId } as any, transport: http(rpcUrl) });
+        const activeChainId = overrideChainId || chainId;
+        const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+        const activeRpcUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/bundler/${projectId}?chainId=${overrideChainId}` : rpcUrl;
+        const activePaymasterUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/paymaster/${projectId}?chainId=${overrideChainId}` : paymasterUrl;
+
+        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(activeRpcUrl) });
 
         // Fetch current nonce from EntryPoint
         const ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
@@ -444,8 +450,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         };
 
         // Request paymaster sponsorship if a paymasterUrl is set
-        if (paymasterUrl) {
-            const pmResp = await fetch(paymasterUrl, {
+        if (activePaymasterUrl) {
+            const pmResp = await fetch(activePaymasterUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -503,7 +509,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         userOp.signature = encoded;
 
         // Submit to the bundler
-        const bundlerUrl = paymasterUrl || rpcUrl;
+        const bundlerUrl = activePaymasterUrl || activeRpcUrl;
         const bundlerResp = await fetch(bundlerUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -597,6 +603,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     // ── executeCrossChainSwap (ZeroDev + Li.Fi) ──────────────────────────────
 
     const executeCrossChainSwap = async (
+        sourceChainId: number,
         destChainId: number,
         fromToken: `0x${string}`,
         toToken: `0x${string}`,
@@ -611,7 +618,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             
             // 1. Fetch Li.Fi Quote
             const LIFI_API = 'https://li.quest/v1';
-            const quoteUrl = `${LIFI_API}/quote?fromChain=${chainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
+            const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
             
             const quoteResp = await fetch(quoteUrl);
             const quoteData = await quoteResp.json();
@@ -652,7 +659,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             // 5. Submit via shared UserOp helper
-            const userOpHash = await submitUserOp(walletCallData, pin);
+            const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
             if (userOpHash) {
                 try {
                     const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');

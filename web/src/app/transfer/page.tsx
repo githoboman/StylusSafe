@@ -12,6 +12,7 @@ const TOKENS = [
 ];
 
 const CHAINS = [
+  { name: 'Arbitrum Sepolia', id: 421614, color: '#12AAFF' },
   { name: 'Base', id: 8453, color: '#0052FF' },
   { name: 'Optimism', id: 10, color: '#FF0420' },
   { name: 'Polygon', id: 137, color: '#8247E5' },
@@ -23,18 +24,20 @@ type AcrossFee = { relayFeeTotal: string; estimatedFillTimeSec: number } | null;
 
 export default function TransferPage() {
   const { address, executeCrossChainSwap, isPending } = useInvisibleWallet();
-  const { ethBalance, usdcBalance } = useBalances(address);
-  
+  const [amount, setAmount] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
+  const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
+  const [selectedChain, setSelectedChain] = useState(CHAINS[1]);
+  const [customChainId, setCustomChainId] = useState('');
+  const [customToToken, setCustomToToken] = useState('');
+
+  const { ethBalance, usdcBalance } = useBalances(address, selectedSourceChain.id);
+
   const getBalanceForToken = () => {
     return selectedToken.symbol === 'USDC' ? usdcBalance : ethBalance;
   };
 
-  const [amount, setAmount] = useState('');
-  const [recipient, setRecipient] = useState('');
-  const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
-  const [selectedChain, setSelectedChain] = useState(CHAINS[0]);
-  const [customChainId, setCustomChainId] = useState('');
-  const [customToToken, setCustomToToken] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [acrossFee, setAcrossFee] = useState<AcrossFee>(null);
   const [feeLoading, setFeeLoading] = useState(false);
@@ -52,7 +55,7 @@ export default function TransferPage() {
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       if (!chainId) return;
       const toToken = customToToken || selectedToken.address;
-      const url = `https://li.quest/v1/quote?fromChain=421614&toChain=${chainId}&fromToken=${selectedToken.address}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
+      const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${selectedToken.address}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
       const data = await resp.json();
@@ -65,7 +68,7 @@ export default function TransferPage() {
     } finally {
       setFeeLoading(false);
     }
-  }, [amount, selectedToken, selectedChain, customChainId, customToToken, address]);
+  }, [amount, selectedToken, selectedSourceChain, selectedChain, customChainId, customToToken, address]);
 
   useEffect(() => {
     const timer = setTimeout(fetchLifiQuote, 600);
@@ -92,6 +95,7 @@ export default function TransferPage() {
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       const toToken = customToToken || selectedToken.address;
       const result = await executeCrossChainSwap(
+        selectedSourceChain.id,
         chainId,
         selectedToken.address,
         toToken as `0x${string}`,
@@ -174,6 +178,25 @@ export default function TransferPage() {
 
           {/* Form */}
           <div className="bg-surface-zinc rounded-[24px] p-6 border border-border-whisper flex flex-col gap-5">
+
+            {/* Source Chain */}
+            <div className="flex flex-col gap-2">
+              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Source Network</label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {CHAINS.map(c => (
+                  <button
+                    key={'src-' + c.id}
+                    onClick={() => setSelectedSourceChain(c)}
+                    className={`flex items-center gap-2 px-3 h-10 rounded-[4px] border text-sm transition-all ${selectedSourceChain.id === c.id ? 'text-text-primary' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                    style={selectedSourceChain.id === c.id ? { borderColor: c.color + '80', backgroundColor: c.color + '18', color: c.color } : {}}
+                    type="button"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                    <span className="text-xs font-mono truncate">{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Token */}
             <div className="flex flex-col gap-2">
