@@ -6,11 +6,13 @@ import { SignModal } from '@/components/SignModal';
 import { SessionKeyCard } from '@/components/SessionKeyCard';
 import { SubscriptionCard } from '@/components/SubscriptionCard';
 import { IntentBatchCard } from '@/components/IntentBatchCard';
+import { FundWalletModal } from '@/components/FundWalletModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 
 export default function Dashboard() {
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
+  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
@@ -114,22 +116,32 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => {
-                  setIsRegistering(false);
-                  setIsSigningIn(false);
-                  setIsSignModalOpen(true);
-                }}
-                className="h-14 px-6 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-3 transition-all text-text-primary font-medium text-base border border-border-whisper shadow-sm"
-                type="button"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-azure opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-azure"></span>
-                </span>
-                Sign Pending
-                <span className="font-mono text-xs text-white bg-accent-azure px-2 py-0.5 rounded-[4px] ml-1">2</span>
-              </button>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsFundModalOpen(true)}
+                  className="h-14 px-4 flex-1 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[20px]">qr_code</span>
+                  Fund
+                </button>
+                <button
+                  onClick={() => {
+                    setIsRegistering(false);
+                    setIsSigningIn(false);
+                    setIsSignModalOpen(true);
+                  }}
+                  className="h-14 px-4 flex-[2] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
+                  type="button"
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-azure opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-azure"></span>
+                  </span>
+                  Sign Pending
+                  <span className="font-mono text-xs text-white bg-accent-azure px-2 py-0.5 rounded-[4px] ml-1">2</span>
+                </button>
+              </div>
             )}
           </div>
 
