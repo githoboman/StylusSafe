@@ -21,6 +21,7 @@ import {
     getRawPublicKeyBytes,
     sha256
 } from './utils';
+import { createPublicClient as _createPublicClient, http as _http } from 'viem';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,9 +63,10 @@ export type RegisterResult = {
     walletAddress: string;
 };
 
+
 /** Result returned by a successful deploy() call. */
 export type DeployResult = {
-    /** The on-chain contract address of the deployed wallet ("C..."). */
+    /** The on-chain contract address of the deployed wallet. */
     walletAddress: string;
     /**
      * True if the wallet was already deployed before this call.
@@ -74,55 +76,21 @@ export type DeployResult = {
 };
 
 type InvisibleWallet = {
-    /** EVM contract address of the deployed wallet, or null if not yet registered. */
     address: string | null;
     isPending: boolean;
     error: string | null;
-    /** Create a new passkey credential and compute the deterministic wallet address. */
+    hasMounted: boolean;
     register: (username: string, pin?: string) => Promise<RegisterResult>;
-    /**
-     * Deploy the user's wallet contract on-chain via the factory.
-     *
-     * @param relayerAccount Optional external account/wallet used to pay fees.
-     * @param publicKeyBytes Optional override for the P-256 public key. Defaults to
-     *                       the key stored in localStorage by register().
-     * @returns The deployed wallet's contract address and whether it was already live.
-     */
     deploy: (relayerAccount?: any, publicKeyBytes?: Uint8Array) => Promise<DeployResult>;
-    /**
-     * Sign an ERC-4337 UserOperation hash using the stored passkey.
-     *
-     * @param signaturePayload  The 32-byte hash from the UserOperation.
-     * @param pin               (Optional) The 6-digit PIN used to decrypt the private key for web. If omitted, uses hardware WebAuthn (for mobile).
-     */
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
-    /** Restore an existing wallet session from localStorage. */
     login: () => Promise<void>;
-    
-    /**
-     * Executes a gasless cross-chain swap using ZeroDev Paymaster and Across Protocol.
-     * 
-     * @param destChainId The destination chain ID (e.g. Base, Optimism)
-     * @param tokenAddress The ERC20 token to swap/bridge
-     * @param amount The amount of tokens to send
-     * @param recipient The destination address receiving the funds
-     */
-    executeCrossChainSwap: (
-        destChainId: number,
-        tokenAddress: `0x${string}`,
-        amount: bigint,
-        recipient: `0x${string}`
-    ) => Promise<{ userOpHash: string } | null>;
-
-    /** Creates a temporary session key in the browser for 1-click trading */
+    disconnect: () => void;
+    executeCrossChainSwap: (destChainId: number, tokenAddress: `0x${string}`, amount: bigint, recipient: `0x${string}`) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number) => Promise<{ sessionKey: string } | null>;
-
-    /** Sets up an automated DCA schedule (Pull Payment) */
     setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number) => Promise<boolean>;
-
-    /** Executes a batch of intents atomically across chains */
     executeIntentBatch: (intents: any[]) => Promise<{ userOpHash: string } | null>;
 };
+
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -140,11 +108,21 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || 'https://rpc.zerodev.app/api/v2/paymaster/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3' 
     } = config;
 
-    const [address, setAddress] = useState<string | null>(null);
+    const [address, setAddress] = useState<string | null>(() => {
+        // Lazy initializer: runs once synchronously on first render (client-side only).
+        // This eliminates the flash where returning users see "Create Wallet" for one frame.
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('invisible_wallet_address') ?? null;
+        }
+        return null;
+    });
     const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
 
     useEffect(() => {
+        setHasMounted(true);
+        // Re-read on mount in case storage was updated by another tab.
         const stored = localStorage.getItem('invisible_wallet_address');
         if (stored) setAddress(stored);
     }, []);
@@ -200,7 +178,36 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 localStorage.setItem('invisible_wallet_mode', 'webauthn');
             }
             
-            const walletAddress = computeWalletAddress(factoryAddress, publicKeyBytes, initCodeHash);
+            // ── Resolve the canonical wallet address from the factory ──────────
+            // computeWalletAddress() needs the correct initCodeHash from the deployed
+            // factory, which we don't have locally. Instead, call factory.getAddress()
+            // as a view function — it's free (no gas) and returns the CREATE2 result.
+            let walletAddress: string;
+            try {
+                const RPC = 'https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e';
+                const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
+                    ? factoryAddress
+                    : (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) ||
+                      '0xe98c353fF883445995021182D918E3577365b284';
+
+                const pc = _createPublicClient({ transport: _http(RPC) });
+                walletAddress = await pc.readContract({
+                    address: FACTORY,
+                    abi: [{
+                        type: 'function',
+                        name: 'getAddress',
+                        inputs: [{ name: 'publicKey', type: 'bytes' }],
+                        outputs: [{ name: 'predicted', type: 'address' }],
+                        stateMutability: 'view'
+                    }],
+                    functionName: 'getAddress',
+                    args: [`0x${publicKeyHex.replace(/^0x/, '')}`]
+                }) as string;
+            } catch (_e) {
+                // Fallback: derive locally if RPC fails (e.g. offline demo)
+                walletAddress = computeWalletAddress(factoryAddress, publicKeyBytes, initCodeHash);
+            }
+
             localStorage.setItem('invisible_wallet_address', walletAddress);
             localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
             setAddress(walletAddress);
@@ -265,6 +272,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         } else {
             setError('No wallet found. Please register first.');
         }
+    };
+
+    // ── disconnect ────────────────────────────────────────────────────────────
+
+    const disconnect = () => {
+        localStorage.removeItem('invisible_wallet_address');
+        localStorage.removeItem('invisible_wallet_public_key');
+        localStorage.removeItem('invisible_wallet_key_id');
+        localStorage.removeItem('invisible_wallet_encrypted_key');
+        localStorage.removeItem('invisible_wallet_key_iv');
+        localStorage.removeItem('invisible_wallet_mode');
+        setAddress(null);
     };
 
     // ── signAuthEntry ─────────────────────────────────────────────────────────────
@@ -681,8 +700,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     };
 
     return { 
-        address, isPending, error, 
-        register, deploy, signAuthEntry, login, executeCrossChainSwap,
-        createSessionKey, setupDCA, executeIntentBatch
+        address, isPending, error, hasMounted,
+        register, deploy, signAuthEntry, login, disconnect,
+        executeCrossChainSwap, createSessionKey, setupDCA, executeIntentBatch
     };
 }

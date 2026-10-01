@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
-  const { address, register, signAuthEntry } = useInvisibleWallet();
+  const { address, register, signAuthEntry, disconnect } = useInvisibleWallet();
   const { ethBalance, usdcBalance, isFetching } = useBalances(address);
 
   // Approximate Net Worth for demo purposes
@@ -32,7 +32,16 @@ export default function Dashboard() {
           <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-2">Portfolio Overview</h1>
           <p className="text-text-muted">
             {address ? (
-              <span className="font-mono text-sm break-all">Wallet: {address}</span>
+              <span className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-sm break-all">Wallet: {address}</span>
+                <button
+                  onClick={disconnect}
+                  title="Disconnect wallet"
+                  className="font-mono text-[11px] text-text-muted hover:text-error transition-colors uppercase tracking-wider"
+                >
+                  [disconnect]
+                </button>
+              </span>
             ) : (
               'Manage your cross-chain assets securely without seed phrases.'
             )}
