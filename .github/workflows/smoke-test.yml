@@ -1,0 +1,37 @@
+name: End-to-End Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'contracts/scripts/smoke_test.mjs'
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: contracts
+        run: npm install ethers
+
+      - name: Run Smoke Test
+        working-directory: contracts
+        run: node scripts/smoke_test.mjs
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "## Smoke Test Successful ✅" >> $GITHUB_STEP_SUMMARY
+          echo "The Smart Contract Factory successfully deployed a StylusSafe instance and verified its initialized state on-chain." >> $GITHUB_STEP_SUMMARY
