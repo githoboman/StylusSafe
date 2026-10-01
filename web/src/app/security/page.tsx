@@ -82,7 +82,7 @@ export default function SecurityPage() {
         </div>
         <button
           onClick={() => { setAddingKey(true); setNewKeyName(''); }}
-          className="h-10 px-5 bg-accent-azure hover:bg-accent-azure/90 active:translate-y-[1px] text-white rounded-[4px] font-medium text-sm transition-all flex items-center gap-2 self-start md:self-auto"
+          className="h-10 px-5 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] text-white rounded-[4px] font-medium text-sm transition-all flex items-center gap-2 self-start md:self-auto"
           type="button"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
@@ -92,9 +92,9 @@ export default function SecurityPage() {
 
       {/* Policy Success Banner */}
       {policySubmitted && (
-        <div className="flex items-center gap-3 bg-accent-azure/10 border border-accent-azure/30 rounded-[4px] p-4 animate-in zoom-in duration-300">
-          <span className="material-symbols-outlined text-accent-azure">check_circle</span>
-          <span className="text-sm text-accent-azure font-medium">Approval policy updated. Proposal sent to {threshold} existing signers for confirmation.</span>
+        <div className="flex items-center gap-3 bg-accent-orange/10 border border-accent-orange/30 rounded-[4px] p-4 animate-in zoom-in duration-300">
+          <span className="material-symbols-outlined text-accent-orange">check_circle</span>
+          <span className="text-sm text-accent-orange font-medium">Approval policy updated. Proposal sent to {threshold} existing signers for confirmation.</span>
         </div>
       )}
 
@@ -130,7 +130,7 @@ export default function SecurityPage() {
               className="w-full accent-[#0284c7]"
             />
             <div className="flex gap-3">
-              <button onClick={handlePolicySave} className="h-10 px-5 bg-accent-azure hover:bg-accent-azure/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">Save Policy</button>
+              <button onClick={handlePolicySave} className="h-10 px-5 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">Save Policy</button>
               <button onClick={() => setEditingPolicy(false)} className="h-10 px-5 bg-surface-container hover:bg-surface-container-high text-text-primary rounded-[4px] text-sm border border-border-whisper transition-all" type="button">Cancel</button>
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function SecurityPage() {
 
       {/* Add Signer Form */}
       {addingKey && (
-        <div className="bg-surface-zinc rounded-[24px] p-6 border border-accent-azure/30 animate-in slide-in-from-top-4 duration-300 flex flex-col gap-4">
+        <div className="bg-surface-zinc rounded-[24px] p-6 border border-accent-orange/30 animate-in slide-in-from-top-4 duration-300 flex flex-col gap-4">
           <span className="font-medium text-text-primary">Register New Passkey Signer</span>
           <input
             autoFocus
@@ -147,11 +147,11 @@ export default function SecurityPage() {
             onChange={e => setNewKeyName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddKey()}
             placeholder="e.g. Personal iPad, Security Key 2"
-            className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary placeholder:text-text-muted outline-none focus:border-accent-azure transition-colors"
+            className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary placeholder:text-text-muted outline-none focus:border-accent-orange transition-colors"
           />
           <p className="text-xs text-text-muted">This will trigger a WebAuthn credential ceremony on the target device. The proposal requires approval from {threshold} existing signer(s) before becoming active.</p>
           <div className="flex gap-3">
-            <button onClick={handleAddKey} className="h-10 px-5 bg-accent-azure hover:bg-accent-azure/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">Register Device</button>
+            <button onClick={handleAddKey} className="h-10 px-5 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">Register Device</button>
             <button onClick={() => setAddingKey(false)} className="h-10 px-5 bg-surface-container hover:bg-surface-container-high text-text-primary rounded-[4px] text-sm border border-border-whisper transition-all" type="button">Cancel</button>
           </div>
         </div>
@@ -161,22 +161,22 @@ export default function SecurityPage() {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between px-1">
           <span className="font-mono text-xs text-text-muted uppercase tracking-wider">Authorized Signers</span>
-          <span className="font-mono text-xs text-accent-azure bg-accent-azure/10 px-2 py-0.5 rounded-[4px]">{signers.length} Total</span>
+          <span className="font-mono text-xs text-accent-orange bg-accent-orange/10 px-2 py-0.5 rounded-[4px]">{signers.length} Total</span>
         </div>
         <div className="flex flex-col gap-3">
           {signers.map((signer) => (
             <div key={signer.id} className="bg-surface-zinc rounded-[24px] p-5 border border-border-whisper flex items-center justify-between transition-all">
               <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${signer.active ? 'bg-accent-azure/10 border border-accent-azure/20' : 'bg-surface-container border border-border-whisper'}`}>
-                  <span className={`material-symbols-outlined text-[20px] ${signer.active ? 'text-accent-azure' : 'text-text-muted'}`}>{signer.icon}</span>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${signer.active ? 'bg-accent-orange/10 border border-accent-orange/20' : 'bg-surface-container border border-border-whisper'}`}>
+                  <span className={`material-symbols-outlined text-[20px] ${signer.active ? 'text-accent-orange' : 'text-text-muted'}`}>{signer.icon}</span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-text-primary font-medium flex items-center gap-2 flex-wrap">
                     {signer.name}
-                    <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-[4px] font-mono ${signer.type === 'hardware' ? 'bg-text-muted/10 text-text-muted' : 'bg-accent-azure/10 text-accent-azure'}`}>
+                    <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded-[4px] font-mono ${signer.type === 'hardware' ? 'bg-text-muted/10 text-text-muted' : 'bg-accent-orange/10 text-accent-orange'}`}>
                       {signer.type === 'hardware' ? 'Hardware' : 'Passkey'}
                     </span>
-                    {signer.active && <span className="flex items-center gap-1 text-[10px] text-accent-azure font-mono"><span className="w-1.5 h-1.5 rounded-full bg-accent-azure animate-pulse"></span>This Device</span>}
+                    {signer.active && <span className="flex items-center gap-1 text-[10px] text-accent-orange font-mono"><span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>This Device</span>}
                   </span>
                   <span className="font-mono text-xs text-text-muted mt-1">{signer.date}</span>
                 </div>
@@ -216,8 +216,8 @@ export default function SecurityPage() {
           </div>
           <div className="flex items-center gap-3">
             {sessionActive && (
-              <span className="font-mono text-xs text-accent-azure bg-accent-azure/10 px-2 py-1 rounded-[4px] flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-azure animate-pulse"></span>
+              <span className="font-mono text-xs text-accent-orange bg-accent-orange/10 px-2 py-1 rounded-[4px] flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>
                 Active
               </span>
             )}
@@ -230,7 +230,7 @@ export default function SecurityPage() {
                 Revoke
               </button>
             ) : (
-              <Link href="/trading" className="h-9 px-4 text-sm text-accent-azure border border-accent-azure/30 rounded-[4px] flex items-center hover:bg-accent-azure/10 transition-colors">
+              <Link href="/trading" className="h-9 px-4 text-sm text-accent-orange border border-accent-orange/30 rounded-[4px] flex items-center hover:bg-accent-orange/10 transition-colors">
                 Create Key
               </Link>
             )}
@@ -253,7 +253,7 @@ export default function SecurityPage() {
 
       {/* Info */}
       <div className="bg-surface-container/40 rounded-[4px] p-5 border border-border-whisper flex items-start gap-3">
-        <span className="material-symbols-outlined text-accent-azure text-[20px] shrink-0">info</span>
+        <span className="material-symbols-outlined text-accent-orange text-[20px] shrink-0">info</span>
         <p className="text-sm text-text-muted leading-relaxed">
           Adding or removing a signer creates an on-chain governance proposal. It requires approval from <strong className="text-text-primary">{threshold}</strong> existing signers before taking effect. All operations are recorded immutably on Arbitrum Stylus.
         </p>

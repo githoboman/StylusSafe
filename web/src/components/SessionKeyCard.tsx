@@ -4,11 +4,11 @@ import Link from 'next/link';
 
 export function SessionKeyCard() {
   return (
-    <div className="bg-surface-zinc rounded-[24px] p-5 shadow-sm border border-border-whisper space-y-4 hover:border-accent-azure/30 transition-colors group">
+    <div className="bg-surface-zinc rounded-[24px] p-5 shadow-sm border border-border-whisper space-y-4 hover:border-accent-orange/30 transition-colors group">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-accent-azure text-[18px]">key</span>
+            <span className="material-symbols-outlined text-accent-orange text-[18px]">key</span>
           </div>
           <div>
             <h3 className="text-sm font-semibold text-text-primary tracking-tight">1-Click Trading</h3>
@@ -35,7 +35,7 @@ export function SessionKeyCard() {
 
       <Link
         href="/trading"
-        className="w-full h-11 bg-surface-container hover:bg-surface-container-high border border-border-whisper group-hover:border-accent-azure/50 active:scale-[0.98] transition-all rounded-[4px] flex items-center justify-center gap-2 font-medium text-sm text-text-primary"
+        className="w-full h-11 bg-surface-container hover:bg-surface-container-high border border-border-whisper group-hover:border-accent-orange/50 active:scale-[0.98] transition-all rounded-[4px] flex items-center justify-center gap-2 font-medium text-sm text-text-primary"
       >
         <span className="material-symbols-outlined text-[16px]">open_in_new</span>
         Manage Session Key

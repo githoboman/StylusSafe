@@ -27,7 +27,7 @@ const TYPE_LABELS: Record<TxType, string> = {
 };
 
 const STATUS_CONFIG: Record<TxStatus, { color: string; label: string }> = {
-  executed: { color: 'text-accent-azure', label: 'Executed' },
+  executed: { color: 'text-accent-orange', label: 'Executed' },
   pending:  { color: 'text-yellow-400', label: 'Pending' },
   failed:   { color: 'text-red-400', label: 'Failed' },
 };
@@ -96,7 +96,7 @@ export default function ActivityPage() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setFilter('all')}
-          className={`h-8 px-4 rounded-[4px] text-xs font-mono uppercase tracking-wider transition-colors border ${filter === 'all' ? 'bg-accent-azure text-white border-accent-azure' : 'bg-surface-container text-text-muted border-border-whisper hover:text-text-primary hover:border-text-muted/30'}`}
+          className={`h-8 px-4 rounded-[4px] text-xs font-mono uppercase tracking-wider transition-colors border ${filter === 'all' ? 'bg-accent-orange text-white border-accent-orange' : 'bg-surface-container text-text-muted border-border-whisper hover:text-text-primary hover:border-text-muted/30'}`}
           type="button"
         >
           All
@@ -105,7 +105,7 @@ export default function ActivityPage() {
           <button
             key={type}
             onClick={() => setFilter(type)}
-            className={`h-8 px-4 rounded-[4px] text-xs font-mono uppercase tracking-wider transition-colors border ${filter === type ? 'bg-accent-azure text-white border-accent-azure' : 'bg-surface-container text-text-muted border-border-whisper hover:text-text-primary hover:border-text-muted/30'}`}
+            className={`h-8 px-4 rounded-[4px] text-xs font-mono uppercase tracking-wider transition-colors border ${filter === type ? 'bg-accent-orange text-white border-accent-orange' : 'bg-surface-container text-text-muted border-border-whisper hover:text-text-primary hover:border-text-muted/30'}`}
             type="button"
           >
             {TYPE_LABELS[type]}
@@ -145,7 +145,7 @@ export default function ActivityPage() {
                         onClick={() => setExpandedId(isExpanded ? null : tx.id)}
                       >
                         {/* Icon */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-accent-azure ${tx.status === 'failed' ? 'bg-red-400/10 text-red-400' : tx.amountPositive ? 'bg-green-500/10 text-green-500' : 'bg-accent-azure/10'}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-accent-orange ${tx.status === 'failed' ? 'bg-red-400/10 text-red-400' : tx.amountPositive ? 'bg-green-500/10 text-green-500' : 'bg-accent-orange/10'}`}>
                           <span className="material-symbols-outlined text-[20px]">{tx.icon}</span>
                         </div>
 
@@ -164,7 +164,7 @@ export default function ActivityPage() {
                           )}
                           <span className={`font-mono text-xs mt-1 flex items-center gap-1 ${statusCfg.color}`}>
                             {tx.status === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />}
-                            {tx.status === 'executed' && <span className="w-1.5 h-1.5 rounded-full bg-accent-azure" />}
+                            {tx.status === 'executed' && <span className="w-1.5 h-1.5 rounded-full bg-accent-orange" />}
                             {tx.status === 'failed' && <span className="w-1.5 h-1.5 rounded-full bg-red-400" />}
                             {statusCfg.label}
                           </span>
@@ -192,7 +192,7 @@ export default function ActivityPage() {
                                   href={`https://sepolia.arbiscan.io/tx/${tx.txHash}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-sm text-accent-azure font-mono hover:underline flex items-center gap-1"
+                                  className="text-sm text-accent-orange font-mono hover:underline flex items-center gap-1"
                                 >
                                   {tx.txHash}
                                   <span className="material-symbols-outlined text-[14px]">open_in_new</span>

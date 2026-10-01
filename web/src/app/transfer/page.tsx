@@ -140,7 +140,7 @@ export default function TransferPage() {
         </div>
         <div className="flex flex-col items-center gap-6 py-12 animate-in zoom-in duration-500 delay-100">
           <div className="w-20 h-20 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center">
-            <span className="material-symbols-outlined text-[40px] text-accent-azure">check_circle</span>
+            <span className="material-symbols-outlined text-[40px] text-accent-orange">check_circle</span>
           </div>
           <div className="text-center">
             <h2 className="text-2xl font-bold text-text-primary mb-2">Transfer Submitted</h2>
@@ -149,11 +149,11 @@ export default function TransferPage() {
           {txHash && (
             <div className="bg-surface-zinc border border-border-whisper rounded-[4px] px-5 py-3 flex items-center gap-3">
               <span className="font-mono text-xs text-text-muted">UserOp Hash:</span>
-              <span className="font-mono text-xs text-accent-azure truncate max-w-[200px]">{txHash.slice(0, 20)}…</span>
+              <span className="font-mono text-xs text-accent-orange truncate max-w-[200px]">{txHash.slice(0, 20)}…</span>
             </div>
           )}
           <div className="flex gap-3 mt-2">
-            <button onClick={() => setStatus('idle')} className="h-10 px-6 bg-accent-azure hover:bg-accent-azure/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">New Transfer</button>
+            <button onClick={() => setStatus('idle')} className="h-10 px-6 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-[4px] text-sm font-medium transition-all" type="button">New Transfer</button>
             <Link href="/activity" className="h-10 px-6 bg-surface-container hover:bg-surface-container-high text-text-primary rounded-[4px] text-sm font-medium transition-all border border-border-whisper flex items-center">View Activity</Link>
           </div>
         </div>
@@ -215,7 +215,7 @@ export default function TransferPage() {
                   <button
                     key={t.symbol}
                     onClick={() => setSelectedToken(t)}
-                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-azure/50 bg-accent-azure/10 text-accent-azure' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                     type="button"
                   >
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
@@ -223,7 +223,7 @@ export default function TransferPage() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-orange transition-colors">
                   <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
                   <input
                     className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
@@ -242,14 +242,14 @@ export default function TransferPage() {
                 {address && (
                   <button
                     onClick={() => setAmount(getBalanceForToken())}
-                    className="font-mono text-[10px] text-accent-azure uppercase tracking-wider bg-accent-azure/10 px-2 py-0.5 rounded-[4px]"
+                    className="font-mono text-[10px] text-accent-orange uppercase tracking-wider bg-accent-orange/10 px-2 py-0.5 rounded-[4px]"
                     type="button"
                   >
                     Max: {getBalanceForToken()}
                   </button>
                 )}
               </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-orange transition-colors">
                 <input
                   className="flex-1 bg-transparent h-16 text-3xl text-text-primary font-semibold outline-none placeholder:text-text-muted/30"
                   placeholder="0.00"
@@ -265,7 +265,7 @@ export default function TransferPage() {
             {/* Recipient */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Address</label>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-orange transition-colors">
                 <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">wallet</span>
                 <input
                   className="flex-1 bg-transparent h-14 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
@@ -275,7 +275,7 @@ export default function TransferPage() {
                   onChange={(e) => setRecipient(e.target.value)}
                 />
                 <button
-                  className="text-accent-azure text-xs font-medium uppercase tracking-wider"
+                  className="text-accent-orange text-xs font-medium uppercase tracking-wider"
                   type="button"
                   onClick={async () => {
                     try { setRecipient(await navigator.clipboard.readText()); } catch {}
@@ -304,7 +304,7 @@ export default function TransferPage() {
                 ))}
               </div>
               {selectedChain.id === -1 && (
-                <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+                <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-orange transition-colors">
                   <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">account_tree</span>
                   <input
                     className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
@@ -325,7 +325,7 @@ export default function TransferPage() {
                   <button
                     key={'dest-' + t.symbol}
                     onClick={() => setSelectedDestToken(t)}
-                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedDestToken.symbol === t.symbol ? 'border-accent-azure/50 bg-accent-azure/10 text-accent-azure' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedDestToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                     type="button"
                   >
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
@@ -333,7 +333,7 @@ export default function TransferPage() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-orange transition-colors">
                   <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
                   <input
                     className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
@@ -354,14 +354,14 @@ export default function TransferPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-text-muted">Network Fee</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[14px] text-accent-azure">bolt</span>
-                    <span className="font-mono text-xs text-accent-azure font-medium">Sponsored</span>
+                    <span className="material-symbols-outlined text-[14px] text-accent-orange">bolt</span>
+                    <span className="font-mono text-xs text-accent-orange font-medium">Sponsored</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-text-muted">Relay Fee (Across)</span>
                   <div className="flex items-center gap-1.5">
-                    {feeLoading && <span className="w-3 h-3 border border-accent-azure border-t-transparent rounded-full animate-spin" />}
+                    {feeLoading && <span className="w-3 h-3 border border-accent-orange border-t-transparent rounded-full animate-spin" />}
                     <span className="font-mono text-xs text-text-primary">{relayFeeDisplay()}</span>
                   </div>
                 </div>
@@ -390,7 +390,7 @@ export default function TransferPage() {
             )}
 
             <button
-              className="w-full h-14 bg-accent-azure hover:bg-accent-azure/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2"
+              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2"
               type="button"
               onClick={() => setIsModalOpen(true)}
               disabled={!amount || !recipient || isPending || !address}

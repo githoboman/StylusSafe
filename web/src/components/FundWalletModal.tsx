@@ -57,7 +57,7 @@ export function FundWalletModal({ isOpen, onClose, address }: { isOpen: boolean,
             href="https://www.alchemy.com/faucets/arbitrum-sepolia" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="w-full h-12 flex items-center justify-center gap-2 bg-accent-azure hover:bg-accent-azure/90 text-white font-medium rounded-[4px] transition-colors"
+            className="w-full h-12 flex items-center justify-center gap-2 bg-accent-orange hover:bg-accent-orange/90 text-white font-medium rounded-[4px] transition-colors"
           >
             Get Testnet ETH <span className="material-symbols-outlined text-[18px]">open_in_new</span>
           </a>

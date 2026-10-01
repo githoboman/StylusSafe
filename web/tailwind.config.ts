@@ -10,20 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        "background-ink": "#18181b",
-        "surface-zinc": "#27272a",
-        "surface-container": "#1f1f22",
-        "surface-container-low": "#1b1b1e",
-        "surface-container-high": "#2a2a2d",
-        "surface-container-highest": "#353438",
-        "text-primary": "#f4f4f5",
-        "text-muted": "#71717a",
-        "accent-azure": "#0284c7",
-        "primary": "#93ccff",
-        "primary-container": "#3198dc",
-        "secondary": "#c6c5cf",
-        "tertiary": "#ffb875",
-        "error": "#ffb4ab",
+        "background-ink": "#000000", // Pitch black
+        "surface-zinc": "#0A0A0A", // Almost black
+        "surface-container": "#111111", // Very dark grey
+        "surface-container-low": "#080808",
+        "surface-container-high": "#1C1C1C",
+        "surface-container-highest": "#262626",
+        "text-primary": "#FFFFFF", // Pure white
+        "text-muted": "#A1A1AA", // Muted light grey
+        "accent-orange": "#FF4500", // Reddish orange
+        "primary": "#FF5722",
+        "primary-container": "#E64A19",
+        "secondary": "#E4E4E7",
+        "tertiary": "#FFB875",
+        "error": "#FF4C4C",
       },
       fontFamily: {
         sans: ["Geist", "sans-serif"],

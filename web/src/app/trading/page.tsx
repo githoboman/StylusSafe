@@ -42,7 +42,7 @@ export default function TradingPage() {
         {status === 'success' ? (
           <div className="flex flex-col items-center gap-6 animate-in zoom-in duration-500 delay-150">
             <div className="w-24 h-24 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center text-text-primary">
-              <span className="material-symbols-outlined text-[48px] text-accent-azure">check_circle</span>
+              <span className="material-symbols-outlined text-[48px] text-accent-orange">check_circle</span>
             </div>
             <div className="text-center">
               <h2 className="text-2xl font-bold text-text-primary mb-2">Session Key Issued</h2>
@@ -59,7 +59,7 @@ export default function TradingPage() {
               <div className="space-y-5">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-text-primary">Target Contract</label>
-                  <select className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors">
+                  <select className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-orange transition-colors">
                     <option value="uniswap">Uniswap V3 Router</option>
                     <option value="gmx">GMX V2 Exchange</option>
                     <option value="aave">Aave V3 Pool</option>
@@ -69,7 +69,7 @@ export default function TradingPage() {
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-text-primary">Spending Cap</label>
-                  <div className="flex items-center bg-surface-container-low border border-border-whisper rounded-[4px] px-4 focus-within:border-accent-azure transition-colors">
+                  <div className="flex items-center bg-surface-container-low border border-border-whisper rounded-[4px] px-4 focus-within:border-accent-orange transition-colors">
                     <span className="text-text-muted font-mono">$</span>
                     <input 
                       type="number" 
@@ -85,7 +85,7 @@ export default function TradingPage() {
                   <select 
                     value={duration}
                     onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors font-mono"
+                    className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-orange transition-colors font-mono"
                   >
                     <option value="1">1 Hour</option>
                     <option value="4">4 Hours</option>
@@ -97,7 +97,7 @@ export default function TradingPage() {
 
             <button
               onClick={() => setIsModalOpen(true)}
-              className="w-full h-14 bg-accent-azure hover:bg-accent-azure/90 active:translate-y-[1px] transition-all rounded-[4px] flex items-center justify-center gap-2 font-semibold text-base text-white"
+              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] transition-all rounded-[4px] flex items-center justify-center gap-2 font-semibold text-base text-white"
             >
               Issue Session Key
             </button>

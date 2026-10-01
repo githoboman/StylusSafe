@@ -85,7 +85,7 @@ export function SignModal({ isOpen, onClose, onSign, actionText = "Bridge & Swap
                 key={index} 
                 className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
                   index < pin.length 
-                    ? 'bg-accent-azure scale-110' 
+                    ? 'bg-accent-orange scale-110' 
                     : 'bg-surface-container-high'
                 }`}
               />
@@ -132,7 +132,7 @@ export function SignModal({ isOpen, onClose, onSign, actionText = "Bridge & Swap
             disabled={isSigning || pin.length !== 6}
             className={`w-full h-14 rounded-[12px] font-semibold text-base transition-all flex items-center justify-center gap-2
               ${pin.length === 6 && !isSigning 
-                ? 'bg-accent-azure hover:bg-accent-azure/90 text-white shadow-lg shadow-accent-azure/20' 
+                ? 'bg-accent-orange hover:bg-accent-orange/90 text-white shadow-lg shadow-accent-orange/20' 
                 : 'bg-surface-container text-text-muted cursor-not-allowed'}
             `}
           >

@@ -7,7 +7,7 @@ export function BottomNav() {
 
   const getNavClass = (path: string) => {
     return pathname === path
-      ? "flex flex-col items-center justify-center min-w-[64px] min-h-[44px] text-accent-azure"
+      ? "flex flex-col items-center justify-center min-w-[64px] min-h-[44px] text-accent-orange"
       : "flex flex-col items-center justify-center min-w-[64px] min-h-[44px] text-text-muted hover:text-text-primary transition-colors";
   };
 

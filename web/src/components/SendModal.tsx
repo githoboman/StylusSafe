@@ -55,7 +55,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
         <div className="bg-surface-zinc border border-border-whisper rounded-[24px] p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center mb-6">
-            <span className="material-symbols-outlined text-[32px] text-accent-azure">check_circle</span>
+            <span className="material-symbols-outlined text-[32px] text-accent-orange">check_circle</span>
           </div>
           <h2 className="text-2xl font-bold text-text-primary mb-2">Sent Successfully</h2>
           <p className="text-text-muted text-sm text-center mb-6">Your transaction has been submitted to the bundler and will be confirmed shortly.</p>
@@ -63,7 +63,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           {txHash && (
             <div className="bg-surface-container rounded-[8px] p-3 w-full mb-6 border border-border-whisper flex flex-col gap-1">
               <span className="text-[10px] uppercase font-mono tracking-widest text-text-muted">UserOp Hash</span>
-              <a href={`https://sepolia.arbiscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-sm font-mono text-accent-azure truncate hover:underline">
+              <a href={`https://sepolia.arbiscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-sm font-mono text-accent-orange truncate hover:underline">
                 {txHash}
               </a>
             </div>
@@ -108,7 +108,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                 <button
                   key={t.symbol}
                   onClick={() => setSelectedToken(t)}
-                  className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-azure/50 bg-accent-azure/10 text-accent-azure' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
                   {t.symbol}
@@ -119,7 +119,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             {/* Recipient */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-xs text-text-muted uppercase tracking-wider">To</label>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-3 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-3 focus-within:border-accent-orange transition-colors">
                 <input
                   className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
                   placeholder="0x..."
@@ -134,11 +134,11 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             <div className="flex flex-col gap-2 mb-2">
               <div className="flex justify-between items-center">
                 <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Amount</label>
-                <button onClick={() => setAmount(getBalance())} className="font-mono text-[10px] text-accent-azure hover:underline">
+                <button onClick={() => setAmount(getBalance())} className="font-mono text-[10px] text-accent-orange hover:underline">
                   Max: {getBalance()}
                 </button>
               </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-3 focus-within:border-accent-azure transition-colors">
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-3 focus-within:border-accent-orange transition-colors">
                 <input
                   className="flex-1 bg-transparent h-14 text-2xl text-text-primary font-semibold outline-none placeholder:text-text-muted/30"
                   placeholder="0.00"
@@ -154,7 +154,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             <button
               onClick={() => setIsSignOpen(true)}
               disabled={!amount || !recipient || parseFloat(amount) <= 0}
-              className="w-full h-14 bg-accent-azure hover:bg-accent-azure/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2 mt-2"
             >
               <span className="material-symbols-outlined text-[20px]">send</span>
               Send {selectedToken.symbol}

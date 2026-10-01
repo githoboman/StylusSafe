@@ -8,13 +8,23 @@ import { SubscriptionCard } from '@/components/SubscriptionCard';
 import { IntentBatchCard } from '@/components/IntentBatchCard';
 import { FundWalletModal } from '@/components/FundWalletModal';
 import { SendModal } from '@/components/SendModal';
+import { ImportTokenModal } from '@/components/ImportTokenModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
+
+const CHAINS = [
+  { name: 'Arbitrum Sepolia', id: 421614, color: '#12AAFF' },
+  { name: 'Base', id: 8453, color: '#0052FF' },
+  { name: 'Optimism', id: 10, color: '#FF0420' },
+  { name: 'Polygon', id: 137, color: '#8247E5' },
+  { name: 'Ethereum', id: 1, color: '#627EEA' },
+];
 
 export default function Dashboard() {
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
@@ -22,11 +32,8 @@ export default function Dashboard() {
   const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
   const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
 
-  const handleImportToken = () => {
-    const addr = window.prompt('Enter token contract address (0x...):');
-    if (addr && addr.startsWith('0x')) {
-      addCustomToken(addr);
-    }
+  const handleImportToken = (addr: string) => {
+    addCustomToken(addr);
   };
 
   // Calculate Net Worth
@@ -57,24 +64,36 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <div className="flex flex-col gap-2 self-start md:self-auto">
+        <div className="flex flex-col gap-3 self-start md:self-auto">
           <div className="flex items-center gap-1.5 bg-surface-container px-3 py-1.5 rounded-[4px] border border-border-whisper">
-            <span className={`w-2 h-2 rounded-full ${address ? 'bg-accent-azure' : 'bg-error'}`}></span>
+            <span className={`w-2 h-2 rounded-full ${address ? 'bg-accent-orange' : 'bg-error'}`}></span>
             <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">
               {address ? '3 of 5 Policy Active' : 'Unregistered'}
             </span>
           </div>
-          <select 
-            value={selectedChain} 
-            onChange={e => setSelectedChain(Number(e.target.value))}
-            className="bg-surface-container border border-border-whisper text-text-primary font-mono text-[11px] uppercase tracking-wider px-2 py-1 rounded-[4px] outline-none hover:border-accent-azure transition-colors"
-          >
-            <option value={421614}>Arbitrum Sepolia</option>
-            <option value={8453}>Base</option>
-            <option value={10}>Optimism</option>
-            <option value={137}>Polygon</option>
-            <option value={1}>Ethereum</option>
-          </select>
+          
+          <div className="relative group">
+            <div className="flex items-center justify-between gap-3 bg-surface-container border border-border-whisper text-text-primary px-3 py-2 rounded-[4px] cursor-pointer hover:border-text-muted transition-colors">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHAINS.find(c => c.id === selectedChain)?.color }}></span>
+                <span className="font-mono text-[11px] uppercase tracking-wider">{CHAINS.find(c => c.id === selectedChain)?.name}</span>
+              </div>
+              <span className="material-symbols-outlined text-[14px] text-text-muted">expand_more</span>
+            </div>
+            
+            <div className="absolute right-0 top-full mt-1 w-full min-w-[160px] bg-surface-container-high border border-border-whisper rounded-[4px] shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 overflow-hidden">
+              {CHAINS.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedChain(c.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-zinc transition-colors ${selectedChain === c.id ? 'bg-surface-zinc' : ''}`}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }}></span>
+                  <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">{c.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -87,7 +106,7 @@ export default function Dashboard() {
           <div className="bg-surface-zinc rounded-[24px] p-8 md:p-10 border border-border-whisper">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Consolidated Net Worth</span>
-              {isFetching && <span className="w-4 h-4 border-2 border-accent-azure border-t-transparent rounded-full animate-spin"></span>}
+              {isFetching && <span className="w-4 h-4 border-2 border-accent-orange border-t-transparent rounded-full animate-spin"></span>}
             </div>
             
             <div className="flex items-baseline gap-3 my-4">
@@ -99,7 +118,7 @@ export default function Dashboard() {
             
             <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-whisper">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-[2px] bg-accent-azure"></span>
+                <span className="w-3 h-3 rounded-[2px] bg-accent-orange"></span>
                 <span className="font-mono text-base text-text-primary">{address ? ethBalance : '0.00'} ETH</span>
               </div>
               <div className="flex items-center gap-2">
@@ -113,8 +132,8 @@ export default function Dashboard() {
                 </div>
               ))}
               <button 
-                onClick={handleImportToken}
-                className="font-mono text-[11px] text-text-muted hover:text-text-primary uppercase tracking-wider underline underline-offset-2 ml-auto"
+                onClick={() => setIsImportModalOpen(true)}
+                className="font-mono text-[11px] text-text-muted hover:text-accent-orange uppercase tracking-wider underline underline-offset-4 ml-auto transition-colors"
               >
                 + Import Token
               </button>
@@ -126,7 +145,7 @@ export default function Dashboard() {
             <Link
               href="/transfer"
               className={`h-14 px-6 rounded-[4px] flex items-center justify-center gap-3 transition-all font-medium text-base shadow-sm
-                ${address ? 'bg-accent-azure hover:bg-accent-azure/90 text-white' : 'bg-surface-container text-text-muted cursor-not-allowed pointer-events-none'}`}
+                ${address ? 'bg-accent-orange hover:bg-accent-orange/90 text-white' : 'bg-surface-container text-text-muted cursor-not-allowed pointer-events-none'}`}
             >
               <span className="material-symbols-outlined text-[20px]">swap_calls</span>
               Cross-Chain Swap
@@ -140,7 +159,7 @@ export default function Dashboard() {
                     setIsSigningIn(false);
                     setIsSignModalOpen(true);
                   }}
-                  className="h-14 px-6 flex-1 bg-accent-azure hover:bg-accent-azure/90 rounded-[4px] flex items-center justify-center gap-3 transition-all text-white font-semibold text-base shadow-sm"
+                  className="h-14 px-6 flex-1 bg-accent-orange hover:bg-accent-orange/90 rounded-[4px] flex items-center justify-center gap-3 transition-all text-white font-semibold text-base shadow-sm"
                   type="button"
                 >
                   <span className="material-symbols-outlined text-[20px]">add_circle</span>
@@ -187,11 +206,11 @@ export default function Dashboard() {
                   type="button"
                 >
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-azure opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-azure"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-orange opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-orange"></span>
                   </span>
                   Sign Pending
-                  <span className="font-mono text-xs text-white bg-accent-azure px-2 py-0.5 rounded-[4px] ml-1">2</span>
+                  <span className="font-mono text-xs text-white bg-accent-orange px-2 py-0.5 rounded-[4px] ml-1">2</span>
                 </button>
               </div>
             )}
@@ -202,12 +221,12 @@ export default function Dashboard() {
             <div className="bg-surface-zinc rounded-[24px] p-6 border border-border-whisper mt-2">
               <div className="flex items-center justify-between mb-4 px-2">
                 <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Recent Activity</span>
-                <Link href="/activity" className="text-xs text-accent-azure hover:underline">View All</Link>
+                <Link href="/activity" className="text-xs text-accent-orange hover:underline">View All</Link>
               </div>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-azure/10 text-accent-azure flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
                     </div>
                     <div>
@@ -223,7 +242,7 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-azure/10 text-accent-azure flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[20px]">autorenew</span>
                     </div>
                     <div>
@@ -271,10 +290,10 @@ export default function Dashboard() {
 
           <div className="p-5 bg-surface-container/30 rounded-[4px] flex items-center justify-between border border-border-whisper">
             <div className="flex items-center gap-3 text-text-muted">
-              <span className="material-symbols-outlined text-[20px] text-accent-azure">verified_user</span>
+              <span className="material-symbols-outlined text-[20px] text-accent-orange">verified_user</span>
               <span className="font-mono text-sm">Rust-WASM Verified</span>
             </div>
-            <span className="font-mono text-xs text-accent-azure bg-accent-azure/10 px-2 py-1 rounded-[4px]">Stylus 0.5.2</span>
+            <span className="font-mono text-xs text-accent-orange bg-accent-orange/10 px-2 py-1 rounded-[4px]">Stylus 0.5.2</span>
           </div>
 
         </div>
@@ -302,6 +321,11 @@ export default function Dashboard() {
       <SendModal
         isOpen={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)}
+      />
+      <ImportTokenModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportToken}
       />
     </div>
   );

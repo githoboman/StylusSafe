@@ -32,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col mb-10">
             <span className="text-2xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
             <div className="flex items-center gap-1.5 mt-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-azure animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>
               <span className="text-xs text-text-muted uppercase tracking-wider font-mono">Vault 01 // Arbitrum</span>
             </div>
           </div>
@@ -48,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[4px] font-medium text-sm transition-colors
                     ${active
-                      ? 'bg-surface-container text-accent-azure'
+                      ? 'bg-surface-container text-accent-orange'
                       : 'text-text-muted hover:bg-surface-container-low hover:text-text-primary'
                     }`}
                 >
@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[4px] font-medium text-sm transition-colors
                     ${active
-                      ? 'bg-surface-container text-accent-azure'
+                      ? 'bg-surface-container text-accent-orange'
                       : 'text-text-muted hover:bg-surface-container-low hover:text-text-primary'
                     }`}
                 >
@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-[4px] font-medium text-sm transition-colors
                     ${active
-                      ? 'bg-surface-container text-accent-azure'
+                      ? 'bg-surface-container text-accent-orange'
                       : 'text-text-muted hover:bg-surface-container-low hover:text-text-primary'
                     }`}
                 >
@@ -118,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col">
             <span className="text-xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-azure animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>
               <span className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Vault 01</span>
             </div>
           </div>
@@ -140,7 +140,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={`flex flex-col items-center justify-center min-w-[64px] min-h-[44px] transition-colors
-                  ${active ? 'text-accent-azure' : 'text-text-muted hover:text-text-primary'}`}
+                  ${active ? 'text-accent-orange' : 'text-text-muted hover:text-text-primary'}`}
               >
                 <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
                 <span className="font-mono text-[10px] uppercase tracking-wider mt-1">{item.label}</span>

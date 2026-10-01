@@ -44,7 +44,7 @@ export default function IntentsPage() {
         {status === 'success' ? (
           <div className="flex flex-col items-center gap-6 animate-in zoom-in duration-500 delay-150 z-10">
             <div className="w-24 h-24 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center text-text-primary">
-              <span className="material-symbols-outlined text-[48px] text-accent-azure">check_circle</span>
+              <span className="material-symbols-outlined text-[48px] text-accent-orange">check_circle</span>
             </div>
             <div className="text-center">
               <h2 className="text-2xl font-bold text-text-primary mb-2">Batch Executed</h2>
@@ -60,7 +60,7 @@ export default function IntentsPage() {
             <div className="w-full bg-surface-zinc rounded-2xl p-6 border border-border-whisper relative">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-sm font-medium text-text-primary">Action Builder</h3>
-                <button className="text-xs text-accent-azure flex items-center gap-1 hover:underline">
+                <button className="text-xs text-accent-orange flex items-center gap-1 hover:underline">
                   <span className="material-symbols-outlined text-[14px]">add</span> Add Action
                 </button>
               </div>
@@ -72,14 +72,14 @@ export default function IntentsPage() {
                     <span className="text-xs font-mono text-text-muted bg-surface-container border border-border-whisper px-2 py-0.5 rounded-[2px]">Action 1</span>
                     <span className="material-symbols-outlined text-[16px] text-text-muted cursor-pointer hover:text-error transition-colors">close</span>
                   </div>
-                  <select className="w-full h-10 bg-surface-zinc border border-border-whisper rounded-[4px] text-sm text-text-primary outline-none focus:border-accent-azure px-2">
+                  <select className="w-full h-10 bg-surface-zinc border border-border-whisper rounded-[4px] text-sm text-text-primary outline-none focus:border-accent-orange px-2">
                     <option value="swap">Swap Tokens (Across Protocol)</option>
                     <option value="deposit">Deposit to Yield (Aave)</option>
                     <option value="transfer">Transfer</option>
                   </select>
                   <div className="flex items-center gap-2">
-                    <input type="number" defaultValue="500" className="flex-1 h-10 bg-surface-zinc border border-border-whisper rounded-[4px] font-mono text-sm px-3 text-text-primary outline-none focus:border-accent-azure" placeholder="Amount" />
-                    <select className="w-24 h-10 bg-surface-zinc border border-border-whisper rounded-[4px] font-mono text-sm px-2 text-text-primary outline-none focus:border-accent-azure">
+                    <input type="number" defaultValue="500" className="flex-1 h-10 bg-surface-zinc border border-border-whisper rounded-[4px] font-mono text-sm px-3 text-text-primary outline-none focus:border-accent-orange" placeholder="Amount" />
+                    <select className="w-24 h-10 bg-surface-zinc border border-border-whisper rounded-[4px] font-mono text-sm px-2 text-text-primary outline-none focus:border-accent-orange">
                       <option>USDC</option>
                       <option>ETH</option>
                     </select>
@@ -95,7 +95,7 @@ export default function IntentsPage() {
                     <span className="text-xs font-mono text-text-muted bg-surface-container border border-border-whisper px-2 py-0.5 rounded-[2px]">Action 2</span>
                     <span className="material-symbols-outlined text-[16px] text-text-muted cursor-pointer hover:text-error transition-colors">close</span>
                   </div>
-                  <select className="w-full h-10 bg-surface-zinc border border-border-whisper rounded-[4px] text-sm text-text-primary outline-none focus:border-accent-azure px-2">
+                  <select className="w-full h-10 bg-surface-zinc border border-border-whisper rounded-[4px] text-sm text-text-primary outline-none focus:border-accent-orange px-2">
                     <option value="deposit">Deposit to Yield (Aave)</option>
                     <option value="swap">Swap Tokens (Across Protocol)</option>
                     <option value="transfer">Transfer</option>
@@ -109,7 +109,7 @@ export default function IntentsPage() {
 
             <button
               onClick={() => setIsModalOpen(true)}
-              className="w-full h-14 bg-accent-azure hover:bg-accent-azure/90 active:translate-y-[1px] transition-all rounded-[4px] flex items-center justify-center gap-2 font-semibold text-base text-white"
+              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] transition-all rounded-[4px] flex items-center justify-center gap-2 font-semibold text-base text-white"
             >
               Execute Batch
             </button>
