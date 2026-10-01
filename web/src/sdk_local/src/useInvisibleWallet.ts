@@ -85,7 +85,7 @@ type InvisibleWallet = {
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
     login: () => Promise<void>;
     disconnect: () => void;
-    executeCrossChainSwap: (destChainId: number, tokenAddress: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
+    executeCrossChainSwap: (destChainId: number, fromToken: `0x${string}`, toToken: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
     setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
@@ -594,11 +594,12 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    // ── executeCrossChainSwap (ZeroDev + Across) ──────────────────────────────
+    // ── executeCrossChainSwap (ZeroDev + Li.Fi) ──────────────────────────────
 
     const executeCrossChainSwap = async (
         destChainId: number,
-        tokenAddress: `0x${string}`,
+        fromToken: `0x${string}`,
+        toToken: `0x${string}`,
         amount: bigint,
         recipient: `0x${string}`,
         pin?: string
@@ -608,78 +609,46 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         try {
             if (!address) throw new Error("Wallet not initialized. Call login() or register().");
             
-            // 1. Configure the ZeroDev Paymaster Client
-            const publicClient = createPublicClient({ transport: http(rpcUrl) });
-            const paymasterClient = createPaymasterClient({
-                transport: http(paymasterUrl)
-            });
-
-            // 2. Fetch real SpokePool address + relay fees from Across Protocol API
-            const ACROSS_API = 'https://across.to/api';
+            // 1. Fetch Li.Fi Quote
+            const LIFI_API = 'https://li.quest/v1';
+            const quoteUrl = `${LIFI_API}/quote?fromChain=${chainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
             
-            const suggestedFeesResp = await fetch(
-                `${ACROSS_API}/suggested-fees?` +
-                `inputToken=${tokenAddress}&outputToken=${tokenAddress}` +
-                `&originChainId=${chainId}&destinationChainId=${destChainId}` +
-                `&amount=${amount.toString()}`
-            );
-            if (!suggestedFeesResp.ok) {
-                throw new Error(`Across API error: ${suggestedFeesResp.statusText}`);
+            const quoteResp = await fetch(quoteUrl);
+            const quoteData = await quoteResp.json();
+
+            if (!quoteResp.ok) {
+                throw new Error(`Li.Fi API error: ${quoteData.message || quoteResp.statusText}`);
             }
-            const acrossData = await suggestedFeesResp.json();
-            const ACROSS_SPOKE_POOL = acrossData.spokePoolAddress as `0x${string}`;
-            const relayFee: bigint = BigInt(acrossData.totalRelayFee?.total ?? '0');
-            const quoteTimestamp: number = acrossData.timestamp ?? Math.floor(Date.now() / 1000);
-            const exclusiveRelayer = (acrossData.exclusiveRelayer ?? '0x0000000000000000000000000000000000000000') as `0x${string}`;
-            const exclusivityDeadline: number = acrossData.exclusivityDeadline ?? 0;
-            const outputAmount = amount - relayFee;
 
-            if (outputAmount <= 0n) throw new Error('Amount too small to cover relay fee.');
+            const txRequest = quoteData.transactionRequest;
+            const approvalAddress = quoteData.estimate.approvalAddress;
 
-            // 3. Build Across depositV3 calldata
-            const depositCallData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'depositV3',
-                    inputs: [
-                        { name: 'depositor', type: 'address' },
-                        { name: 'recipient', type: 'address' },
-                        { name: 'inputToken', type: 'address' },
-                        { name: 'outputToken', type: 'address' },
-                        { name: 'inputAmount', type: 'uint256' },
-                        { name: 'outputAmount', type: 'uint256' },
-                        { name: 'destinationChainId', type: 'uint256' },
-                        { name: 'exclusiveRelayer', type: 'address' },
-                        { name: 'quoteTimestamp', type: 'uint32' },
-                        { name: 'fillDeadline', type: 'uint32' },
-                        { name: 'exclusivityDeadline', type: 'uint32' },
-                        { name: 'message', type: 'bytes' }
-                    ],
-                    outputs: [],
-                    stateMutability: 'payable'
-                }],
-                functionName: 'depositV3',
-                args: [
-                    address as `0x${string}`,
-                    recipient,
-                    tokenAddress,
-                    tokenAddress,
-                    amount,
-                    outputAmount,
-                    BigInt(destChainId),
-                    exclusiveRelayer,
-                    quoteTimestamp,
-                    quoteTimestamp + 3600,
-                    exclusivityDeadline,
-                    '0x'
-                ]
-            });
+            // 2. Prepare the calls (Approve + Swap)
+            const dests: `0x${string}`[] = [];
+            const values: bigint[] = [];
+            const funcs: `0x${string}`[] = [];
 
-            // 4. Wrap in StylusSafe execute() calldata
+            // If it's an ERC20 token and requires approval
+            if (fromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
+                dests.push(fromToken);
+                values.push(0n);
+                funcs.push(encodeFunctionData({
+                    abi: [{ name: 'approve', type: 'function', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' }],
+                    functionName: 'approve',
+                    args: [approvalAddress as `0x${string}`, amount]
+                }));
+            }
+
+            // The actual swap/bridge call
+            dests.push(txRequest.to as `0x${string}`);
+            values.push(BigInt(txRequest.value ?? 0));
+            funcs.push(txRequest.data as `0x${string}`);
+
+            // 3. Wrap in StylusSafe execute_batch() calldata
             const walletCallData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'execute',
-                args: [ACROSS_SPOKE_POOL, 0n, depositCallData]
+                abi: [{ type: 'function', name: 'execute_batch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'execute_batch',
+                args: [dests, values, funcs]
             });
 
             // 5. Submit via shared UserOp helper

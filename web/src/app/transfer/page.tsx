@@ -29,6 +29,7 @@ export default function TransferPage() {
   const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
   const [selectedChain, setSelectedChain] = useState(CHAINS[0]);
   const [customChainId, setCustomChainId] = useState('');
+  const [customToToken, setCustomToToken] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [acrossFee, setAcrossFee] = useState<AcrossFee>(null);
   const [feeLoading, setFeeLoading] = useState(false);
@@ -36,8 +37,8 @@ export default function TransferPage() {
   const [txHash, setTxHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch live Across relay fee whenever amount or chain changes
-  const fetchAcrossFee = useCallback(async () => {
+  // Fetch live Li.Fi quote whenever amount, chain, or tokens change
+  const fetchLifiQuote = useCallback(async () => {
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) { setAcrossFee(null); return; }
     setFeeLoading(true);
@@ -45,25 +46,26 @@ export default function TransferPage() {
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       if (!chainId) return;
-      const url = `https://across.to/api/suggested-fees?inputToken=${selectedToken.address}&outputToken=${selectedToken.address}&originChainId=421614&destinationChainId=${chainId}&amount=${amountRaw.toString()}`;
+      const toToken = customToToken || selectedToken.address;
+      const url = `https://li.quest/v1/quote?fromChain=421614&toChain=${chainId}&fromToken=${selectedToken.address}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
       const data = await resp.json();
       setAcrossFee({
-        relayFeeTotal: data.totalRelayFee?.total ?? '0',
-        estimatedFillTimeSec: data.estimatedFillTimeSec ?? 45,
+        relayFeeTotal: data.estimate?.feeCosts?.[0]?.amount ?? '0',
+        estimatedFillTimeSec: data.estimate?.executionDuration ?? 45,
       });
     } catch {
       setAcrossFee(null);
     } finally {
       setFeeLoading(false);
     }
-  }, [amount, selectedToken, selectedChain]);
+  }, [amount, selectedToken, selectedChain, customChainId, customToToken, address]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchAcrossFee, 600);
+    const timer = setTimeout(fetchLifiQuote, 600);
     return () => clearTimeout(timer);
-  }, [fetchAcrossFee]);
+  }, [fetchLifiQuote]);
 
   const relayFeeDisplay = () => {
     if (!acrossFee) return '—';
@@ -83,9 +85,11 @@ export default function TransferPage() {
     try {
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
+      const toToken = customToToken || selectedToken.address;
       const result = await executeCrossChainSwap(
         chainId,
         selectedToken.address,
+        toToken as `0x${string}`,
         amountRaw,
         recipient as `0x${string}`,
         pin
@@ -148,8 +152,8 @@ export default function TransferPage() {
             <span className="material-symbols-outlined">arrow_back</span>
           </Link>
           <div>
-            <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-1">Cross-Chain Swap</h1>
-            <p className="text-text-muted text-sm">Bridge assets cross-chain. Gas is sponsored via ZeroDev Paymaster.</p>
+            <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-1">Swap & Bridge</h1>
+            <p className="text-text-muted text-sm">Swap and bridge assets across chains. Gas is sponsored via ZeroDev Paymaster.</p>
           </div>
         </div>
 
@@ -181,6 +185,16 @@ export default function TransferPage() {
                     {t.symbol}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
+                  <input
+                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
+                    placeholder="Custom Destination Token (Optional)"
+                    type="text"
+                    value={customToToken}
+                    onChange={(e) => setCustomToToken(e.target.value)}
+                  />
               </div>
             </div>
 
@@ -287,8 +301,8 @@ export default function TransferPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-text-muted">Bridge Protocol</span>
-                  <span className="font-mono text-xs text-text-primary">Across Protocol</span>
+                  <span className="font-mono text-xs text-text-muted">Routing Protocol</span>
+                  <span className="font-mono text-xs text-text-primary">Li.Fi / DEX Aggregator</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-text-muted">Est. Fill Time</span>
