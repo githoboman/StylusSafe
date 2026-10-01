@@ -87,9 +87,9 @@ type InvisibleWallet = {
     disconnect: () => void;
     executeCrossChainSwap: (destChainId: number, tokenAddress: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
-    createSessionKey: (durationHours: number) => Promise<{ sessionKey: string } | null>;
-    setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number) => Promise<boolean>;
-    executeIntentBatch: (intents: any[]) => Promise<{ userOpHash: string } | null>;
+    createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
+    setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
+    executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
 
@@ -406,10 +406,30 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             args: [address as `0x${string}`, 0n],
         }) as bigint;
 
+        let initCode = '0x';
+        if (nonce === 0n) {
+            const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
+            if (pubKeyHex) {
+                const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
+                    ? factoryAddress
+                    : (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) || '0xe98c353fF883445995021182D918E3577365b284';
+                
+                const viem = await import('viem');
+                const deployCallData = viem.encodeFunctionData({
+                    abi: [{ type: 'function', name: 'deployWallet', inputs: [{ name: 'publicKey', type: 'bytes' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
+                    functionName: 'deployWallet',
+                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`]
+                });
+                
+                // initCode is factory address + factory calldata
+                initCode = FACTORY + deployCallData.slice(2);
+            }
+        }
+
         const userOp: Record<string, any> = {
             sender: address,
             nonce: `0x${nonce.toString(16)}`,
-            initCode: '0x',
+            initCode: initCode,
             callData,
             callGasLimit: '0x7A120',      // 500000
             verificationGasLimit: '0x30D40', // 200000
@@ -716,7 +736,23 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 functionName: 'execute',
                 args: [address as `0x${string}`, 0n, callData],
             });
-            await submitUserOp(walletCallData, pin);
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (userOpHash) {
+                try {
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+                    existing.unshift({
+                        id: Date.now().toString(),
+                        type: 'session',
+                        title: 'Session Key Issued',
+                        subtitle: `1-click trading — ${durationHours}h window`,
+                        status: 'executed',
+                        timestamp: new Date().toISOString(),
+                        icon: 'flash_on',
+                        txHash: userOpHash
+                    });
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                } catch (e) {}
+            }
 
             // 4. Store the session key securely for 1-click signing later
             localStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
@@ -753,7 +789,25 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 functionName: 'execute',
                 args: [address as `0x${string}`, 0n, callData],
             });
-            await submitUserOp(walletCallData, pin);
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (userOpHash) {
+                try {
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+                    existing.unshift({
+                        id: Date.now().toString(),
+                        type: 'subscription',
+                        title: 'Subscription Setup',
+                        subtitle: `Pull every ${frequencyDays} days`,
+                        amount: `-${(Number(amount) / 1e6).toFixed(2)} USDC`,
+                        amountPositive: false,
+                        status: 'executed',
+                        timestamp: new Date().toISOString(),
+                        icon: 'autorenew',
+                        txHash: userOpHash
+                    });
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                } catch (e) {}
+            }
 
             return true;
         } catch (err: unknown) {
@@ -782,6 +836,22 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             const userOpHash = await submitUserOp(callData, pin);
+            if (userOpHash) {
+                try {
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
+                    existing.unshift({
+                        id: Date.now().toString(),
+                        type: 'intent',
+                        title: 'Intent Batch',
+                        subtitle: `${intents.length} operations bundled`,
+                        status: 'executed',
+                        timestamp: new Date().toISOString(),
+                        icon: 'stacks',
+                        txHash: userOpHash
+                    });
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                } catch (e) {}
+            }
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));

@@ -14,7 +14,8 @@ export default function TradingPage() {
   const handleAuthorize = async (pin: string) => {
     setStatus('authorizing');
     try {
-      await createSessionKey(duration, pin);
+      const result = await createSessionKey(duration, pin);
+      if (!result) throw new Error("Failed to issue session key");
       setStatus('success');
     } catch (e) {
       console.error(e);

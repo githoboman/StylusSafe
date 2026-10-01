@@ -13,10 +13,11 @@ export default function IntentsPage() {
   const handleExecute = async (pin: string) => {
     setStatus('authorizing');
     try {
-      await executeIntentBatch([
+      const result = await executeIntentBatch([
         { dest: '0x1234567890123456789012345678901234567890', value: 0n, func: '0x' },
         { dest: '0x0987654321098765432109876543210987654321', value: 0n, func: '0x' }
       ], pin);
+      if (!result) throw new Error("Failed to execute batch");
       setStatus('success');
     } catch (e) {
       console.error(e);

@@ -10,10 +10,16 @@ export default function SubscriptionPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [status, setStatus] = useState<'idle' | 'authorizing' | 'success'>('idle');
 
+  const [merchantAddress, setMerchantAddress] = useState('0xaf88d065e77c8cC2239327C5EDb3A432268e5831');
+  const [amountInput, setAmountInput] = useState('15.00');
+  const [frequency, setFrequency] = useState(30);
+
   const handleSubscribe = async (pin: string) => {
     setStatus('authorizing');
     try {
-      await setupDCA('0xaf88d065e77c8cC2239327C5EDb3A432268e5831', 15000000n, 30, pin);
+      const amountRaw = BigInt(Math.floor(parseFloat(amountInput) * 1e6));
+      const result = await setupDCA(merchantAddress as `0x${string}`, amountRaw, frequency, pin);
+      if (!result) throw new Error("Failed to setup subscription");
       setStatus('success');
     } catch (e) {
       console.error(e);
@@ -44,7 +50,7 @@ export default function SubscriptionPage() {
             </div>
             <div className="text-center">
               <h2 className="text-2xl font-bold text-text-primary mb-2">Subscription Active</h2>
-              <p className="text-text-muted max-w-sm mx-auto">15.00 USDC will be pulled automatically every 30 days.</p>
+              <p className="text-text-muted max-w-sm mx-auto">{amountInput} USDC will be pulled automatically every {frequency} days.</p>
             </div>
             <Link href="/" className="mt-4 h-12 px-8 bg-surface-container hover:bg-surface-container-high rounded-[8px] font-medium text-text-primary flex items-center justify-center transition-all border border-border-whisper">
               Return to Dashboard
@@ -61,7 +67,8 @@ export default function SubscriptionPage() {
                     <span className="material-symbols-outlined text-[18px] text-text-muted mr-2">storefront</span>
                     <input 
                       type="text" 
-                      defaultValue="Web3 Netflix Premium" 
+                      value={merchantAddress}
+                      onChange={(e) => setMerchantAddress(e.target.value)}
                       className="w-full h-12 bg-transparent outline-none text-text-primary font-mono text-sm"
                     />
                   </div>
@@ -73,7 +80,8 @@ export default function SubscriptionPage() {
                     <span className="text-text-muted font-mono">$</span>
                     <input 
                       type="number" 
-                      defaultValue="15.00" 
+                      value={amountInput}
+                      onChange={(e) => setAmountInput(e.target.value)}
                       className="w-full h-12 bg-transparent outline-none px-2 text-text-primary font-mono"
                     />
                     <span className="text-xs text-text-muted uppercase tracking-widest">USDC</span>
@@ -82,7 +90,11 @@ export default function SubscriptionPage() {
 
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium text-text-primary">Billing Frequency</label>
-                  <select className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors font-mono">
+                  <select 
+                    value={frequency}
+                    onChange={(e) => setFrequency(Number(e.target.value))}
+                    className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-azure transition-colors font-mono"
+                  >
                     <option value="30">Monthly (Every 30 Days)</option>
                     <option value="7">Weekly (Every 7 Days)</option>
                     <option value="365">Yearly (Every 365 Days)</option>
@@ -106,7 +118,7 @@ export default function SubscriptionPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         actionText="Setup Subscription"
-        amountText="15.00 USDC"
+        amountText={`${amountInput} USDC`}
         onSign={handleSubscribe}
       />
     </div>
