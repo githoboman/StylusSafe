@@ -1,0 +1,48 @@
+name: Build Mobile APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile-app/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: mobile-app
+        run: npm install
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build APK locally
+        working-directory: mobile-app
+        run: |
+          # The --local flag uses the runner's Android SDK to build, no Expo account required.
+          eas build --platform android --profile preview --local --non-interactive
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stylussafe-mobile-apk
+          path: mobile-app/*.apk
