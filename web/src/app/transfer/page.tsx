@@ -7,8 +7,13 @@ import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 
 const TOKENS = [
-  { symbol: 'ETH', name: 'Ether', address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, color: '#0284c7' },
-  { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA' },
+  { symbol: 'ETH', name: 'Ether', decimals: 18, color: '#0284c7' },
+  { symbol: 'USDC', name: 'USD Coin', decimals: 6, color: '#2775CA' },
+  { symbol: 'USDT', name: 'Tether USD', decimals: 6, color: '#26A17B' },
+  { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, color: '#F4B731' },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, color: '#F7931A' },
+  { symbol: 'UNI', name: 'Uniswap', decimals: 18, color: '#FF007A' },
+  { symbol: 'LINK', name: 'Chainlink', decimals: 18, color: '#2A5ADA' },
 ];
 
 const CHAINS = [
@@ -54,8 +59,8 @@ export default function TransferPage() {
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       if (!chainId) return;
-      const toToken = selectedDestToken.address;
-      const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${selectedToken.address}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
+      const toToken = selectedDestToken.symbol;
+      const url = `https://li.quest/v1/quote?fromChain=${selectedSourceChain.id}&toChain=${chainId}&fromToken=${selectedToken.symbol}&toToken=${toToken}&fromAmount=${amountRaw.toString()}&fromAddress=${address || '0x0000000000000000000000000000000000000000'}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
       const data = await resp.json();
@@ -93,12 +98,12 @@ export default function TransferPage() {
     try {
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
       const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
-      const toToken = selectedDestToken.address;
+      const toToken = selectedDestToken.symbol;
       const result = await executeCrossChainSwap(
         selectedSourceChain.id,
         chainId,
-        selectedToken.address,
-        toToken as `0x${string}`,
+        selectedToken.symbol,
+        toToken,
         amountRaw,
         recipient as `0x${string}`,
         pin

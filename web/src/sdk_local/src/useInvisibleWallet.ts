@@ -605,8 +605,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     const executeCrossChainSwap = async (
         sourceChainId: number,
         destChainId: number,
-        fromToken: `0x${string}`,
-        toToken: `0x${string}`,
+        fromToken: string,
+        toToken: string,
         amount: bigint,
         recipient: `0x${string}`,
         pin?: string
@@ -629,6 +629,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             const txRequest = quoteData.transactionRequest;
             const approvalAddress = quoteData.estimate.approvalAddress;
+            const actualFromToken = quoteData.action.fromToken.address as `0x${string}`;
 
             // 2. Prepare the calls (Approve + Swap)
             const dests: `0x${string}`[] = [];
@@ -636,8 +637,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const funcs: `0x${string}`[] = [];
 
             // If it's an ERC20 token and requires approval
-            if (fromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
-                dests.push(fromToken);
+            if (actualFromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
+                dests.push(actualFromToken);
                 values.push(0n);
                 funcs.push(encodeFunctionData({
                     abi: [{ name: 'approve', type: 'function', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' }],
