@@ -44,9 +44,6 @@ export function SignModal({ isOpen, onClose, onSign, actionText = "Bridge & Swap
     try {
       if (onSign) {
         await onSign(pin);
-      } else {
-        // Fallback mock delay if no onSign provided
-        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       onClose();
     } catch (err: any) {

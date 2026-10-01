@@ -244,12 +244,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             const walletAddress = computeWalletAddress(factoryAddress, pubKeyBytes, initCodeHash);
 
-            // HACKATHON MOCK: Bypass actual deployment due to Windows cargo-stylus compilation bug.
-            // We just pretend it's deployed immediately so we can test the UI flows!
-            console.warn("MOCK MODE: Skipping actual on-chain deployment. Proceeding with mock address.");
-            
-            // Delay for realistic UX
-            await new Promise(r => setTimeout(r, 2000));
+            // In an actual ERC-4337 flow, the bundler will deploy the factory on the first UserOp
+            // We just compute the address deterministically and store it!
 
             setAddress(walletAddress);
             localStorage.setItem('invisible_wallet_address', walletAddress);

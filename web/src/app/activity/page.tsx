@@ -19,16 +19,7 @@ type Transaction = {
   txHash?: string;
 };
 
-const TX_DATA: Transaction[] = [
-  { id: '1', type: 'swap', title: 'Cross-Chain Swap', subtitle: 'Arbitrum One → Base', amount: '-1.50 ETH', amountPositive: false, status: 'executed', timestamp: new Date(Date.now() - 2 * 3600000), icon: 'swap_horiz', txHash: '0x3a9c...f12b' },
-  { id: '2', type: 'subscription', title: 'Subscription Pull', subtitle: 'Netflix Web3 — Monthly', amount: '-15.00 USDC', amountPositive: false, status: 'executed', timestamp: new Date(Date.now() - 5 * 3600000), icon: 'autorenew', txHash: '0x7c2a...8d4f' },
-  { id: '3', type: 'intent', title: 'Intent Batch', subtitle: '3 ops — Swap + Bridge + Stake', amount: '-500.00 USDC', amountPositive: false, status: 'executed', timestamp: new Date(Date.now() - 8 * 3600000), icon: 'stacks', txHash: '0x1f8e...32a1' },
-  { id: '4', type: 'receive', title: 'Receive', subtitle: 'From 0x71C...9A23', amount: '+4,500.00 USDC', amountPositive: true, status: 'executed', timestamp: new Date(Date.now() - 2 * 86400000), icon: 'south_west' },
-  { id: '5', type: 'signer', title: 'Signer Added', subtitle: 'My iPhone (Passkey)', status: 'executed', timestamp: new Date(Date.now() - 2 * 86400000 + 3600000), icon: 'shield_person' },
-  { id: '6', type: 'swap', title: 'Cross-Chain Swap', subtitle: 'Base → Optimism', amount: '-0.25 ETH', amountPositive: false, status: 'failed', timestamp: new Date(Date.now() - 3 * 86400000), icon: 'swap_horiz', txHash: '0xb3c1...aa99' },
-  { id: '7', type: 'session', title: 'Session Key Issued', subtitle: '1-click trading — 8h window', status: 'executed', timestamp: new Date(Date.now() - 4 * 86400000), icon: 'flash_on' },
-  { id: '8', type: 'send', title: 'Send', subtitle: 'To 0xAbC...1234', amount: '-200.00 USDC', amountPositive: false, status: 'pending', timestamp: new Date(Date.now() - 30 * 60000), icon: 'north_east', txHash: '0x9d7f...c02b' },
-];
+// Mock data removed in favor of real localStorage data.
 
 const TYPE_LABELS: Record<TxType, string> = {
   swap: 'Swaps', subscription: 'Subscriptions', receive: 'Received', send: 'Sent',
@@ -76,14 +67,14 @@ export default function ActivityPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const combined = [...localHistory, ...TX_DATA];
+    const combined = [...localHistory];
     const f = filter === 'all' ? combined : combined.filter(t => t.type === filter);
     return f.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [filter, localHistory]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
 
-  const allTypes = Array.from(new Set([...localHistory, ...TX_DATA].map(t => t.type)));
+  const allTypes = Array.from(new Set([...localHistory].map(t => t.type)));
 
   return (
     <div className="p-4 md:p-10 w-full max-w-5xl mx-auto flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-400">
@@ -96,7 +87,7 @@ export default function ActivityPage() {
           </Link>
           <div>
             <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-1">Activity Log</h1>
-            <p className="text-text-muted text-sm">{TX_DATA.length} operations recorded on Arbitrum Stylus.</p>
+            <p className="text-text-muted text-sm">{localHistory.length} operations recorded on Arbitrum Stylus.</p>
           </div>
         </div>
       </div>

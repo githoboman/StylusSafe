@@ -18,10 +18,10 @@ export default function Dashboard() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   
-  const { address, register, signAuthEntry, disconnect } = useInvisibleWallet();
+  const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
   const { ethBalance, usdcBalance, isFetching } = useBalances(address);
 
-  // Approximate Net Worth for demo purposes
+  // Calculate Net Worth
   const ethValue = parseFloat(ethBalance.replace(/,/g, '')) * 3000;
   const usdcValue = parseFloat(usdcBalance.replace(/,/g, ''));
   const netWorth = (ethValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -256,15 +256,7 @@ export default function Dashboard() {
           if (isRegistering) {
             await register("StylusUser", pin);
           } else if (isSigningIn) {
-            // Simulate a sign-in recovery delay
-            await new Promise(r => setTimeout(r, 1000));
-            // In a real app, we'd fetch the address via indexer from the Passkey ID
-            alert("Sign In Simulated!");
-          } else {
-            // Mock a 32-byte hash payload to sign
-            const dummyPayload = new Uint8Array(32);
-            crypto.getRandomValues(dummyPayload);
-            await signAuthEntry(dummyPayload, pin);
+            await login();
           }
         }}
       />

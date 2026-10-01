@@ -161,7 +161,5 @@ export function derToRawSignature(der: ArrayBuffer): Uint8Array {
 }
 
 export async function extractP256PublicKey(response: any): Promise<Uint8Array> {
-    // Stub for WebAuthn public key extraction (CBOR parsing is omitted here since we default to PIN mode for the web app UI)
-    console.warn("extractP256PublicKey invoked. Returning dummy key. Ensure you are using PIN mode.");
-    return new Uint8Array(65);
+    throw new Error("WebAuthn public key extraction (CBOR parsing) is not implemented. Ensure you are using PIN mode for the web UI.");
 }
