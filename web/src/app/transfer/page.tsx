@@ -23,7 +23,12 @@ type AcrossFee = { relayFeeTotal: string; estimatedFillTimeSec: number } | null;
 
 export default function TransferPage() {
   const { address, executeCrossChainSwap, isPending } = useInvisibleWallet();
-  const { ethBalance } = useBalances(address);
+  const { ethBalance, usdcBalance } = useBalances(address);
+  
+  const getBalanceForToken = () => {
+    return selectedToken.symbol === 'USDC' ? usdcBalance : ethBalance;
+  };
+
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
@@ -204,11 +209,11 @@ export default function TransferPage() {
                 <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Amount</label>
                 {address && (
                   <button
-                    onClick={() => setAmount(ethBalance)}
+                    onClick={() => setAmount(getBalanceForToken())}
                     className="font-mono text-[10px] text-accent-azure uppercase tracking-wider bg-accent-azure/10 px-2 py-0.5 rounded-[4px]"
                     type="button"
                   >
-                    Max: {ethBalance}
+                    Max: {getBalanceForToken()}
                   </button>
                 )}
               </div>
