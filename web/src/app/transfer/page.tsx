@@ -16,6 +16,7 @@ const CHAINS = [
   { name: 'Optimism', id: 10, color: '#FF0420' },
   { name: 'Polygon', id: 137, color: '#8247E5' },
   { name: 'Ethereum', id: 1, color: '#627EEA' },
+  { name: 'Custom', id: -1, color: '#6b7280' },
 ];
 
 type AcrossFee = { relayFeeTotal: string; estimatedFillTimeSec: number } | null;
@@ -27,6 +28,7 @@ export default function TransferPage() {
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
   const [selectedChain, setSelectedChain] = useState(CHAINS[0]);
+  const [customChainId, setCustomChainId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [acrossFee, setAcrossFee] = useState<AcrossFee>(null);
   const [feeLoading, setFeeLoading] = useState(false);
@@ -41,7 +43,9 @@ export default function TransferPage() {
     setFeeLoading(true);
     try {
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
-      const url = `https://across.to/api/suggested-fees?inputToken=${selectedToken.address}&outputToken=${selectedToken.address}&originChainId=421614&destinationChainId=${selectedChain.id}&amount=${amountRaw.toString()}`;
+      const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
+      if (!chainId) return;
+      const url = `https://across.to/api/suggested-fees?inputToken=${selectedToken.address}&outputToken=${selectedToken.address}&originChainId=421614&destinationChainId=${chainId}&amount=${amountRaw.toString()}`;
       const resp = await fetch(url);
       if (!resp.ok) { setAcrossFee(null); return; }
       const data = await resp.json();
@@ -78,8 +82,9 @@ export default function TransferPage() {
   const handleTransfer = async (pin: string) => {
     try {
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
+      const chainId = selectedChain.id === -1 ? parseInt(customChainId || '0') : selectedChain.id;
       const result = await executeCrossChainSwap(
-        selectedChain.id,
+        chainId,
         selectedToken.address,
         amountRaw,
         recipient as `0x${string}`,
@@ -233,7 +238,7 @@ export default function TransferPage() {
             {/* Chain */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Target Chain</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {CHAINS.map(c => (
                   <button
                     key={c.id}
@@ -247,6 +252,18 @@ export default function TransferPage() {
                   </button>
                 ))}
               </div>
+              {selectedChain.id === -1 && (
+                <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-azure transition-colors">
+                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">account_tree</span>
+                  <input
+                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
+                    placeholder="Enter Custom Chain ID"
+                    type="number"
+                    value={customChainId}
+                    onChange={(e) => setCustomChainId(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
