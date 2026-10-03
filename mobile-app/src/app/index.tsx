@@ -1,247 +1,259 @@
-import { useState, useEffect } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Platform,
-} from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@/constants/theme';
-import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
-import { useBalances } from '@/hooks/useBalances';
 
-export default function PortfolioScreen() {
+const { width, height } = Dimensions.get('window');
+
+const SLIDES = [
+  {
+    id: '1',
+    title: 'Make Blockchains Invisible',
+    description: 'The ultimate Intent-Based Smart Wallet. Execute 1-click cross-chain swaps without ever holding gas tokens.',
+    icon: 'planet',
+  },
+  {
+    id: '2',
+    title: 'Seedless Onboarding',
+    description: 'Powered by WebAuthn passkeys. Create a secure, non-custodial wallet instantly using FaceID or TouchID. No 24-word phrases to lose.',
+    icon: 'finger-print',
+  },
+  {
+    id: '3',
+    title: '1-Click Cross-Chain',
+    description: 'Integrated deeply with Li.Fi. Declare your intent to turn Arbitrum USDC into a Base token. We handle the bridging and swapping atomically.',
+    icon: 'swap-horizontal',
+  },
+  {
+    id: '4',
+    title: 'Zero Gas Fees',
+    description: 'Never worry about holding ETH on a new chain. Our ZeroDev ERC-4337 Paymaster sponsors your gas fees transparently across all EVM rollups.',
+    icon: 'flash',
+  }
+];
+
+export default function OnboardingScreen() {
   const router = useRouter();
-  const [selectedChain, setSelectedChain] = useState(421614);
-  const { address: walletAddress, register, isPending: isRegistering } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(walletAddress, selectedChain);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const slidesRef = useRef<FlatList>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const handleImportToken = () => {
-    // Basic react-native propmt isn't standard across platforms without alert trickery or custom modal.
-    // We will just do a placeholder alert for the hackathon demo, or a custom prompt.
-    // For now we assume they input it somehow.
-    // addCustomToken(address)
-  };
+  const viewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems && viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  }).current;
 
-  const handleCreateWallet = async () => {
-    try {
-      await register('MobileUser');
-    } catch (e) {
-      console.error(e);
-      alert('Failed to register passkey. ' + String(e));
+  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+
+  const scrollToNext = () => {
+    if (currentIndex < SLIDES.length - 1) {
+      slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
+    } else {
+      router.replace('/(tabs)/portfolio');
     }
   };
 
-  const ethValue = parseFloat(ethBalance) * 3000;
-  const usdcValue = parseFloat(usdcBalance);
-  const netWorth = (ethValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
+    return (
+      <View style={styles.slide}>
+        <View style={styles.iconContainer}>
+          <View style={styles.iconRing} />
+          <View style={styles.iconRingInner} />
+          <Ionicons name={item.icon as any} size={80} color={Colors.accentOrange} style={styles.icon} />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.description}>{item.description}</Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container}>
+      {/* Skip Button */}
+      <TouchableOpacity 
+        style={styles.skipButton} 
+        onPress={() => router.replace('/(tabs)/portfolio')}
+      >
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flex: 1, paddingRight: Spacing.md }}>
-            <Text style={styles.pageTitle} adjustsFontSizeToFit numberOfLines={1}>Portfolio</Text>
-            <Text style={styles.pageSubtitle} numberOfLines={1}>
-              {walletAddress ? walletAddress.slice(0, 8) + '...' + walletAddress.slice(-6) : 'No wallet connected'}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: walletAddress ? Colors.primary + '18' : Colors.error + '18' }]}>
-            <View style={[styles.statusDot, { backgroundColor: walletAddress ? Colors.primary : Colors.error }]} />
-            <Text style={[styles.statusText, { color: walletAddress ? Colors.primary : Colors.error }]}>
-              {walletAddress ? 'Active' : 'No Wallet'}
-            </Text>
-          </View>
+      <FlatList
+        data={SLIDES}
+        renderItem={renderItem}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        pagingEnabled
+        bounces={false}
+        keyExtractor={(item) => item.id}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+          useNativeDriver: false,
+        })}
+        scrollEventThrottle={32}
+        onViewableItemsChanged={viewableItemsChanged}
+        viewabilityConfig={viewConfig}
+        ref={slidesRef}
+      />
+
+      {/* Bottom Paginator & CTA */}
+      <View style={styles.bottomContainer}>
+        <View style={styles.paginator}>
+          {SLIDES.map((_, i) => {
+            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+            
+            const dotWidth = scrollX.interpolate({
+              inputRange,
+              outputRange: [8, 24, 8],
+              extrapolate: 'clamp',
+            });
+
+            const opacity = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.3, 1, 0.3],
+              extrapolate: 'clamp',
+            });
+
+            const backgroundColor = scrollX.interpolate({
+              inputRange,
+              outputRange: [Colors.textMuted, Colors.accentOrange, Colors.textMuted],
+              extrapolate: 'clamp',
+            });
+
+            return (
+              <Animated.View 
+                key={i.toString()} 
+                style={[styles.dot, { width: dotWidth, opacity, backgroundColor }]} 
+              />
+            );
+          })}
         </View>
 
-        {/* Net Worth Card */}
-        <View style={styles.netWorthCard}>
-          <View style={styles.netWorthHeader}>
-            <Text style={styles.netWorthLabel}>Consolidated Net Worth</Text>
-            {isFetching && <ActivityIndicator size="small" color={Colors.primary} />}
-          </View>
-          <Text style={styles.netWorthAmount} adjustsFontSizeToFit numberOfLines={1}>${walletAddress ? netWorth : '0.00'}</Text>
-          <Text style={styles.netWorthCurrency}>USD</Text>
-
-          <View style={styles.assetRow}>
-            <View style={styles.assetChip}>
-              <View style={[styles.assetDot, { backgroundColor: Colors.primary }]} />
-              <Text style={styles.assetText}>{ethBalance} ETH</Text>
-            </View>
-            <View style={styles.assetChip}>
-              <View style={[styles.assetDot, { backgroundColor: Colors.secondary }]} />
-              <Text style={styles.assetText}>{usdcBalance} USDC</Text>
-            </View>
-            {customTokens?.map((t: any) => (
-              <View key={t.address} style={styles.assetChip}>
-                <View style={[styles.assetDot, { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.textMuted }]} />
-                <Text style={styles.assetText}>{t.balance} {t.symbol}</Text>
-              </View>
-            ))}
-          </View>
-          
-          <TouchableOpacity style={{ marginTop: Spacing.md, alignSelf: 'flex-end' }}>
-            <Text style={{ color: Colors.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, textDecorationLine: 'underline' }}>+ Import Token</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Actions */}
-        {walletAddress ? (
-          <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => router.push('/transfer')}>
-              <Text style={styles.primaryButtonText}>New Transfer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.8} onPress={() => router.push('/security')}>
-              <Text style={styles.secondaryButtonText}>Sign Pending</Text>
-              <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.primaryButton, { marginTop: Spacing.md }]}
-            onPress={handleCreateWallet}
-            disabled={isRegistering}
-            activeOpacity={0.8}
-          >
-            {isRegistering
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryButtonText}>Create Wallet with FaceID</Text>
-            }
-          </TouchableOpacity>
-        )}
-
-        {/* Advanced Features */}
-        <Text style={styles.sectionLabel}>Advanced Capabilities</Text>
-        {[
-          { title: 'Session Keys', subtitle: '1-click signing for 8 hours', icon: 'flash', route: '/session-keys' },
-          { title: 'DCA Schedule', subtitle: 'Auto-invest every 7 days', icon: 'repeat', route: '/dca' },
-          { title: 'Intent Batches', subtitle: 'Multi-step atomic swaps', icon: 'layers', route: '/intents' },
-        ].map((item) => (
-          <TouchableOpacity key={item.title} style={styles.featureCard} activeOpacity={0.75} onPress={() => router.push(item.route as any)}>
-            <View style={styles.featureIconBox}>
-              <Ionicons name={item.icon as any} size={22} color={Colors.textPrimary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>{item.title}</Text>
-              <Text style={styles.featureSubtitle}>{item.subtitle}</Text>
-            </View>
-            <Text style={[styles.featureSubtitle, { color: Colors.accentAzure }]}>Configure</Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* Footer badge */}
-        <View style={styles.footerBadge}>
-          <Text style={styles.footerText}>ZeroDev ERC-4337</Text>
-        </View>
-
-      </ScrollView>
+        <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8} onPress={scrollToNext}>
+          <Text style={styles.ctaText}>
+            {currentIndex === SLIDES.length - 1 ? 'Launch App' : 'Next'}
+          </Text>
+          {currentIndex === SLIDES.length - 1 && (
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: Colors.backgroundInk,
   },
-  scroll: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
+  skipButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    right: 24,
+    zIndex: 10,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.sm,
+  skipText: {
+    color: Colors.textMuted,
+    fontSize: 15,
+    fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  pageTitle: {
+  slide: {
+    width,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  iconContainer: {
+    width: 250,
+    height: 250,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+  },
+  iconRing: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: Colors.accentOrange,
+    opacity: 0.2,
+  },
+  iconRingInner: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1,
+    borderColor: Colors.accentOrange,
+    opacity: 0.4,
+  },
+  icon: {
+    shadowColor: Colors.accentOrange,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  textContainer: {
+    alignItems: 'center',
+  },
+  title: {
     fontSize: 32,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textPrimary,
+    marginBottom: 16,
+    textAlign: 'center',
     letterSpacing: -0.5,
   },
-  pageSubtitle: {
-    fontSize: 13,
+  description: {
+    fontSize: 16,
     color: Colors.textMuted,
-    fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace',
-    marginTop: 2,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 16,
   },
-  statusBadge: {
+  bottomContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 50 : 30,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 32,
+  },
+  paginator: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Radius.sm,
+    height: 10,
+    justifyContent: 'center',
+    marginBottom: 32,
   },
-  statusDot: { width: 7, height: 7, borderRadius: 99 },
-  statusText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
-  netWorthCard: {
-    backgroundColor: Colors.surfaceZinc,
-    borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  dot: {
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
   },
-  netWorthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  netWorthLabel: { fontSize: 11, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
-  netWorthAmount: { fontSize: 48, fontWeight: '600', color: Colors.textPrimary, letterSpacing: -1.5, marginTop: Spacing.md },
-  netWorthCurrency: { fontSize: 18, color: Colors.textMuted, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace', marginTop: 2 },
-  assetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginTop: Spacing.lg, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
-  assetChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  assetDot: { width: 10, height: 10, borderRadius: 2 },
-  assetText: { fontSize: 15, color: Colors.textPrimary, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
-  actionsRow: { flexDirection: 'row', gap: Spacing.sm },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: Colors.accentAzure,
-    borderRadius: Radius.sm,
-    height: 52,
+  ctaButton: {
+    backgroundColor: Colors.accentOrange,
+    height: 56,
+    borderRadius: Radius.full,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
     gap: 8,
+    shadowColor: Colors.accentOrange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: Colors.surfaceContainer,
-    borderRadius: Radius.sm,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flexDirection: 'row',
-    gap: 8,
+  ctaText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
-  secondaryButtonText: { color: Colors.textPrimary, fontSize: 15, fontWeight: '500' },
-  badge: { backgroundColor: Colors.tertiary, borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
-  sectionLabel: { fontSize: 11, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace', marginTop: Spacing.sm },
-  featureCard: {
-    backgroundColor: Colors.surfaceZinc,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  featureIconBox: { width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.surfaceContainer, alignItems: 'center', justifyContent: 'center' },
-  featureTitle: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
-  featureSubtitle: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  footerBadge: {
-    backgroundColor: Colors.surfaceContainer,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: Spacing.sm,
-  },
-  footerText: { fontSize: 11, color: Colors.textMuted, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace', letterSpacing: 0.5 },
 });

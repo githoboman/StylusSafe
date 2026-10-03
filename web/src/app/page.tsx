@@ -1,332 +1,155 @@
-'use client';
-
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { SignModal } from '@/components/SignModal';
-import { SessionKeyCard } from '@/components/SessionKeyCard';
-import { SubscriptionCard } from '@/components/SubscriptionCard';
-import { IntentBatchCard } from '@/components/IntentBatchCard';
-import { FundWalletModal } from '@/components/FundWalletModal';
-import { SendModal } from '@/components/SendModal';
-import { ImportTokenModal } from '@/components/ImportTokenModal';
-import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
-import { useBalances } from '@/hooks/useBalances';
 
-const CHAINS = [
-  { name: 'Arbitrum Sepolia', id: 421614, color: '#12AAFF' },
-  { name: 'Base', id: 8453, color: '#0052FF' },
-  { name: 'Optimism', id: 10, color: '#FF0420' },
-  { name: 'Polygon', id: 137, color: '#8247E5' },
-  { name: 'Ethereum', id: 1, color: '#627EEA' },
-];
-
-export default function Dashboard() {
-  const [isSignModalOpen, setIsSignModalOpen] = useState(false);
-  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
-  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  
-  const [selectedChain, setSelectedChain] = useState(421614);
-  const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
-
-  const handleImportToken = (addr: string) => {
-    addCustomToken(addr);
-  };
-
-  // Calculate Net Worth
-  const ethValue = parseFloat(ethBalance.replace(/,/g, '')) * 3000;
-  const usdcValue = parseFloat(usdcBalance.replace(/,/g, ''));
-  const netWorth = (ethValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+export default function LandingPage() {
   return (
-    <div className="p-4 md:p-10 w-full max-w-7xl mx-auto flex flex-col gap-8 md:gap-12">
-
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-2">Portfolio Overview</h1>
-          <p className="text-text-muted">
-            {address ? (
-              <span className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-sm break-all">Wallet: {address}</span>
-                <button
-                  onClick={disconnect}
-                  title="Disconnect wallet"
-                  className="font-mono text-[11px] text-text-muted hover:text-error transition-colors uppercase tracking-wider"
-                >
-                  [disconnect]
-                </button>
-              </span>
-            ) : (
-              'Manage your cross-chain assets securely without seed phrases.'
-            )}
-          </p>
+    <div className="min-h-screen bg-background-ink text-text-primary overflow-x-hidden selection:bg-accent-orange selection:text-white">
+      
+      {/* Navigation */}
+      <nav className="fixed top-0 w-full border-b border-border-whisper bg-background-ink/80 backdrop-blur-md z-50">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-orange to-red-600 flex items-center justify-center shadow-lg shadow-accent-orange/20">
+              <span className="material-symbols-outlined text-white text-xl">shield_lock</span>
+            </div>
+            <span className="text-xl font-bold tracking-tight">StylusSafe</span>
+          </div>
+          <Link 
+            href="/dashboard"
+            className="h-10 px-6 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-full font-medium text-sm flex items-center transition-all shadow-[0_0_20px_rgba(255,69,0,0.3)] hover:shadow-[0_0_30px_rgba(255,69,0,0.5)]"
+          >
+            Launch App
+          </Link>
         </div>
-        <div className="flex flex-col gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-1.5 bg-surface-container px-3 py-1.5 rounded-[4px] border border-border-whisper">
-            <span className={`w-2 h-2 rounded-full ${address ? 'bg-accent-orange' : 'bg-error'}`}></span>
-            <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">
-              {address ? '3 of 5 Policy Active' : 'Unregistered'}
-            </span>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative pt-48 pb-32 px-6">
+        {/* Abstract background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-accent-orange/10 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="max-w-5xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-accent-orange/30 text-accent-orange text-xs font-mono uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <span className="w-2 h-2 rounded-full bg-accent-orange animate-pulse"></span>
+            ZeroDev ERC-4337 Live on Arbitrum
           </div>
           
-          <div className="relative group">
-            <div className="flex items-center justify-between gap-3 bg-surface-container border border-border-whisper text-text-primary px-3 py-2 rounded-[4px] cursor-pointer hover:border-text-muted transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: CHAINS.find(c => c.id === selectedChain)?.color }}></span>
-                <span className="font-mono text-[11px] uppercase tracking-wider">{CHAINS.find(c => c.id === selectedChain)?.name}</span>
-              </div>
-              <span className="material-symbols-outlined text-[14px] text-text-muted">expand_more</span>
-            </div>
-            
-            <div className="absolute right-0 top-full mt-1 w-full min-w-[160px] bg-surface-container-high border border-border-whisper rounded-[4px] shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 overflow-hidden">
-              {CHAINS.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedChain(c.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-zinc transition-colors ${selectedChain === c.id ? 'bg-surface-zinc' : ''}`}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }}></span>
-                  <span className="font-mono text-[11px] text-text-primary uppercase tracking-wider">{c.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        {/* Left column — 8 cols */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-
-          {/* Net Worth card */}
-          <div className="bg-surface-zinc rounded-[24px] p-8 md:p-10 border border-border-whisper">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Consolidated Net Worth</span>
-              {isFetching && <span className="w-4 h-4 border-2 border-accent-orange border-t-transparent rounded-full animate-spin"></span>}
-            </div>
-            
-            <div className="flex items-baseline gap-3 my-4">
-              <span className="text-5xl md:text-7xl text-text-primary tracking-tight font-semibold">
-                ${address ? netWorth : '0.00'}
-              </span>
-              <span className="font-mono text-lg text-text-muted">USD</span>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-whisper">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-[2px] bg-accent-orange"></span>
-                <span className="font-mono text-base text-text-primary">{address ? ethBalance : '0.00'} ETH</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-[2px] bg-text-muted"></span>
-                <span className="font-mono text-base text-text-primary">{address ? usdcBalance : '0.00'} USDC</span>
-              </div>
-              {customTokens.map(t => (
-                <div key={t.address} className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-[2px] border border-text-muted/30"></span>
-                  <span className="font-mono text-base text-text-primary" title={t.address}>{t.balance} {t.symbol}</span>
-                </div>
-              ))}
-              <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="font-mono text-[11px] text-text-muted hover:text-accent-orange uppercase tracking-wider underline underline-offset-4 ml-auto transition-colors"
-              >
-                + Import Token
-              </button>
-            </div>
-          </div>
-
-          {/* Quick actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link
-              href="/transfer"
-              className={`h-14 px-6 rounded-[4px] flex items-center justify-center gap-3 transition-all font-medium text-base shadow-sm
-                ${address ? 'bg-accent-orange hover:bg-accent-orange/90 text-white' : 'bg-surface-container text-text-muted cursor-not-allowed pointer-events-none'}`}
+          <h1 className="text-6xl md:text-8xl font-bold tracking-tighter mb-8 leading-[1.1] animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+            Make Blockchains <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-orange to-red-600">Completely Invisible.</span>
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-text-muted max-w-3xl mx-auto mb-12 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+            The ultimate Intent-Based Smart Wallet. Create an account with FaceID. Execute 1-click cross-chain swaps without ever holding gas tokens.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
+            <Link 
+              href="/dashboard"
+              className="h-14 px-8 bg-text-primary text-background-ink hover:bg-gray-200 rounded-full font-semibold text-lg flex items-center gap-2 transition-all w-full sm:w-auto justify-center"
             >
-              <span className="material-symbols-outlined text-[20px]">swap_calls</span>
-              Cross-Chain Swap
+              Enter the Vault
+              <span className="material-symbols-outlined">arrow_forward</span>
             </Link>
+            <a 
+              href="#features"
+              className="h-14 px-8 bg-surface-container hover:bg-surface-container-high border border-border-whisper text-text-primary rounded-full font-medium text-lg flex items-center transition-all w-full sm:w-auto justify-center"
+            >
+              Explore Architecture
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Showcase Grid */}
+      <section id="features" className="py-32 px-6 bg-surface-zinc/30 border-y border-border-whisper relative">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-20 text-center">Engineered for absolute frictionlessness.</h2>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Feature 1 */}
+            <div className="bg-surface-container/50 border border-border-whisper p-8 rounded-[32px] hover:border-accent-orange/50 transition-colors group">
+              <div className="w-14 h-14 bg-surface-container-high border border-border-whisper rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                <span className="material-symbols-outlined text-accent-orange text-3xl">fingerprint</span>
+              </div>
+              <h3 className="text-2xl font-semibold mb-3">Seedless Onboarding</h3>
+              <p className="text-text-muted leading-relaxed">
+                Powered by WebAuthn passkeys. Create a secure, non-custodial wallet instantly using FaceID, TouchID, or your device passcode. No 24-word phrases to lose.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="bg-surface-container/50 border border-border-whisper p-8 rounded-[32px] hover:border-accent-orange/50 transition-colors group">
+              <div className="w-14 h-14 bg-surface-container-high border border-border-whisper rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                <span className="material-symbols-outlined text-accent-orange text-3xl">route</span>
+              </div>
+              <h3 className="text-2xl font-semibold mb-3">1-Click Cross-Chain</h3>
+              <p className="text-text-muted leading-relaxed">
+                Integrated deeply with Li.Fi. Declare your intent to turn Arbitrum USDC into a Base meme coin. We handle the bridging, routing, and swapping in a single atomic transaction.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="bg-surface-container/50 border border-border-whisper p-8 rounded-[32px] hover:border-accent-orange/50 transition-colors group">
+              <div className="w-14 h-14 bg-surface-container-high border border-border-whisper rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                <span className="material-symbols-outlined text-accent-orange text-3xl">local_gas_station</span>
+              </div>
+              <h3 className="text-2xl font-semibold mb-3">Zero Gas Fees</h3>
+              <p className="text-text-muted leading-relaxed">
+                Never worry about holding ETH on a new chain. Our ZeroDev ERC-4337 Paymaster architecture sponsors your gas fees transparently across all EVM rollups.
+              </p>
+            </div>
             
-            {!address ? (
-              <div className="flex gap-4">
-                <button
-                  onClick={() => {
-                    setIsRegistering(true);
-                    setIsSigningIn(false);
-                    setIsSignModalOpen(true);
-                  }}
-                  className="h-14 px-6 flex-1 bg-accent-orange hover:bg-accent-orange/90 rounded-[4px] flex items-center justify-center gap-3 transition-all text-white font-semibold text-base shadow-sm"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                  Create Wallet
-                </button>
-                <button
-                  onClick={() => {
-                    setIsRegistering(false);
-                    setIsSigningIn(true);
-                    setIsSignModalOpen(true);
-                  }}
-                  className="h-14 px-6 flex-1 bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-3 transition-all text-text-primary font-medium text-base border border-border-whisper shadow-sm"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">login</span>
-                  Sign In
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-4">
-                <button
-                  onClick={() => setIsFundModalOpen(true)}
-                  className="h-14 px-4 flex-1 min-w-[100px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">qr_code</span>
-                  Fund
-                </button>
-                <button
-                  onClick={() => setIsSendModalOpen(true)}
-                  className="h-14 px-4 flex-1 min-w-[100px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">send</span>
-                  Send
-                </button>
-                <button
-                  onClick={() => {
-                    setIsRegistering(false);
-                    setIsSigningIn(false);
-                    setIsSignModalOpen(true);
-                  }}
-                  className="h-14 px-4 flex-[2] min-w-[180px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
-                  type="button"
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-orange opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-orange"></span>
-                  </span>
-                  Sign Pending
-                  <span className="font-mono text-xs text-white bg-accent-orange px-2 py-0.5 rounded-[4px] ml-1">2</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Activity */}
-          {address && (
-            <div className="bg-surface-zinc rounded-[24px] p-6 border border-border-whisper mt-2">
-              <div className="flex items-center justify-between mb-4 px-2">
-                <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Recent Activity</span>
-                <Link href="/activity" className="text-xs text-accent-orange hover:underline">View All</Link>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Cross-Chain Swap</h4>
-                      <p className="text-xs text-text-muted">Arbitrum → Base</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-text-primary">-1.50 ETH</h4>
-                    <p className="text-xs text-green-500 font-mono">Success</p>
-                  </div>
+            {/* Feature 4 (Large spanning) */}
+            <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-surface-container to-background-ink border border-border-whisper p-10 md:p-16 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-10 overflow-hidden relative group">
+              <div className="absolute right-0 top-0 w-[500px] h-[500px] bg-accent-orange/10 blur-[100px] pointer-events-none rounded-full translate-x-1/2 -translate-y-1/2" />
+              
+              <div className="max-w-xl relative z-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-orange/10 text-accent-orange text-xs font-mono uppercase tracking-widest mb-6 border border-accent-orange/20">
+                  Developer Experience
                 </div>
-
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">autorenew</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Netflix Web3</h4>
-                      <p className="text-xs text-text-muted">Pull Payment</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-text-primary">-15.00 USDC</h4>
-                    <p className="text-xs text-green-500 font-mono">Success</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">south_west</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Receive</h4>
-                      <p className="text-xs text-text-muted">From 0x71C...9A23</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-green-500">+4,500.00 USDC</h4>
-                    <p className="text-xs text-text-muted font-mono">2 days ago</p>
+                <h3 className="text-4xl font-bold mb-6 leading-tight">Built for automated trading & AI Agents.</h3>
+                <p className="text-lg text-text-muted mb-8 leading-relaxed">
+                  Instead of handing over your private keys to a Telegram trading bot, StylusSafe allows you to issue <strong>cryptographically scoped Session Keys</strong>. Restrict your AI agents to only trade on Uniswap, with a $1,000 limit, expiring in 24 hours. Speed meets absolute security.
+                </p>
+                <ul className="space-y-4 font-mono text-sm text-text-primary">
+                  <li className="flex items-center gap-3"><span className="material-symbols-outlined text-accent-orange text-lg">check_circle</span> ERC-4337 Account Abstraction</li>
+                  <li className="flex items-center gap-3"><span className="material-symbols-outlined text-accent-orange text-lg">check_circle</span> Passkey / WebAuthn Signatures</li>
+                  <li className="flex items-center gap-3"><span className="material-symbols-outlined text-accent-orange text-lg">check_circle</span> Modular Session Keys</li>
+                </ul>
+              </div>
+              
+              {/* Abstract Visual Representation */}
+              <div className="relative w-full max-w-sm aspect-square bg-surface-container-high border border-border-whisper rounded-2xl shadow-2xl flex items-center justify-center z-10 group-hover:border-accent-orange/30 transition-colors">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-48 h-48 rounded-full border border-accent-orange/20 animate-[spin_10s_linear_infinite]" />
+                  <div className="absolute w-32 h-32 rounded-full border border-accent-orange/40 animate-[spin_7s_linear_infinite_reverse]" />
+                  <div className="absolute w-16 h-16 rounded-full bg-accent-orange shadow-[0_0_50px_rgba(255,69,0,0.8)] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white">smart_toy</span>
                   </div>
                 </div>
               </div>
             </div>
-          )}
-
-        </div>
-
-        {/* Right column — 4 cols */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-
-          <h2 className="text-sm text-text-muted uppercase tracking-widest font-medium px-1">Advanced Capabilities</h2>
-
-          <div className="flex flex-col gap-4">
-            <SessionKeyCard />
-            <SubscriptionCard />
-            <IntentBatchCard />
           </div>
-
-          <div className="p-5 bg-surface-container/30 rounded-[4px] flex items-center justify-between border border-border-whisper">
-            <div className="flex items-center gap-3 text-text-muted">
-              <span className="material-symbols-outlined text-[20px] text-accent-orange">verified_user</span>
-              <span className="font-mono text-sm">Rust-WASM Verified</span>
-            </div>
-            <span className="font-mono text-xs text-accent-orange bg-accent-orange/10 px-2 py-1 rounded-[4px]">Stylus 0.5.2</span>
-          </div>
-
         </div>
-      </div>
+      </section>
 
-      <SignModal 
-        isOpen={isSignModalOpen} 
-        onClose={() => setIsSignModalOpen(false)} 
-        actionText={isRegistering ? "Create Wallet" : isSigningIn ? "Sign In" : "Sign Batch"}
-        amountText={isRegistering ? "No cost" : isSigningIn ? "Recover Session" : "Pending..."}
-        onSign={async (pin) => {
-          if (isRegistering) {
-            await register("StylusUser", pin);
-          } else if (isSigningIn) {
-            await login();
-          }
-        }}
-      />
-      <FundWalletModal 
-        isOpen={isFundModalOpen} 
-        onClose={() => setIsFundModalOpen(false)} 
-        address={address} 
-      />
-
-      <SendModal
-        isOpen={isSendModalOpen}
-        onClose={() => setIsSendModalOpen(false)}
-      />
-      <ImportTokenModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImport={handleImportToken}
-      />
+      {/* CTA */}
+      <section className="py-32 px-6 text-center">
+        <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-8">Ready to navigate the multichain?</h2>
+        <Link 
+          href="/dashboard"
+          className="inline-flex h-16 px-10 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-full font-semibold text-lg items-center justify-center gap-3 transition-all shadow-[0_0_30px_rgba(255,69,0,0.4)] hover:shadow-[0_0_50px_rgba(255,69,0,0.6)] hover:scale-105"
+        >
+          Create Wallet with FaceID
+          <span className="material-symbols-outlined">fingerprint</span>
+        </Link>
+      </section>
+      
+      <footer className="py-8 text-center border-t border-border-whisper text-text-muted text-sm font-mono">
+        Built for the Arbitrum Singapore Buildathon
+      </footer>
     </div>
   );
 }
