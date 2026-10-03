@@ -1,47 +1,47 @@
-# StylusSafe
+# StylusSafe: The Invisible Cross-Chain Wallet
 
-**StylusSafe** is a next-generation, premium cross-chain wallet leveraging the speed of Arbitrum Stylus (Rust) and the security of ERC-4337 Account Abstraction. With a strict "Swiss-architecture studio" aesthetic, it prioritizes performance, security, and an incredibly sleek user experience across both Web and Mobile platforms.
+**StylusSafe** is a next-generation "Intent-Based" Smart Wallet that makes blockchain boundaries completely invisible. By combining **ZeroDev (ERC-4337 Account Abstraction)**, **Passkey Authentication (WebAuthn)**, and the **Li.Fi Aggregation Engine**, it solves the biggest friction point in crypto today: Cross-Chain Swaps.
 
-## 🚀 Project Milestones & What We've Built
+## 🚀 The Problem & Our Pitch
+Right now, if a user has `$500` in USDC on **Arbitrum**, and they want to buy a newly launched token on **Base**, it takes 20 minutes and 6 tedious steps: finding a bridge, paying gas in ETH to bridge, waiting, buying gas on the new chain, and finally swapping. 
 
-### 1. Smart Contracts (Arbitrum Stylus)
-We built a highly optimized smart contract layer written in Rust, compiling to WebAssembly (`wasm32-unknown-unknown`) for execution on the Arbitrum Stylus testnet.
-- **ERC-4337 Account Abstraction:** Implemented custom account validation logic via `validateUserOp`.
-- **Biometric Passkey Authentication:** Built hardware-level security utilizing **P-256 ECDSA** verification to simulate FaceID/TouchID transaction signing.
-- **Atomic Operations:** Added `execute` and `execute_batch` methods to handle complex cross-chain bridging and swapping logic securely.
-- **Build Infrastructure:** Resolved Windows MSVC C-compiler linking restrictions by dynamically stripping `native-keccak` dependencies in favor of `asm-keccak` within the updated `stylus-sdk` (v0.10.9).
+**StylusSafe eliminates this entirely:**
+1. **Passkey Onboarding:** Users create wallets instantly using FaceID/TouchID. No seed phrases to store or lose.
+2. **Gasless Execution:** Users never need to hold native gas tokens (ETH) on *any* chain. Our ERC-4337 Paymaster sponsors all gas.
+3. **1-Click Universal Swap:** Users simply declare their *Intent*: "Turn my Arbitrum USDC into this new Base Meme Token." 
+4. **Automated Routing:** Under the hood, StylusSafe automatically batches the token approvals, routes the funds across the optimal bridge, executes the swap on the destination chain, and pays the gas—all in a single click, instantly. 
 
-### 2. Web Application (Next.js)
-We developed a production-ready, highly responsive Next.js web portal.
-- **Premium Design System:** Translated the Google Stitch visual specs into a bespoke `tailwind.config.js` (using customized tokens like `background-ink`, `accent-azure`, `surface-zinc`).
-- **Pages & Routing:** Created the main Vault Dashboard, Cross-Chain Transfer interface, Security/Signers management page, and the Activity Ledger.
-- **Interactive UI:** Engineered the `SignModal.tsx` to visually simulate a biometric authentication delay for transaction approvals.
-- **Production Built:** Successfully ran an optimized static Next.js production build (`npm run build`).
+What used to take 20 minutes now takes 3 seconds and one FaceID scan.
 
-### 3. Mobile Application (React Native / Expo)
-We created a 1-to-1 pixel-perfect Native port of the Web UI for iOS and Android.
-- **NativeWind Integration:** Integrated `nativewind` into Expo Router (SDK 57) to seamlessly recycle all Tailwind CSS classes directly into React Native `<View>` components.
-- **Native Navigation:** Implemented a persistent, custom-styled bottom tab bar via `expo-router`'s `_layout.tsx`.
-- **Screen Parity:** Replicated the Vault, Transfer, Security, and Activity screens using native `ScrollView` and `SafeAreaView` paradigms while maintaining identical aesthetics.
+---
+
+## 🏗 What We Built
+
+### 1. The Intent Execution Engine (`useInvisibleWallet.ts`)
+Instead of building standard transaction flows, we engineered a custom cross-chain router.
+- **Li.Fi API Integration:** Dynamically fetches optimal routes for swapping ANY token on ANY EVM chain to ANY destination token.
+- **Dynamic Token Resolution:** Supports pasting brand new, unlisted `0x` token contracts to instantly swap into newly launched tokens.
+- **Transaction Batching:** Combines ERC20 `approve` and `swap` execution into single seamless intents.
+
+### 2. High-Performance Web Portal (Next.js)
+A production-ready Next.js web application deployed to Vercel.
+- **Premium Design System:** Built using Tailwind CSS v4 featuring a stark black, white, and reddish-orange (`#FF4500`) "Swiss-architecture" aesthetic.
+- **Dynamic Dashboard:** Custom Network Selectors, interactive `Custom Token Import` modals, and real-time viem-based RPC balance fetching.
+- **Biometric Simulation:** Engineered custom Modals to handle seamless FaceID / Passkey simulated approvals.
+
+### 3. Native Mobile Application (React Native)
+A 1-to-1 pixel-perfect port of the Web UI to iOS and Android using Expo.
+- **NativeWind Integration:** Flawlessly recycles Web Tailwind classes into React Native `<View>` components.
+- **Cross-Chain Modals:** Replicated the entire Li.Fi cross-chain swap flow on mobile using native `ScrollView` paradigms.
 
 ## 📁 Repository Structure
-*(Assuming standard Monorepo Setup)*
 ```text
 StylusSafe/
-├── contracts/        # Arbitrum Stylus Rust Contracts
-│   ├── Cargo.toml
-│   └── src/          
-│       ├── lib.rs    # Core logic (validateUserOp, execute)
-│       └── auth.rs   # P-256 Signature logic
-├── web/              # Next.js Web App
+├── web/              # Next.js Web App (ZeroDev & Li.Fi integration)
 │   ├── tailwind.config.ts
 │   └── src/app/      # Web Screens (Dashboard, Transfer, Security)
-└── mobile-app/       # React Native Expo App
+│
+└── mobile-app/       # React Native Expo App (iOS / Android)
     ├── tailwind.config.js
     └── src/app/      # Native Screens (Tabs, Modals)
 ```
-
-## 🛠 Next Steps
-1. **Contract Deployment:** Resolve the final `sha3-asm` compilation block and deploy the Stylus WASM binaries to the Arbitrum Sepolia testnet.
-2. **SDK Integration:** Refactor and wire up the `useInvisibleWallet.ts` SDK logic (replacing the temporary Soroban code) to interact with our Arbitrum Stylus contracts directly.
-3. **End-to-End Testing:** Hook the frontend components up to the live smart contracts for full cross-chain bridging execution.

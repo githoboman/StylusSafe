@@ -102,23 +102,33 @@ type InvisibleWallet = {
 
 export function useInvisibleWallet(config: Partial<WalletConfig> = {}): InvisibleWallet {
     // Determine Project ID (fallback to default if undefined)
-    const projectId = process.env.EXPO_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+    const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
     
     const { 
         factoryAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`,
-        rpcUrl = process.env.EXPO_PUBLIC_ZERODEV_BUNDLER_URL || `https://rpc.zerodev.app/api/v2/bundler/${projectId}`, 
+        rpcUrl = process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_URL || `https://rpc.zerodev.app/api/v2/bundler/${projectId}`, 
         chainId = 421614, 
         initCodeHash = '0x0000000000000000000000000000000000000000' as `0x${string}`, 
-        paymasterUrl = process.env.EXPO_PUBLIC_ZERODEV_PAYMASTER_URL || `https://rpc.zerodev.app/api/v2/paymaster/${projectId}` 
+        paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || `https://rpc.zerodev.app/api/v2/paymaster/${projectId}` 
     } = config;
 
-        const [address, setAddress] = useState<string | null>(null);
+    const [address, setAddress] = useState<string | null>(() => {
+        // Lazy initializer: runs once synchronously on first render (client-side only).
+        // This eliminates the flash where returning users see "Create Wallet" for one frame.
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('invisible_wallet_address') ?? null;
+        }
+        return null;
+    });
+    const [isPending, setIsPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
 
     useEffect(() => {
         setHasMounted(true);
-        AsyncStorage.getItem('invisible_wallet_address').then(stored => {
-            if (stored) setAddress(stored);
-        });
+        // Re-read on mount in case storage was updated by another tab.
+        const stored = localStorage.getItem('invisible_wallet_address');
+        if (stored) setAddress(stored);
     }, []);
 
     // ── register ──────────────────────────────────────────────────────────────
@@ -138,26 +148,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
                 publicKeyHex = bufferToHex(publicKeyBytes);
                 
-                AsyncStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
-                AsyncStorage.setItem('invisible_wallet_key_iv', iv);
-                AsyncStorage.setItem('invisible_wallet_mode', 'pin');
+                localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
+                localStorage.setItem('invisible_wallet_key_iv', iv);
+                localStorage.setItem('invisible_wallet_mode', 'pin');
             } else {
                 // WEBAUTHN MODE (Mobile/Hardware)
                 const challenge = crypto.getRandomValues(new Uint8Array(32));
-                const credential = await Passkey.create({
-                        challenge: 'random_challenge_base64_string',
-                        rp: { name: 'Invisible Wallet', id: 'invisiblewallet.com' },
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge,
+                        rp: { name: 'Invisible Wallet' },
                         user: {
-                            id: 'user_id_base64_string',
-                            name: username,
-                            displayName: username,
-                        },
-                        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-                        authenticatorSelection: {
-                            residentKey: 'preferred',
-                            userVerification: 'required',
-                        },
-                    }).encode(username),
+                            id: new TextEncoder().encode(username),
                             name: username,
                             displayName: username,
                         },
@@ -168,16 +170,16 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                             userVerification: 'required',
                         },
                     },
-                }) ;
+                }) as PublicKeyCredential;
 
                 if (!credential) throw new Error('Credential creation failed');
 
-                const response = credential.response ;
+                const response = credential.response as AuthenticatorAttestationResponse;
                 publicKeyBytes = await extractP256PublicKey(response);
                 publicKeyHex = bufferToHex(publicKeyBytes);
                 
-                AsyncStorage.setItem('invisible_wallet_key_id', credential.id);
-                AsyncStorage.setItem('invisible_wallet_mode', 'webauthn');
+                localStorage.setItem('invisible_wallet_key_id', credential.id);
+                localStorage.setItem('invisible_wallet_mode', 'webauthn');
             }
             
             // ── Resolve the canonical wallet address from the factory ──────────
@@ -189,7 +191,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 const RPC = 'https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e';
                 const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
                     ? factoryAddress
-                    : (process.env.EXPO_PUBLIC_FACTORY_ADDRESS as `0x${string}`) ||
+                    : (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) ||
                       '0xe98c353fF883445995021182D918E3577365b284';
 
                 const pc = _createPublicClient({ transport: _http(RPC) });
@@ -210,8 +212,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 walletAddress = computeWalletAddress(factoryAddress, publicKeyBytes, initCodeHash);
             }
 
-            AsyncStorage.setItem('invisible_wallet_address', walletAddress);
-            AsyncStorage.setItem('invisible_wallet_public_key', publicKeyHex);
+            localStorage.setItem('invisible_wallet_address', walletAddress);
+            localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
             setAddress(walletAddress);
 
             return { walletAddress };
@@ -236,7 +238,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         try {
             let pubKeyBytes = publicKeyBytes;
             if (!pubKeyBytes) {
-                const hex = await AsyncStorage.getItem('invisible_wallet_public_key');
+                const hex = localStorage.getItem('invisible_wallet_public_key');
                 if (!hex) throw new Error(
                     'No public key found. Call register() first, or pass publicKeyBytes explicitly.'
                 );
@@ -249,7 +251,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             // We just compute the address deterministically and store it!
 
             setAddress(walletAddress);
-            AsyncStorage.setItem('invisible_wallet_address', walletAddress);
+            localStorage.setItem('invisible_wallet_address', walletAddress);
             return { walletAddress, alreadyDeployed: false };
 
         } catch (err: unknown) {
@@ -264,7 +266,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     // ── login ─────────────────────────────────────────────────────────────────
 
     const login = async () => {
-        const stored = await AsyncStorage.getItem('invisible_wallet_address');
+        const stored = localStorage.getItem('invisible_wallet_address');
         if (stored) {
             setAddress(stored);
         } else {
@@ -275,12 +277,12 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     // ── disconnect ────────────────────────────────────────────────────────────
 
     const disconnect = () => {
-        AsyncStorage.removeItem('invisible_wallet_address');
-        AsyncStorage.removeItem('invisible_wallet_public_key');
-        AsyncStorage.removeItem('invisible_wallet_key_id');
-        AsyncStorage.removeItem('invisible_wallet_encrypted_key');
-        AsyncStorage.removeItem('invisible_wallet_key_iv');
-        AsyncStorage.removeItem('invisible_wallet_mode');
+        localStorage.removeItem('invisible_wallet_address');
+        localStorage.removeItem('invisible_wallet_public_key');
+        localStorage.removeItem('invisible_wallet_key_id');
+        localStorage.removeItem('invisible_wallet_encrypted_key');
+        localStorage.removeItem('invisible_wallet_key_iv');
+        localStorage.removeItem('invisible_wallet_mode');
         setAddress(null);
     };
 
@@ -293,8 +295,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const mode = await AsyncStorage.getItem('invisible_wallet_mode') || 'webauthn';
-            const publicKeyHex = await AsyncStorage.getItem('invisible_wallet_public_key');
+            const mode = localStorage.getItem('invisible_wallet_mode') || 'webauthn';
+            const publicKeyHex = localStorage.getItem('invisible_wallet_public_key');
             
             if (!publicKeyHex) {
                 throw new Error("No wallet keys found. Please register first.");
@@ -303,8 +305,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             if (mode === 'pin') {
                 if (!pin) throw new Error("PIN is required for this wallet.");
                 
-                const encryptedJwk = await AsyncStorage.getItem('invisible_wallet_encrypted_key');
-                const iv = await AsyncStorage.getItem('invisible_wallet_key_iv');
+                const encryptedJwk = localStorage.getItem('invisible_wallet_encrypted_key');
+                const iv = localStorage.getItem('invisible_wallet_key_iv');
                 if (!encryptedJwk || !iv) throw new Error("Wallet keys corrupted.");
 
                 // 1. Decrypt private key using PIN
@@ -344,7 +346,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             } else {
                 // WEBAUTHN MODE
-                const keyId = await AsyncStorage.getItem('invisible_wallet_key_id');
+                const keyId = localStorage.getItem('invisible_wallet_key_id');
                 if (!keyId) throw new Error('No key ID found. Please register first.');
 
                 if (signaturePayload.length !== 32) {
@@ -359,11 +361,13 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 const credIdBin = atob(keyId.replace(/-/g, '+').replace(/_/g, '/'));
                 const credId = Uint8Array.from(credIdBin, c => c.charCodeAt(0));
 
-                const assertion = await Passkey.get({
-                        challenge: 'random_challenge_base64_string',
-                        rpId: 'invisiblewallet.com',
+                const assertion = await navigator.credentials.get({
+                    publicKey: {
+                        challenge,
+                        allowCredentials: [{ id: credId, type: 'public-key' }],
                         userVerification: 'required',
-                    }) ;
+                    },
+                }) as PublicKeyCredential;
 
                 if (!assertion) throw new Error('Signing was cancelled');
 
@@ -390,11 +394,17 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     const submitUserOp = async (
         callData: `0x${string}`,
-        pin?: string
+        pin?: string,
+        overrideChainId?: number
     ): Promise<string> => {
         if (!address) throw new Error('Wallet not initialized.');
 
-        const publicClient = createPublicClient({ chain: { id: chainId } as any, transport: http(rpcUrl) });
+        const activeChainId = overrideChainId || chainId;
+        const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+        const activeRpcUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/bundler/${projectId}?chainId=${overrideChainId}` : rpcUrl;
+        const activePaymasterUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/paymaster/${projectId}?chainId=${overrideChainId}` : paymasterUrl;
+
+        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(activeRpcUrl) });
 
         // Fetch current nonce from EntryPoint
         const ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
@@ -407,11 +417,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
         let initCode = '0x';
         if (nonce === 0n) {
-            const pubKeyHex = await AsyncStorage.getItem('invisible_wallet_public_key');
+            const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
             if (pubKeyHex) {
                 const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
                     ? factoryAddress
-                    : (process.env.EXPO_PUBLIC_FACTORY_ADDRESS as `0x${string}`) || '0xe98c353fF883445995021182D918E3577365b284';
+                    : (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) || '0xe98c353fF883445995021182D918E3577365b284';
                 
                 const viem = await import('viem');
                 const deployCallData = viem.encodeFunctionData({
@@ -440,8 +450,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         };
 
         // Request paymaster sponsorship if a paymasterUrl is set
-        if (paymasterUrl) {
-            const pmResp = await fetch(paymasterUrl, {
+        if (activePaymasterUrl) {
+            const pmResp = await fetch(activePaymasterUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -499,7 +509,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         userOp.signature = encoded;
 
         // Submit to the bundler
-        const bundlerUrl = paymasterUrl || rpcUrl;
+        const bundlerUrl = activePaymasterUrl || activeRpcUrl;
         const bundlerResp = await fetch(bundlerUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -565,7 +575,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (userOpHash) {
                 try {
-                    const existing = JSON.parse(await AsyncStorage.getItem('invisible_wallet_activity') || '[]');
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'send',
@@ -578,7 +588,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                         icon: 'north_east',
                         txHash: userOpHash
                     });
-                    AsyncStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
                 } catch (e) {}
             }
             return { userOpHash };
@@ -593,9 +603,10 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     // ── executeCrossChainSwap (ZeroDev + Li.Fi) ──────────────────────────────
 
     const executeCrossChainSwap = async (
+        sourceChainId: number,
         destChainId: number,
-        fromToken: `0x${string}`,
-        toToken: `0x${string}`,
+        fromToken: string,
+        toToken: string,
         amount: bigint,
         recipient: `0x${string}`,
         pin?: string
@@ -607,7 +618,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             
             // 1. Fetch Li.Fi Quote
             const LIFI_API = 'https://li.quest/v1';
-            const quoteUrl = `${LIFI_API}/quote?fromChain=${chainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
+            const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
             
             const quoteResp = await fetch(quoteUrl);
             const quoteData = await quoteResp.json();
@@ -618,6 +629,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             const txRequest = quoteData.transactionRequest;
             const approvalAddress = quoteData.estimate.approvalAddress;
+            const actualFromToken = quoteData.action.fromToken.address as `0x${string}`;
 
             // 2. Prepare the calls (Approve + Swap)
             const dests: `0x${string}`[] = [];
@@ -625,8 +637,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const funcs: `0x${string}`[] = [];
 
             // If it's an ERC20 token and requires approval
-            if (fromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
-                dests.push(fromToken);
+            if (actualFromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
+                dests.push(actualFromToken);
                 values.push(0n);
                 funcs.push(encodeFunctionData({
                     abi: [{ name: 'approve', type: 'function', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' }],
@@ -648,10 +660,10 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             // 5. Submit via shared UserOp helper
-            const userOpHash = await submitUserOp(walletCallData, pin);
+            const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
             if (userOpHash) {
                 try {
-                    const existing = JSON.parse(await AsyncStorage.getItem('invisible_wallet_activity') || '[]');
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'swap',
@@ -664,7 +676,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                         icon: 'swap_horiz',
                         txHash: userOpHash
                     });
-                    AsyncStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
                 } catch (e) {}
             }
             return { userOpHash };
@@ -707,7 +719,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (userOpHash) {
                 try {
-                    const existing = JSON.parse(await AsyncStorage.getItem('invisible_wallet_activity') || '[]');
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'session',
@@ -718,14 +730,14 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                         icon: 'flash_on',
                         txHash: userOpHash
                     });
-                    AsyncStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
                 } catch (e) {}
             }
 
             // 4. Store the session key securely for 1-click signing later
-            AsyncStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
-            AsyncStorage.setItem('invisible_wallet_session_pk', ephemeralPk);
-            AsyncStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
+            localStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
+            localStorage.setItem('invisible_wallet_session_pk', ephemeralPk);
+            localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
 
             return { sessionKey: sessionKeyAddress };
         } catch (err: unknown) {
@@ -760,7 +772,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (userOpHash) {
                 try {
-                    const existing = JSON.parse(await AsyncStorage.getItem('invisible_wallet_activity') || '[]');
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'subscription',
@@ -773,7 +785,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                         icon: 'autorenew',
                         txHash: userOpHash
                     });
-                    AsyncStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
                 } catch (e) {}
             }
 
@@ -806,7 +818,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const userOpHash = await submitUserOp(callData, pin);
             if (userOpHash) {
                 try {
-                    const existing = JSON.parse(await AsyncStorage.getItem('invisible_wallet_activity') || '[]');
+                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'intent',
@@ -817,7 +829,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                         icon: 'stacks',
                         txHash: userOpHash
                     });
-                    AsyncStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
                 } catch (e) {}
             }
             return { userOpHash };
