@@ -396,7 +396,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         const activeRpcUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/bundler/${projectId}?chainId=${overrideChainId}` : rpcUrl;
         const activePaymasterUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/paymaster/${projectId}?chainId=${overrideChainId}` : paymasterUrl;
 
-        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(activeRpcUrl) });
+        // Chain reads (nonce, hash) go to a real node RPC — the bundler endpoint rejects plain eth_call with 400.
+        const chainRpc = activeChainId === 421614
+            ? 'https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e'
+            : activeRpcUrl;
+        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(chainRpc) });
 
         // Fetch current nonce from EntryPoint
         const ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
@@ -461,28 +465,44 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             userOp.preVerificationGas = pm.preVerificationGas ?? userOp.preVerificationGas;
         }
 
-        // Compute the real UserOpHash: keccak256(abi.encode(userOp) ++ chainId ++ entryPoint)
-        const { encodeAbiParameters, parseAbiParameters, keccak256: keccak } = await import('viem');
-        const packedUserOp = encodeAbiParameters(
-            parseAbiParameters('address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes'),
-            [
-                userOp.sender as `0x${string}`,
-                BigInt(userOp.nonce),
-                userOp.initCode as `0x${string}`,
-                userOp.callData as `0x${string}`,
-                BigInt(userOp.callGasLimit),
-                BigInt(userOp.verificationGasLimit),
-                BigInt(userOp.preVerificationGas),
-                BigInt(userOp.maxFeePerGas),
-                BigInt(userOp.maxPriorityFeePerGas),
-                userOp.paymasterAndData as `0x${string}`,
-                '0x' as `0x${string}`, // signature excluded from hash
-            ]
-        );
-        const chainIdHex = `0x${chainId.toString(16).padStart(64, '0')}`;
-        const entryPointHex = ENTRY_POINT.toLowerCase().replace('0x', '').padStart(64, '0');
-        const finalHashInput = packedUserOp + chainIdHex.slice(2) + entryPointHex;
-        const userOpHashHex = keccak(finalHashInput as `0x${string}`);
+        // Ask the EntryPoint itself for the canonical v0.6 userOpHash so it always matches
+        // what validateUserOp receives on-chain.
+        const userOpHashHex = await publicClient.readContract({
+            address: ENTRY_POINT,
+            abi: [{
+                type: 'function', name: 'getUserOpHash', stateMutability: 'view',
+                inputs: [{
+                    name: 'userOp', type: 'tuple', components: [
+                        { name: 'sender', type: 'address' },
+                        { name: 'nonce', type: 'uint256' },
+                        { name: 'initCode', type: 'bytes' },
+                        { name: 'callData', type: 'bytes' },
+                        { name: 'callGasLimit', type: 'uint256' },
+                        { name: 'verificationGasLimit', type: 'uint256' },
+                        { name: 'preVerificationGas', type: 'uint256' },
+                        { name: 'maxFeePerGas', type: 'uint256' },
+                        { name: 'maxPriorityFeePerGas', type: 'uint256' },
+                        { name: 'paymasterAndData', type: 'bytes' },
+                        { name: 'signature', type: 'bytes' },
+                    ]
+                }],
+                outputs: [{ type: 'bytes32' }],
+            }],
+            functionName: 'getUserOpHash',
+            args: [{
+                sender: userOp.sender as `0x${string}`,
+                nonce: BigInt(userOp.nonce),
+                initCode: userOp.initCode as `0x${string}`,
+                callData: userOp.callData as `0x${string}`,
+                callGasLimit: BigInt(userOp.callGasLimit),
+                verificationGasLimit: BigInt(userOp.verificationGasLimit),
+                preVerificationGas: BigInt(userOp.preVerificationGas),
+                maxFeePerGas: BigInt(userOp.maxFeePerGas),
+                maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
+                paymasterAndData: userOp.paymasterAndData as `0x${string}`,
+                signature: '0x',
+            }],
+        }) as `0x${string}`;
         const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
 
         const webauthnSig = await signAuthEntry(userOpHashBytes, pin);
@@ -501,7 +521,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         userOp.signature = encoded;
 
         // Submit to the bundler
-        const bundlerUrl = activePaymasterUrl || activeRpcUrl;
+        const bundlerUrl = activeRpcUrl;
         const bundlerResp = await fetch(bundlerUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -511,8 +531,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 params: [userOp, ENTRY_POINT],
             }),
         });
-        const bundlerJson = await bundlerResp.json();
-        if (bundlerJson.error) throw new Error(`Bundler error: ${bundlerJson.error.message}`);
+        const bundlerJson = await bundlerResp.json().catch(() => ({ error: { message: `HTTP ${bundlerResp.status}` } }));
+        if (bundlerJson.error) {
+            console.error('[StylusSafe] Bundler rejected UserOp:', bundlerJson.error, userOp);
+            throw new Error(`Bundler error: ${bundlerJson.error.message}`);
+        }
         return bundlerJson.result as string; // userOpHash
     };
 

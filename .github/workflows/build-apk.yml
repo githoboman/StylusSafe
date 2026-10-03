@@ -5,11 +5,13 @@ on:
     branches: [ main ]
     paths:
       - 'mobile-app/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,32 +19,45 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: mobile-app/package-lock.json
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest already ships a full Android SDK (ANDROID_HOME is preset).
+      # android-actions/setup-android@v3 re-downloads cmdline-tools and then fails on the
+      # interactive license prompt, so we just accept the licenses non-interactively instead.
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install dependencies
         working-directory: mobile-app
-        run: npm install
+        run: npm ci || npm install
 
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
-
-      - name: Build APK locally
+      # Generate the native android/ project from app.json (no Expo account / EAS login needed).
+      - name: Expo prebuild (Android)
         working-directory: mobile-app
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK
+        working-directory: mobile-app/android
         run: |
-          # The --local flag uses the runner's Android SDK to build, no Expo account required.
-          eas build --platform android --profile preview --local --non-interactive
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -x lint
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: stylussafe-mobile-apk
-          path: mobile-app/*.apk
+          path: mobile-app/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
