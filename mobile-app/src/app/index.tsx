@@ -8,58 +8,20 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
-
-// ── Inline hooks for mobile ───────────────────────────────────────────────────
-
-function useBalanceMobile(address: string | null) {
-  const [ethBalance, setEthBalance] = useState('0.00');
-  const [usdcBalance, setUsdcBalance] = useState('0.00');
-  const [isFetching, setIsFetching] = useState(false);
-
-  useEffect(() => {
-    if (!address) return;
-    const fetch_ = async () => {
-      setIsFetching(true);
-      try {
-        const rpc = 'https://sepolia-rollup.arbitrum.io/rpc';
-        const ethResp = await fetch(rpc, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBalance', params: [address, 'latest'] }),
-        });
-        const ethJson = await ethResp.json();
-        const weiHex = ethJson.result as string;
-        const ethNum = parseInt(weiHex, 16) / 1e18;
-        setEthBalance(ethNum.toFixed(4));
-
-        // USDC balance call (balanceOf)
-        const USDC = '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d';
-        const selector = '0x70a08231';
-        const paddedAddr = address.replace('0x', '').padStart(64, '0');
-        const usdcResp = await fetch(rpc, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_call', params: [{ to: USDC, data: selector + paddedAddr }, 'latest'] }),
-        });
-        const usdcJson = await usdcResp.json();
-        const usdcHex = usdcJson.result as string;
-        const usdcNum = parseInt(usdcHex, 16) / 1e6;
-        setUsdcBalance(usdcNum.toFixed(2));
-      } catch (_) {}
-      finally { setIsFetching(false); }
-    };
-    fetch_();
-    const timer = setInterval(fetch_, 15000);
-    return () => clearInterval(timer);
-  }, [address]);
-
-  return { ethBalance, usdcBalance, isFetching };
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
+import { useBalances } from '@/hooks/useBalances';
 
 export default function PortfolioScreen() {
   const router = useRouter();
+  const [selectedChain, setSelectedChain] = useState(421614);
   const { address: walletAddress, register, isPending: isRegistering } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, isFetching } = useBalanceMobile(walletAddress);
+  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(walletAddress, selectedChain);
+
+  const handleImportToken = () => {
+    // Basic react-native propmt isn't standard across platforms without alert trickery or custom modal.
+    // We will just do a placeholder alert for the hackathon demo, or a custom prompt.
+    // For now we assume they input it somehow.
+    // addCustomToken(address)
+  };
 
   const handleCreateWallet = async () => {
     try {
@@ -112,7 +74,17 @@ export default function PortfolioScreen() {
               <View style={[styles.assetDot, { backgroundColor: Colors.secondary }]} />
               <Text style={styles.assetText}>{usdcBalance} USDC</Text>
             </View>
+            {customTokens?.map((t: any) => (
+              <View key={t.address} style={styles.assetChip}>
+                <View style={[styles.assetDot, { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.textMuted }]} />
+                <Text style={styles.assetText}>{t.balance} {t.symbol}</Text>
+              </View>
+            ))}
           </View>
+          
+          <TouchableOpacity style={{ marginTop: Spacing.md, alignSelf: 'flex-end' }}>
+            <Text style={{ color: Colors.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, textDecorationLine: 'underline' }}>+ Import Token</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -161,7 +133,7 @@ export default function PortfolioScreen() {
 
         {/* Footer badge */}
         <View style={styles.footerBadge}>
-          <Text style={styles.footerText}>Rust-WASM Verified  ·  Stylus 0.5.2</Text>
+          <Text style={styles.footerText}>ZeroDev ERC-4337</Text>
         </View>
 
       </ScrollView>

@@ -9,18 +9,21 @@ import { Platform } from 'react-native';
 // ── Core Palette ──────────────────────────────────────────────────────────────
 export const Colors = {
   // Backgrounds
-  backgroundInk: '#0A0A0A',      // page background
-  surfaceZinc: '#121212',        // card background
-  surfaceContainer: '#1E1E1E',   // subtle container
-  surfaceContainerHigh: '#242424', // hover state
+  backgroundInk: '#000000',      // page background
+  surfaceZinc: '#0A0A0A',        // card background
+  surfaceContainer: '#111111',   // subtle container
+  surfaceContainerHigh: '#1C1C1C', // hover state
 
   // Text
-  textPrimary: '#FAFAFA',        // primary text
-  textMuted: '#A1A1AA',          // secondary text
+  textPrimary: '#FFFFFF',        // primary text
+  textMuted: '#888888',          // secondary text
 
   // Semantic
-  accentAzure: '#0284C7',        // action azure
-  error: '#DC2626',
+  accentOrange: '#FF4500',       // action orange
+  primary: '#FF4500',
+  secondary: '#888888',
+  tertiary: '#242424',
+  error: '#FF4C4C',
 
   // Borders
   border: 'rgba(255,255,255,0.1)',
