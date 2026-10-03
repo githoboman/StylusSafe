@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { href: '/', icon: 'account_balance_wallet', label: 'Vault Overview' },
+  { href: '/dashboard', icon: 'account_balance_wallet', label: 'Vault Overview' },
   { href: '/transfer', icon: 'sync_alt', label: 'Cross-Chain Swap' },
   { href: '/trading', icon: 'flash_on', label: '1-Click Trading' },
   { href: '/subscription', icon: 'autorenew', label: 'Subscriptions' },
@@ -15,7 +15,7 @@ const navItems = [
 
 // Bottom nav only shows the 4 primary destinations on mobile
 const mobileNavItems = [
-  { href: '/', icon: 'account_balance_wallet', label: 'Vault' },
+  { href: '/dashboard', icon: 'account_balance_wallet', label: 'Vault' },
   { href: '/transfer', icon: 'sync_alt', label: 'Swap' },
   { href: '/security', icon: 'shield', label: 'Security' },
   { href: '/activity', icon: 'receipt_long', label: 'Activity' },
@@ -23,6 +23,10 @@ const mobileNavItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
+  if (pathname === '/') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-background-ink flex flex-col md:flex-row">

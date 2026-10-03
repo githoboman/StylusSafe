@@ -6,6 +6,7 @@ import { useBalances } from '@/hooks/useBalances';
 const TOKENS = [
   { symbol: 'ETH', name: 'Ether', address: null, decimals: 18, color: '#0284c7' },
   { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA' },
+  { symbol: 'ARB', name: 'Arbitrum', address: '0x912CE59144191C1204E64559FE8253a0e49E6548' as `0x${string}`, decimals: 18, color: '#28A0F0' },
 ];
 
 export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
@@ -41,6 +42,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
         setErrorMsg('Transaction failed — check console for details.');
       }
     } catch (e: any) {
+      console.error('SendModal transfer failed:', e);
       setStatus('error');
       setErrorMsg(e?.message ?? 'Unknown error');
     } finally {

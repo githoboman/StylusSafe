@@ -9,6 +9,7 @@ import { SignModal } from '@/components/SignModal';
 const TOKENS = [
   { symbol: 'ETH', name: 'Ether', decimals: 18, color: '#0284c7' },
   { symbol: 'USDC', name: 'USD Coin', decimals: 6, color: '#2775CA' },
+  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, color: '#28A0F0' },
   { symbol: 'USDT', name: 'Tether USD', decimals: 6, color: '#26A17B' },
   { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, color: '#F4B731' },
   { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, color: '#F7931A' },
@@ -122,6 +123,7 @@ export default function TransferPage() {
         setErrorMsg('Transaction failed — check console for details.');
       }
     } catch (e: any) {
+      console.error('Transfer execution failed:', e);
       setStatus('error');
       setErrorMsg(e?.message ?? 'Unknown error');
     } finally {

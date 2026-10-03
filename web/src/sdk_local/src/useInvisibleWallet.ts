@@ -112,21 +112,13 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || `https://rpc.zerodev.app/api/v2/paymaster/${projectId}` 
     } = config;
 
-    const [address, setAddress] = useState<string | null>(() => {
-        // Lazy initializer: runs once synchronously on first render (client-side only).
-        // This eliminates the flash where returning users see "Create Wallet" for one frame.
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('invisible_wallet_address') ?? null;
-        }
-        return null;
-    });
+    const [address, setAddress] = useState<string | null>(null);
     const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasMounted, setHasMounted] = useState(false);
 
     useEffect(() => {
         setHasMounted(true);
-        // Re-read on mount in case storage was updated by another tab.
         const stored = localStorage.getItem('invisible_wallet_address');
         if (stored) setAddress(stored);
     }, []);

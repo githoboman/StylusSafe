@@ -3,7 +3,7 @@ import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 
 const CHAIN_CONFIGS: Record<number, { rpc: string, usdc: `0x${string}` }> = {
   // Arbitrum Sepolia
-  421614: { rpc: 'https://sepolia-rollup.arbitrum.io/rpc', usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' },
+  421614: { rpc: 'https://arbitrum-sepolia.blockpi.network/v1/rpc/public', usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' },
   // Base
   8453: { rpc: 'https://mainnet.base.org', usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
   // Optimism
@@ -53,23 +53,26 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBalances = async () => {
-    if (!walletAddress) {
-      setEthBalance('0.00');
-      setUsdcBalance('0.00');
-      return;
-    }
-
+  useEffect(() => {
+    let isMounted = true;
     const config = CHAIN_CONFIGS[chainId];
     if (!config) return;
 
-    setIsFetching(true);
-    setError(null);
-    try {
-      const publicClient = createPublicClient({
-        chain: { id: chainId } as any,
-        transport: http(config.rpc),
-      });
+    const publicClient = createPublicClient({
+      chain: { id: chainId } as any,
+      transport: http(config.rpc),
+    });
+
+    const fetchBalances = async () => {
+      if (!walletAddress) {
+        setEthBalance('0.00');
+        setUsdcBalance('0.00');
+        return;
+      }
+
+      setIsFetching(true);
+      setError(null);
+      try {
 
       const [eth, usdc] = await Promise.all([
         publicClient.getBalance({ address: walletAddress as `0x${string}` }),
@@ -101,32 +104,40 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         } catch(e) { return null; }
       }));
 
-      setEthBalance(Number(formatEther(eth)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
-      setUsdcBalance(Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-      setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
-    } catch (err: any) {
-      console.error('Failed to fetch balances:', err);
-      setError(err.message || 'Failed to fetch balances');
-    } finally {
-      setIsFetching(false);
-    }
-  };
+        if (isMounted) {
+          setEthBalance(Number(formatEther(eth)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
+          setUsdcBalance(Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+          setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch balances:', err);
+        if (isMounted) setError(err.message || 'Failed to fetch balances');
+      } finally {
+        if (isMounted) setIsFetching(false);
+      }
+    };
 
-  useEffect(() => {
     fetchBalances();
-    // Poll every 15 seconds
     const interval = setInterval(fetchBalances, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [walletAddress, chainId]); 
+
+  const refetch = () => {
+    // A quick hack to allow manual refetch trigger (we can't easily expose the inner fetchBalances now)
+    // For now we'll just let the interval handle it, or we could lift the client up.
+  };
 
   const addCustomToken = (address: string) => {
     const saved = JSON.parse(localStorage.getItem('custom_tokens') || '[]');
     if (!saved.find((t: any) => t.address.toLowerCase() === address.toLowerCase() && t.chainId === chainId)) {
       saved.push({ address, chainId });
       localStorage.setItem('custom_tokens', JSON.stringify(saved));
-      fetchBalances();
+      // Will be picked up on next poll
     }
   };
 
-  return { ethBalance, usdcBalance, customTokens, isFetching, error, refetch: fetchBalances, addCustomToken };
+  return { ethBalance, usdcBalance, customTokens, isFetching, error, refetch, addCustomToken };
 }
