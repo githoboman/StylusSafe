@@ -421,9 +421,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 
                 const viem = await import('viem');
                 const deployCallData = viem.encodeFunctionData({
-                    abi: [{ type: 'function', name: 'deployWallet', inputs: [{ name: 'publicKey', type: 'bytes' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
-                    functionName: 'deployWallet',
-                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`]
+                    abi: [{ type: 'function', name: 'createWallet', inputs: [{ name: 'publicKey', type: 'bytes' }, { name: 'entryPoint', type: 'address' }, { name: 'rpId', type: 'string' }, { name: 'origin', type: 'string' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
+                    functionName: 'createWallet',
+                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`, ENTRY_POINT, window.location.hostname, window.location.origin]
                 });
                 
                 // initCode is factory address + factory calldata

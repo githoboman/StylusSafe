@@ -118,18 +118,22 @@ async function main() {
   const deployPayload = Buffer.concat([initCode, runtimeCode]);
   console.log(`   Final transaction payload size: ${(deployPayload.length / 1024).toFixed(1)} KB`);
 
-  console.log('\n📤 Step 1: Deploying WASM bytecode...');
-  const feeData = await provider.getFeeData();
-  
-  const deployTx = await wallet.sendTransaction({
-    data: '0x' + deployPayload.toString('hex'),
-    gasLimit: 15_000_000n,
-    maxFeePerGas: feeData.maxFeePerGas,
-    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-  });
+  console.log(`   Tx payload length: ${deployPayload.length}`);
 
-  console.log(`   Tx hash: ${deployTx.hash}`);
-  console.log('   Waiting for confirmation...');
+  let deployTx;
+  try {
+    const feeData = await provider.getFeeData();
+    deployTx = await wallet.sendTransaction({
+      data: '0x' + deployPayload.toString('hex'),
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      gasLimit: 15_000_000n, // Manual gas limit to bypass estimation failure
+    });
+    console.log(`   Tx Hash: ${deployTx.hash}`);
+  } catch (err) {
+    console.error(`   Tx failed: ${err.message}`);
+    process.exit(1);
+  }
   
   const receipt = await deployTx.wait();
   

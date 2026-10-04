@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
+
 const navItems = [
   { href: '/dashboard', icon: 'account_balance_wallet', label: 'Vault Overview' },
   { href: '/transfer', icon: 'sync_alt', label: 'Cross-Chain Swap' },
@@ -23,10 +25,15 @@ const mobileNavItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { address } = useInvisibleWallet();
 
   if (pathname === '/') {
     return <>{children}</>;
   }
+
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
 
   return (
     <div className="min-h-screen bg-background-ink flex flex-col md:flex-row">
@@ -36,8 +43,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col mb-10">
             <span className="text-2xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
             <div className="flex items-center gap-1.5 mt-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>
-              <span className="text-xs text-text-muted uppercase tracking-wider font-mono">Vault 01 // Arbitrum</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-accent-orange animate-pulse' : 'bg-text-muted'}`}></span>
+              <span className="text-xs text-text-muted uppercase tracking-wider font-mono">
+                {address ? 'Vault 01 // Arbitrum' : 'Not Connected'}
+              </span>
             </div>
           </div>
 
@@ -109,8 +118,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="material-symbols-outlined text-text-primary text-[20px]">person</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-mono text-xs text-text-primary tracking-tight">0x71C8...39B2</span>
-            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">Owner</span>
+            <span className="font-mono text-xs text-text-primary tracking-tight">
+              {address ? formatAddress(address) : 'Not Signed In'}
+            </span>
+            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
+              {address ? 'Owner' : 'Guest'}
+            </span>
           </div>
         </div>
       </aside>
@@ -122,8 +135,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col">
             <span className="text-xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-orange animate-pulse"></span>
-              <span className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Vault 01</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-accent-orange animate-pulse' : 'bg-text-muted'}`}></span>
+              <span className="text-[10px] text-text-muted uppercase tracking-wider font-mono">
+                {address ? 'Vault 01' : 'Disconnected'}
+              </span>
             </div>
           </div>
           <div className="w-8 h-8 rounded-[4px] bg-surface-container flex items-center justify-center border border-border-whisper">

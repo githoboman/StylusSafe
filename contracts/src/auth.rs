@@ -1,14 +1,13 @@
 extern crate alloc;
 
-use alloy_primitives::B256;
-use p256::ecdsa::{VerifyingKey, Signature, signature::hazmat::PrehashVerifier};
-use sha2::{Sha256, Digest};
+use alloy_primitives::{B256, Address};
+use stylus_sdk::{call::RawCall, prelude::Host};
 use crate::WalletError;
+use alloc::vec::Vec;
 
 const BASE64URL: &[u8] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-/// Base64url-encode exactly 32 bytes without padding.
 fn base64url_encode_32(input: &[u8; 32]) -> [u8; 43] {
     let mut out = [0u8; 43];
     let mut o = 0usize;
@@ -32,7 +31,6 @@ fn base64url_encode_32(input: &[u8; 32]) -> [u8; 43] {
     out
 }
 
-/// Verify that the base64url(signature_payload) string appears inside clientDataJSON.
 fn challenge_is_present(client_data_json: &[u8], signature_payload: &[u8; 32]) -> bool {
     let needle = base64url_encode_32(signature_payload);
     let n_len = needle.len();
@@ -51,8 +49,26 @@ fn challenge_is_present(client_data_json: &[u8], signature_payload: &[u8; 32]) -
     false
 }
 
-/// Verify a full WebAuthn ES256 assertion against a payload hash (like userOpHash).
-pub fn verify_webauthn(
+fn sha256<H: Host>(host: &H, data: &[u8]) -> Result<[u8; 32], WalletError> {
+    let mut addr = [0u8; 20];
+    addr[19] = 2; // SHA256 precompile
+    let precompile = Address::from(addr);
+    
+    // unsafe block required for RawCall::call
+    let result = unsafe {
+        RawCall::new_static(host).call(precompile, data).map_err(|_| WalletError::CallFailed)?
+    };
+    if result.len() == 32 {
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&result);
+        Ok(out)
+    } else {
+        Err(WalletError::CallFailed)
+    }
+}
+
+pub fn verify_webauthn<H: Host>(
+    host: &H,
     signature_payload: &B256,
     public_key_bytes: &[u8; 65], // Uncompressed P-256 public key
     auth_data: &[u8],
@@ -62,42 +78,39 @@ pub fn verify_webauthn(
     expected_origin: &str,
 ) -> Result<(), WalletError> {
     
-    // 1. Verify the challenge in clientDataJSON is base64url(signature_payload)
     if !challenge_is_present(client_data_json, &signature_payload.0) {
         return Err(WalletError::InvalidChallenge);
     }
 
-    // 2. SHA256(clientDataJSON)
-    let client_data_hash: [u8; 32] = {
-        let mut h = Sha256::new();
-        h.update(client_data_json);
-        h.finalize().into()
+    let client_data_hash = sha256(host, client_data_json)?;
+
+    let mut message = Vec::with_capacity(auth_data.len() + 32);
+    message.extend_from_slice(auth_data);
+    message.extend_from_slice(&client_data_hash);
+    let message_hash = sha256(host, &message)?;
+
+    // Verify P-256 ECDSA using precompile 0x100
+    // Input format: hash32 | r32 | s32 | x32 | y32 (160 bytes)
+    let mut p256_input = [0u8; 160];
+    p256_input[0..32].copy_from_slice(&message_hash);
+    p256_input[32..96].copy_from_slice(signature_bytes); // r and s
+    p256_input[96..160].copy_from_slice(&public_key_bytes[1..65]); // x and y
+
+    let mut addr = [0u8; 20];
+    addr[18] = 1; // 0x100 P256Verify precompile
+    let precompile = Address::from(addr);
+    
+    let result = unsafe {
+        RawCall::new_static(host).call(precompile, &p256_input)
+            .map_err(|_| WalletError::SignatureVerificationFailed)?
     };
+        
+    // EIP-7212 returns 32 bytes containing 1 on success
+    if result.len() != 32 || result[31] != 1 {
+        return Err(WalletError::SignatureVerificationFailed);
+    }
 
-    // 3. SHA256(authData || SHA256(clientDataJSON))
-    let message_hash: [u8; 32] = {
-        let mut h = Sha256::new();
-        h.update(auth_data);
-        h.update(client_data_hash);
-        h.finalize().into()
-    };
-
-    // 4. Verify P-256 ECDSA signature over the message hash
-    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes)
-        .map_err(|_| WalletError::InvalidPublicKey)?;
-
-    let sig_obj = Signature::from_bytes(signature_bytes.into())
-        .map_err(|_| WalletError::InvalidSignature)?;
-
-    verifying_key.verify_prehash(&message_hash, &sig_obj)
-        .map_err(|_| WalletError::SignatureVerificationFailed)?;
-
-    // 5. Verify rpIdHash
-    let rp_id_hash = {
-        let mut h = Sha256::new();
-        h.update(rp_id.as_bytes());
-        h.finalize()
-    };
+    let rp_id_hash = sha256(host, rp_id.as_bytes())?;
     
     if auth_data.len() < 32 {
         return Err(WalletError::RpIdMismatch);
@@ -107,7 +120,6 @@ pub fn verify_webauthn(
         return Err(WalletError::RpIdMismatch);
     }
 
-    // 6. Verify origin in clientDataJSON
     let origin_bytes = expected_origin.as_bytes();
     let needle = b"\"origin\":\"";
     let n_len = needle.len();

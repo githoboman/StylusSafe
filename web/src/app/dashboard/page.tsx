@@ -217,63 +217,17 @@ export default function Dashboard() {
           </div>
 
           {/* Recent Activity */}
-          {address && (
-            <div className="bg-surface-zinc rounded-[24px] p-6 border border-border-whisper mt-2">
-              <div className="flex items-center justify-between mb-4 px-2">
-                <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Recent Activity</span>
-                <Link href="/activity" className="text-xs text-accent-orange hover:underline">View All</Link>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Cross-Chain Swap</h4>
-                      <p className="text-xs text-text-muted">Arbitrum → Base</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-text-primary">-1.50 ETH</h4>
-                    <p className="text-xs text-green-500 font-mono">Success</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-accent-orange/10 text-accent-orange flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">autorenew</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Netflix Web3</h4>
-                      <p className="text-xs text-text-muted">Pull Payment</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-text-primary">-15.00 USDC</h4>
-                    <p className="text-xs text-green-500 font-mono">Success</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 hover:bg-surface-container rounded-xl transition-colors cursor-pointer border border-transparent hover:border-border-whisper">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">south_west</span>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-text-primary">Receive</h4>
-                      <p className="text-xs text-text-muted">From 0x71C...9A23</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-sm font-medium text-green-500">+4,500.00 USDC</h4>
-                    <p className="text-xs text-text-muted font-mono">2 days ago</p>
-                  </div>
-                </div>
-              </div>
+          <div className="bg-surface-zinc rounded-[24px] p-6 border border-border-whisper mt-2">
+            <div className="flex items-center justify-between mb-4 px-2">
+              <span className="text-sm text-text-muted uppercase tracking-widest font-medium">Recent Activity</span>
             </div>
-          )}
+            
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-surface-container/30 border border-dashed border-border-whisper rounded-xl">
+              <span className="material-symbols-outlined text-text-muted text-4xl mb-3">receipt_long</span>
+              <h4 className="text-sm font-medium text-text-primary mb-1">No Activity Yet</h4>
+              <p className="text-xs text-text-muted">When you execute swaps or transfers, they will appear here.</p>
+            </div>
+          </div>
 
         </div>
 

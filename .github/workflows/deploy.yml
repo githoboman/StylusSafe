@@ -1,6 +1,8 @@
 name: Deploy StylusSafe to Arbitrum Sepolia
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
