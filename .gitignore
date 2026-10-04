@@ -17,3 +17,6 @@ frontend/docs/.next/
 .DS_Store
 build_error.txt
 node_modules/
+
+# Generated Video and Brag Output
+brag-output/

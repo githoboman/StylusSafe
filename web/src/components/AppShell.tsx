@@ -41,7 +41,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex flex-col w-64 border-r border-border-whisper bg-surface-zinc p-6 justify-between h-screen sticky top-0">
         <div>
           <div className="flex flex-col mb-10">
-            <span className="text-2xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
+            <div className="flex items-center gap-2">
+              <img src="/logo.jpg" alt="StylusSafe" className="w-6 h-6 rounded-md" />
+              <span className="text-2xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
+            </div>
             <div className="flex items-center gap-1.5 mt-2">
               <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-accent-orange animate-pulse' : 'bg-text-muted'}`}></span>
               <span className="text-xs text-text-muted uppercase tracking-wider font-mono">
@@ -133,7 +136,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile header */}
         <header className="md:hidden sticky top-0 z-40 bg-background-ink/90 backdrop-blur-xl border-b border-border-whisper px-4 h-16 flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
+            <div className="flex items-center gap-2">
+              <img src="/logo.jpg" alt="StylusSafe" className="w-5 h-5 rounded-md" />
+              <span className="text-xl font-semibold text-text-primary leading-none tracking-tight">StylusSafe</span>
+            </div>
             <div className="flex items-center gap-1.5 mt-1">
               <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-accent-orange animate-pulse' : 'bg-text-muted'}`}></span>
               <span className="text-[10px] text-text-muted uppercase tracking-wider font-mono">

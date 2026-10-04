@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./web/public/logo.jpg" alt="StylusSafe Logo" width="200" style="border-radius: 20px;" />
+</div>
+
 # StylusSafe: The Invisible Cross-Chain Wallet
 
 **StylusSafe** is a next-generation "Intent-Based" Smart Wallet that makes blockchain boundaries completely invisible. By combining **ZeroDev (ERC-4337 Account Abstraction)**, **Passkey Authentication (WebAuthn)**, and the **Li.Fi Aggregation Engine**, it solves the biggest friction point in crypto today: Cross-Chain Swaps.

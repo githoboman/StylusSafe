@@ -15,9 +15,7 @@ export default function LandingPage() {
         {/* Mobile Nav Overlay */}
         <div className="fixed top-0 left-0 w-full p-6 flex justify-between items-center z-50 pointer-events-none">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-orange to-red-600 flex items-center justify-center shadow-lg shadow-accent-orange/20">
-              <span className="material-symbols-outlined text-white text-xl">shield_lock</span>
-            </div>
+            <img src="/logo.jpg" alt="StylusSafe" className="w-8 h-8 rounded-lg shadow-lg shadow-accent-orange/20" />
             <span className="text-xl font-bold tracking-tight shadow-black drop-shadow-md">StylusSafe</span>
           </div>
           <Link 
@@ -121,9 +119,7 @@ export default function LandingPage() {
         <nav className="fixed top-0 w-full border-b border-border-whisper bg-background-ink/80 backdrop-blur-md z-50">
           <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-orange to-red-600 flex items-center justify-center shadow-lg shadow-accent-orange/20">
-                <span className="material-symbols-outlined text-white text-xl">shield_lock</span>
-              </div>
+              <img src="/logo.jpg" alt="StylusSafe" className="w-8 h-8 rounded-lg shadow-lg shadow-accent-orange/20" />
               <span className="text-xl font-bold tracking-tight">StylusSafe</span>
             </div>
             <Link 

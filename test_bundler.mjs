@@ -1,7 +1,7 @@
 import fs from 'fs';
 
 async function testBundler() {
-    const URL = 'https://rpc.zerodev.app/api/v2/bundler/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+    const URL = 'https://rpc.zerodev.app/api/v3/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3/chain/421614';
     const ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
     
     const userOp = {
