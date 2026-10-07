@@ -3,7 +3,7 @@ import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 
 const CHAIN_CONFIGS: Record<number, { rpc: string, usdc: `0x${string}` }> = {
   // Arbitrum Sepolia
-  421614: { rpc: 'https://arbitrum-sepolia.blockpi.network/v1/rpc/public', usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' },
+  421614: { rpc: 'https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e', usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' },
   // Base
   8453: { rpc: 'https://mainnet.base.org', usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
   // Optimism
