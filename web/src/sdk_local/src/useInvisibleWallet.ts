@@ -453,8 +453,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jsonrpc: '2.0', id: 1,
-                    method: 'pm_sponsorUserOperation',
-                    params: [userOp, ENTRY_POINT],
+                    method: 'zd_sponsorUserOperation',
+                    params: [{ chainId: activeChainId, userOp, entryPointAddress: ENTRY_POINT }],
                 }),
             });
             const pmJson = await pmResp.json();
