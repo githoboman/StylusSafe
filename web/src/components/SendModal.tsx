@@ -64,10 +64,10 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           
           {txHash && (
             <div className="bg-surface-container rounded-[8px] p-3 w-full mb-6 border border-border-whisper flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-mono tracking-widest text-text-muted">UserOp Hash</span>
-              <a href={`https://sepolia.arbiscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-sm font-mono text-accent-orange truncate hover:underline">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-text-muted">UserOp Hash (Simulated)</span>
+              <span className="text-sm font-mono text-accent-orange truncate">
                 {txHash}
-              </a>
+              </span>
             </div>
           )}
           
