@@ -461,7 +461,10 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 }),
             });
             const pmJson = await pmResp.json();
-            if (pmJson.error) throw new Error(`Paymaster error: ${pmJson.error.message}`);
+            if (pmJson.error) {
+                const errMsg = typeof pmJson.error === 'string' ? pmJson.error : pmJson.error.message;
+                throw new Error(`Paymaster error: ${errMsg}`);
+            }
             const pm = pmJson.result;
             userOp.paymasterAndData = pm.paymasterAndData;
             userOp.callGasLimit = pm.callGasLimit ?? userOp.callGasLimit;
