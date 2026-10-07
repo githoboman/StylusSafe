@@ -401,8 +401,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
         const activeChainId = overrideChainId || chainId;
         const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
-        const activeRpcUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/bundler/${projectId}?chainId=${overrideChainId}` : rpcUrl;
-        const activePaymasterUrl = overrideChainId ? `https://rpc.zerodev.app/api/v2/paymaster/${projectId}?chainId=${overrideChainId}` : paymasterUrl;
+        const activeRpcUrl = `https://rpc.zerodev.app/api/v3/${projectId}/chain/${activeChainId}`;
+        const activePaymasterUrl = activeRpcUrl;
 
         const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(activeRpcUrl) });
 
@@ -451,28 +451,22 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
         // Request paymaster sponsorship if a paymasterUrl is set
         if (activePaymasterUrl) {
-            try {
-                const pmResp = await fetch(activePaymasterUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 1,
-                        method: 'pm_sponsorUserOperation',
-                        params: [userOp, ENTRY_POINT],
-                    }),
-                });
-                const pmJson = await pmResp.json();
-                if (pmJson.error) throw new Error(`Paymaster error: ${pmJson.error.message}`);
-                const pm = pmJson.result;
-                userOp.paymasterAndData = pm.paymasterAndData;
-                userOp.callGasLimit = pm.callGasLimit ?? userOp.callGasLimit;
-                userOp.verificationGasLimit = pm.verificationGasLimit ?? userOp.verificationGasLimit;
-                userOp.preVerificationGas = pm.preVerificationGas ?? userOp.preVerificationGas;
-            } catch (err: any) {
-                console.warn("[StylusSafe] Paymaster failed. Mocking execution for demo...", err.message);
-                await new Promise(r => setTimeout(r, 1500));
-                return '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
-            }
+            const pmResp = await fetch(activePaymasterUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0', id: 1,
+                    method: 'pm_sponsorUserOperation',
+                    params: [userOp, ENTRY_POINT],
+                }),
+            });
+            const pmJson = await pmResp.json();
+            if (pmJson.error) throw new Error(`Paymaster error: ${pmJson.error.message}`);
+            const pm = pmJson.result;
+            userOp.paymasterAndData = pm.paymasterAndData;
+            userOp.callGasLimit = pm.callGasLimit ?? userOp.callGasLimit;
+            userOp.verificationGasLimit = pm.verificationGasLimit ?? userOp.verificationGasLimit;
+            userOp.preVerificationGas = pm.preVerificationGas ?? userOp.preVerificationGas;
         }
 
         // Compute the real UserOpHash: keccak256(abi.encode(userOp) ++ chainId ++ entryPoint)
