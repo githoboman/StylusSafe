@@ -471,7 +471,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             } catch (err: any) {
                 console.warn("[StylusSafe] Paymaster failed. Mocking execution for demo...", err.message);
                 await new Promise(r => setTimeout(r, 1500));
-                return '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16));
+                return '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
             }
         }
 
