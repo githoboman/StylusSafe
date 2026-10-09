@@ -110,7 +110,7 @@ export default function TransferPage() {
         fromToken,
         toToken,
         amountRaw,
-        recipient as `0x${string}`,
+        (recipient || address) as `0x${string}`,
         pin
       );
       if (result) {
@@ -225,16 +225,6 @@ export default function TransferPage() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-orange transition-colors">
-                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
-                  <input
-                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
-                    placeholder="Or paste 0x token address"
-                    type="text"
-                    value={customSourceToken}
-                    onChange={(e) => setCustomSourceToken(e.target.value)}
-                  />
-              </div>
             </div>
 
             {/* Amount */}
@@ -264,29 +254,7 @@ export default function TransferPage() {
               </div>
             </div>
 
-            {/* Recipient */}
-            <div className="flex flex-col gap-2">
-              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Address</label>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-orange transition-colors">
-                <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">wallet</span>
-                <input
-                  className="flex-1 bg-transparent h-14 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
-                  placeholder="0x... or ENS name"
-                  type="text"
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                />
-                <button
-                  className="text-accent-orange text-xs font-medium uppercase tracking-wider"
-                  type="button"
-                  onClick={async () => {
-                    try { setRecipient(await navigator.clipboard.readText()); } catch {}
-                  }}
-                >
-                  Paste
-                </button>
-              </div>
-            </div>
+
 
             {/* Target Chain */}
             <div className="flex flex-col gap-2">
@@ -334,16 +302,6 @@ export default function TransferPage() {
                     {t.symbol}
                   </button>
                 ))}
-              </div>
-              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 mt-2 focus-within:border-accent-orange transition-colors">
-                  <span className="material-symbols-outlined text-text-muted mr-3 text-[18px]">token</span>
-                  <input
-                    className="flex-1 bg-transparent h-12 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/50"
-                    placeholder="Or paste 0x token address"
-                    type="text"
-                    value={customDestToken}
-                    onChange={(e) => setCustomDestToken(e.target.value)}
-                  />
               </div>
             </div>
           </div>
@@ -395,7 +353,7 @@ export default function TransferPage() {
               className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2"
               type="button"
               onClick={() => setIsModalOpen(true)}
-              disabled={!amount || !recipient || isPending || !address}
+              disabled={!amount || isPending || !address}
             >
               {isPending ? (
                 <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
