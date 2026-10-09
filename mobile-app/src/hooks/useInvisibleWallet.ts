@@ -192,7 +192,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
                     ? factoryAddress
                     : (process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`) ||
-                      '0xe98c353fF883445995021182D918E3577365b284';
+                      '0x470631018cF36900F2A94b53D37f29C719B51990';
 
                 const pc = _createPublicClient({ transport: _http(RPC) });
                 walletAddress = await pc.readContract({
@@ -425,9 +425,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 
                 const viem = await import('viem');
                 const deployCallData = viem.encodeFunctionData({
-                    abi: [{ type: 'function', name: 'deployWallet', inputs: [{ name: 'publicKey', type: 'bytes' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
-                    functionName: 'deployWallet',
-                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`]
+                    abi: [{ type: 'function', name: 'createWallet', inputs: [{ name: 'publicKey', type: 'bytes' }, { name: 'entryPoint', type: 'address' }, { name: 'rpId', type: 'string' }, { name: 'origin', type: 'string' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
+                    functionName: 'createWallet',
+                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`, ENTRY_POINT, 'localhost', 'http://localhost']
                 });
                 
                 // initCode is factory address + factory calldata
