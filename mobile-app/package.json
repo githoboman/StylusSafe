@@ -25,6 +25,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-get-random-values": "^2.0.0",
     "react-native-passkeys": "^0.4.2",
     "react-native-reanimated": "^4.5.1",
     "react-native-safe-area-context": "~5.7.0",
@@ -32,6 +33,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "tailwindcss": "^3.4.19",
+    "text-encoding": "^0.7.0",
     "viem": "^2.57.2"
   },
   "devDependencies": {

@@ -673,10 +673,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             values.push(BigInt(txRequest.value ?? 0));
             funcs.push(txRequest.data as `0x${string}`);
 
-            // 3. Wrap in StylusSafe execute_batch() calldata
             const walletCallData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'execute_batch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'execute_batch',
+                abi: [{ type: 'function', name: 'executeBatch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'executeBatch',
                 args: [dests, values, funcs]
             });
 
@@ -834,8 +833,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const funcs = intents.map(i => (i.func || '0x') as `0x${string}`);
 
             const callData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'execute_batch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'execute_batch',
+                abi: [{ type: 'function', name: 'executeBatch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'executeBatch',
                 args: [dests, values, funcs],
             });
 
