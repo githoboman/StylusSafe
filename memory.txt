@@ -1,0 +1,10 @@
+# Hourly Memory Log
+
+## 2026-10-09 18:00
+- Investigated the "AA20 account not deployed" error when sending tokens via ZeroDev.
+- Determined that the Stylus WASM contract on Arbitrum Sepolia was deployed (Proxy exists) but was never ACTIVATED by calling the ArbWasm precompile.
+- Created `secrets.txt` and added it to `.gitignore`.
+- Generated a new deployer wallet (0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc) and saved its private key to `secrets.txt`.
+- Set up the GitHub Actions `.yml` workflow for automated cloud deployment (since `cargo stylus` fails to compile on Windows).
+- Pushed all local changes (`secrets.txt`, `.gitignore`, scripts, workflows) to the user's GitHub repository.
+- Instructed the user to trigger the GitHub Action from their browser to finalize deployment and fix the token sending issue.

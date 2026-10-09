@@ -440,9 +440,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             nonce: `0x${nonce.toString(16)}`,
             initCode: initCode,
             callData,
-            callGasLimit: '0x7A120',      // 500000
-            verificationGasLimit: '0x30D40', // 200000
-            preVerificationGas: '0xC350',   // 50000
+            callGasLimit: '0xF4240',      // 1,000,000
+            verificationGasLimit: '0xF4240', // 1,000,000
+            preVerificationGas: '0x186A0',   // 100,000
             maxFeePerGas: '0x5F5E100',      // 100 gwei
             maxPriorityFeePerGas: '0x5F5E100',
             paymasterAndData: '0x',
