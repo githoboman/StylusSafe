@@ -8,3 +8,4 @@
 - Set up the GitHub Actions `.yml` workflow for automated cloud deployment (since `cargo stylus` fails to compile on Windows).
 - Pushed all local changes (`secrets.txt`, `.gitignore`, scripts, workflows) to the user's GitHub repository.
 - Instructed the user to trigger the GitHub Action from their browser to finalize deployment and fix the token sending issue.
+Hour 3: Re-deployed the factory to point to the mock implementation. Updated SDK to increase gas limits to fix AA13 initCode OOG errors. Hardcoded the new factory address as the fallback in the SDK for both web and mobile. Pushed changes to GitHub.
