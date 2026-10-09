@@ -254,6 +254,21 @@ export default function TransferPage() {
               </div>
             </div>
 
+            {/* Optional Recipient */}
+            <div className="flex flex-col gap-2">
+              <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Address (Optional)</label>
+              <div className="flex items-center bg-surface-container-low rounded-[4px] border border-border-whisper px-4 focus-within:border-accent-orange transition-colors">
+                <span className="material-symbols-outlined text-text-muted mr-3 text-[16px]">wallet</span>
+                <input
+                  className="flex-1 bg-transparent h-11 text-sm text-text-primary font-mono outline-none placeholder:text-text-muted/40"
+                  placeholder="Defaults to your wallet..."
+                  type="text"
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                />
+              </div>
+            </div>
+
 
 
             {/* Target Chain */}
