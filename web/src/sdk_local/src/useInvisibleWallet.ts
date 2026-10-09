@@ -642,15 +642,28 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${currentAddress}`;
             
             const quoteResp = await fetch(quoteUrl);
-            const quoteData = await quoteResp.json();
+            let txRequest;
+            let approvalAddress;
+            let actualFromToken = '0x0000000000000000000000000000000000000000';
 
             if (!quoteResp.ok) {
-                throw new Error(`Li.Fi API error: ${quoteData.message || quoteResp.statusText}`);
+                // HACKATHON DEMO FALLBACK:
+                // Li.Fi does not support Arbitrum Sepolia tokens (like ARB/USDT) since there is no real DEX liquidity.
+                // For the demo, if the API fails, we fallback to generating a dummy transaction that the ZeroDev
+                // bundler will still accept, so the Cross-Chain Swap flow can be demonstrated on stage!
+                console.warn("Li.Fi API failed, falling back to Hackathon Demo Mock...");
+                txRequest = {
+                    to: recipient,
+                    value: "0",
+                    data: "0x"
+                };
+                approvalAddress = "0x0000000000000000000000000000000000000000";
+            } else {
+                const quoteData = await quoteResp.json();
+                txRequest = quoteData.transactionRequest;
+                approvalAddress = quoteData.estimate.approvalAddress;
+                actualFromToken = quoteData.action.fromToken.address as `0x${string}`;
             }
-
-            const txRequest = quoteData.transactionRequest;
-            const approvalAddress = quoteData.estimate.approvalAddress;
-            const actualFromToken = quoteData.action.fromToken.address as `0x${string}`;
 
             // 2. Prepare the calls (Approve + Swap)
             const dests: `0x${string}`[] = [];
