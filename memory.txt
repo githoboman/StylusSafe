@@ -9,3 +9,4 @@
 - Pushed all local changes (`secrets.txt`, `.gitignore`, scripts, workflows) to the user's GitHub repository.
 - Instructed the user to trigger the GitHub Action from their browser to finalize deployment and fix the token sending issue.
 Hour 3: Re-deployed the factory to point to the mock implementation. Updated SDK to increase gas limits to fix AA13 initCode OOG errors. Hardcoded the new factory address as the fallback in the SDK for both web and mobile. Pushed changes to GitHub.
+Hour 4: Fixed React state closure bug in SDK by reading from localStorage. Verified successful UserOps via JiffyScan. Advised on migrating mobile biometric sign-in to react-native-passkeys. Fixed executeBatch function selector mismatch for Cross-Chain Swaps.

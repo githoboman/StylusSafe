@@ -212,7 +212,7 @@ export default function TransferPage() {
             {/* Source Asset */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Source Asset</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {TOKENS.map(t => (
                   <button
                     key={t.symbol}
@@ -322,7 +322,7 @@ export default function TransferPage() {
             {/* Destination Asset */}
             <div className="flex flex-col gap-2">
               <label className="font-mono text-xs text-text-muted uppercase tracking-wider">Destination Asset</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {TOKENS.map(t => (
                   <button
                     key={'dest-' + t.symbol}
