@@ -396,7 +396,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         pin?: string,
         overrideChainId?: number
     ): Promise<string> => {
-        if (!address) throw new Error('Wallet not initialized.');
+        const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+        if (!currentAddress) throw new Error('Wallet not initialized.');
 
         const activeChainId = overrideChainId || chainId;
         const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
@@ -411,7 +412,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             address: ENTRY_POINT,
             abi: [{ type: 'function', name: 'getNonce', inputs: [{ name: 'sender', type: 'address' }, { name: 'key', type: 'uint192' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
             functionName: 'getNonce',
-            args: [address as `0x${string}`, 0n],
+            args: [currentAddress as `0x${string}`, 0n],
         }) as bigint;
 
         let initCode = '0x';
@@ -435,7 +436,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
 
         const userOp: Record<string, any> = {
-            sender: address,
+            sender: currentAddress,
             nonce: `0x${nonce.toString(16)}`,
             initCode: initCode,
             callData,
@@ -537,7 +538,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            if (!address) throw new Error("Wallet not initialized.");
+            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            if (!currentAddress) throw new Error("Wallet not initialized.");
             
             let dest: `0x${string}`;
             let value: bigint;
@@ -616,11 +618,12 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            if (!address) throw new Error("Wallet not initialized. Call login() or register().");
+            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            if (!currentAddress) throw new Error("Wallet not initialized. Call login() or register().");
             
             // 1. Fetch Li.Fi Quote
             const LIFI_API = 'https://li.quest/v1';
-            const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${address}`;
+            const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${currentAddress}`;
             
             const quoteResp = await fetch(quoteUrl);
             const quoteData = await quoteResp.json();
@@ -696,7 +699,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            if (!address) throw new Error('Wallet not initialized.');
+            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            if (!currentAddress) throw new Error('Wallet not initialized.');
 
             // 1. Generate a real ephemeral secp256k1 key in the browser
             const { generatePrivateKey, privateKeyToAccount } = await import('viem/accounts');
@@ -716,7 +720,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
                 functionName: 'execute',
-                args: [address as `0x${string}`, 0n, callData],
+                args: [currentAddress as `0x${string}`, 0n, callData],
             });
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (userOpHash) {
@@ -754,7 +758,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            if (!address) throw new Error('Wallet not initialized.');
+            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            if (!currentAddress) throw new Error('Wallet not initialized.');
 
             // The payee for DCA is typically a DEX aggregator or auto-invest vault.
             // For now the user's own address acts as payee (self-custody DCA vault).
@@ -769,7 +774,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
                 functionName: 'execute',
-                args: [address as `0x${string}`, 0n, callData],
+                args: [currentAddress as `0x${string}`, 0n, callData],
             });
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (userOpHash) {
@@ -804,7 +809,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            if (!address) throw new Error('Wallet not initialized.');
+            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            if (!currentAddress) throw new Error('Wallet not initialized.');
             if (!intents.length) throw new Error('Intent batch is empty.');
 
             const dests = intents.map(i => i.dest as `0x${string}`);
