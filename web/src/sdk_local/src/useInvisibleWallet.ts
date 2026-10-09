@@ -613,7 +613,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
-            return null;
+            throw err;
         } finally {
             setIsPending(false);
         }

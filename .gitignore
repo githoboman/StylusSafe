@@ -20,3 +20,4 @@ node_modules/
 
 # Generated Video and Brag Output
 brag-output/
+secrets.txt
