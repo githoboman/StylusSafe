@@ -654,7 +654,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 console.warn("Li.Fi API failed, falling back to Hackathon Demo Mock...");
                 txRequest = {
                     to: recipient,
-                    value: "0",
+                    value: amount.toString(),
                     data: "0x"
                 };
                 approvalAddress = "0x0000000000000000000000000000000000000000";
