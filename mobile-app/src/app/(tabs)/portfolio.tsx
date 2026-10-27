@@ -14,13 +14,10 @@ export default function PortfolioScreen() {
   const router = useRouter();
   const [selectedChain, setSelectedChain] = useState(421614);
   const { address: walletAddress, register, isPending: isRegistering } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(walletAddress, selectedChain);
+  const { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(walletAddress, selectedChain);
 
   const handleImportToken = () => {
-    // Basic react-native propmt isn't standard across platforms without alert trickery or custom modal.
-    // We will just do a placeholder alert for the hackathon demo, or a custom prompt.
-    // For now we assume they input it somehow.
-    // addCustomToken(address)
+    // Prompt placeholder
   };
 
   const handleCreateWallet = async () => {
@@ -32,9 +29,9 @@ export default function PortfolioScreen() {
     }
   };
 
-  const ethValue = parseFloat(ethBalance) * 3000;
-  const usdcValue = parseFloat(usdcBalance);
-  const netWorth = (ethValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const usdgValue = parseFloat(usdgBalance || '0') * 1.0;
+  const usdcValue = parseFloat(usdcBalance || '0') * 1.0;
+  const netWorth = (usdgValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -67,8 +64,8 @@ export default function PortfolioScreen() {
 
           <View style={styles.assetRow}>
             <View style={styles.assetChip}>
-              <View style={[styles.assetDot, { backgroundColor: Colors.primary }]} />
-              <Text style={styles.assetText}>{ethBalance} ETH</Text>
+              <View style={[styles.assetDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.assetText}>{usdgBalance} USDG (Native)</Text>
             </View>
             <View style={styles.assetChip}>
               <View style={[styles.assetDot, { backgroundColor: Colors.secondary }]} />

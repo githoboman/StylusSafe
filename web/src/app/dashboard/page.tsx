@@ -30,16 +30,16 @@ export default function Dashboard() {
   
   const [selectedChain, setSelectedChain] = useState(421614);
   const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
-  const { ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
+  const { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
 
   const handleImportToken = (addr: string) => {
     addCustomToken(addr);
   };
 
-  // Calculate Net Worth
-  const ethValue = parseFloat(ethBalance.replace(/,/g, '')) * 3000;
-  const usdcValue = parseFloat(usdcBalance.replace(/,/g, ''));
-  const netWorth = (ethValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Calculate Net Worth with USDG as native stable token ($1.00 USD)
+  const usdgValue = parseFloat((usdgBalance || '0').replace(/,/g, '')) * 1.0;
+  const usdcValue = parseFloat((usdcBalance || '0').replace(/,/g, '')) * 1.0;
+  const netWorth = (usdgValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="p-4 md:p-10 w-full max-w-7xl mx-auto flex flex-col gap-8 md:gap-12">
@@ -118,8 +118,11 @@ export default function Dashboard() {
             
             <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-whisper">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-[2px] bg-accent-orange"></span>
-                <span className="font-mono text-base text-text-primary">{address ? ethBalance : '0.00'} ETH</span>
+                <span className="w-3 h-3 rounded-[2px] bg-emerald-500"></span>
+                <span className="font-mono text-base text-text-primary flex items-center gap-1.5">
+                  {address ? usdgBalance : '0.00'} USDG
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase font-semibold">Native</span>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-[2px] bg-text-muted"></span>
@@ -185,8 +188,8 @@ export default function Dashboard() {
                   className="h-14 px-4 flex-1 min-w-[100px] bg-surface-container hover:bg-surface-container-high rounded-[4px] flex items-center justify-center gap-2 transition-all text-text-primary font-medium text-sm md:text-base border border-border-whisper shadow-sm"
                   type="button"
                 >
-                  <span className="material-symbols-outlined text-[20px]">qr_code</span>
-                  Fund
+                  <span className="material-symbols-outlined text-[20px] text-emerald-400">qr_code</span>
+                  Receive
                 </button>
                 <button
                   onClick={() => setIsSendModalOpen(true)}

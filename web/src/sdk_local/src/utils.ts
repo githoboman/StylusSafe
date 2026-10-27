@@ -51,7 +51,7 @@ export async function deriveAesKey(pin: string): Promise<CryptoKey> {
     return crypto.subtle.deriveKey(
         {
             name: "PBKDF2",
-            salt: salt,
+            salt: salt as any,
             iterations: 100000,
             hash: "SHA-256"
         },
@@ -97,9 +97,9 @@ export async function decryptPrivateKey(encryptedJwkHex: string, ivHex: string, 
     
     try {
         const decryptedBytes = await crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: ivBytes },
+            { name: "AES-GCM", iv: ivBytes as any },
             aesKey,
-            encryptedBytes
+            encryptedBytes as any
         );
         const jwkString = new TextDecoder().decode(decryptedBytes);
         const jwk = JSON.parse(jwkString);

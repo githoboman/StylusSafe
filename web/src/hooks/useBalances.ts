@@ -47,6 +47,7 @@ export type CustomTokenBalance = {
 };
 
 export function useBalances(walletAddress: string | null, chainId: number = 421614) {
+  const [usdgBalance, setUsdgBalance] = useState('0.00');
   const [ethBalance, setEthBalance] = useState('0.00');
   const [usdcBalance, setUsdcBalance] = useState('0.00');
   const [customTokens, setCustomTokens] = useState<CustomTokenBalance[]>([]);
@@ -65,6 +66,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
 
     const fetchBalances = async () => {
       if (!walletAddress) {
+        setUsdgBalance('0.00');
         setEthBalance('0.00');
         setUsdcBalance('0.00');
         return;
@@ -74,14 +76,14 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
       setError(null);
       try {
 
-      const [eth, usdc] = await Promise.all([
+      const [nativeBalRaw, usdc] = await Promise.all([
         publicClient.getBalance({ address: walletAddress as `0x${string}` }),
         publicClient.readContract({
           address: config.usdc,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
           args: [walletAddress as `0x${string}`],
-        }).catch(() => 0n), // fallback if USDC doesn't exist on this chain
+        }).catch(() => BigInt(0)), // fallback if USDC doesn't exist on this chain
       ]);
 
       const savedTokens = JSON.parse(localStorage.getItem('custom_tokens') || '[]') as { address: string, chainId: number }[];
@@ -105,7 +107,9 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
       }));
 
         if (isMounted) {
-          setEthBalance(Number(formatEther(eth)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
+          const formattedNative = Number(formatEther(nativeBalRaw)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+          setUsdgBalance(formattedNative);
+          setEthBalance(formattedNative);
           setUsdcBalance(Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
           setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
         }
@@ -126,8 +130,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
   }, [walletAddress, chainId]); 
 
   const refetch = () => {
-    // A quick hack to allow manual refetch trigger (we can't easily expose the inner fetchBalances now)
-    // For now we'll just let the interval handle it, or we could lift the client up.
+    // manual refetch trigger
   };
 
   const addCustomToken = (address: string) => {
@@ -135,9 +138,8 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
     if (!saved.find((t: any) => t.address.toLowerCase() === address.toLowerCase() && t.chainId === chainId)) {
       saved.push({ address, chainId });
       localStorage.setItem('custom_tokens', JSON.stringify(saved));
-      // Will be picked up on next poll
     }
   };
 
-  return { ethBalance, usdcBalance, customTokens, isFetching, error, refetch, addCustomToken };
+  return { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, error, refetch, addCustomToken };
 }

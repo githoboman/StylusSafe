@@ -8,8 +8,9 @@ import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 const SUPPORTED_TOKENS = [
-  { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Ether', color: Colors.primary },
+  { symbol: 'USDG', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Global Dollar (Native)', color: '#10B981' },
   { symbol: 'USDC', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', decimals: 6, name: 'USD Coin', color: Colors.secondary },
+  { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Ether', color: Colors.primary },
   { symbol: 'WBTC', address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 8, name: 'Wrapped Bitcoin', color: '#F7931A' },
 ];
 

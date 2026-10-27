@@ -7,14 +7,15 @@ import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 
 const TOKENS = [
-  { symbol: 'ETH', name: 'Ether', decimals: 18, color: '#0284c7' },
-  { symbol: 'USDC', name: 'USD Coin', decimals: 6, color: '#2775CA' },
-  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, color: '#28A0F0' },
-  { symbol: 'USDT', name: 'Tether USD', decimals: 6, color: '#26A17B' },
-  { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, color: '#F4B731' },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, color: '#F7931A' },
-  { symbol: 'UNI', name: 'Uniswap', decimals: 18, color: '#FF007A' },
-  { symbol: 'LINK', name: 'Chainlink', decimals: 18, color: '#2A5ADA' },
+  { symbol: 'USDG', name: 'Global Dollar (Native)', decimals: 18, color: '#10B981', isNative: true },
+  { symbol: 'USDC', name: 'USD Coin', decimals: 6, color: '#2775CA', isNative: false },
+  { symbol: 'ETH', name: 'Ether', decimals: 18, color: '#0284c7', isNative: false },
+  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, color: '#28A0F0', isNative: false },
+  { symbol: 'USDT', name: 'Tether USD', decimals: 6, color: '#26A17B', isNative: false },
+  { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, color: '#F4B731', isNative: false },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, color: '#F7931A', isNative: false },
+  { symbol: 'UNI', name: 'Uniswap', decimals: 18, color: '#FF007A', isNative: false },
+  { symbol: 'LINK', name: 'Chainlink', decimals: 18, color: '#2A5ADA', isNative: false },
 ];
 
 const CHAINS = [
@@ -32,18 +33,20 @@ export default function TransferPage() {
   const { address, executeCrossChainSwap, isPending } = useInvisibleWallet();
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
-  const [selectedToken, setSelectedToken] = useState(TOKENS[1]); // Default source USDC
-  const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[0]); // Default dest ETH
+  const [selectedToken, setSelectedToken] = useState(TOKENS[0]); // Default source USDG (Native)
+  const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[1]); // Default dest USDC
   const [customSourceToken, setCustomSourceToken] = useState('');
   const [customDestToken, setCustomDestToken] = useState('');
   const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
   const [selectedChain, setSelectedChain] = useState(CHAINS[0]); // Default dest chain same as source
   const [customChainId, setCustomChainId] = useState('');
 
-  const { ethBalance, usdcBalance } = useBalances(address, selectedSourceChain.id);
+  const { usdgBalance, ethBalance, usdcBalance } = useBalances(address, selectedSourceChain.id);
 
   const getBalanceForToken = () => {
-    return selectedToken.symbol === 'USDC' ? usdcBalance : ethBalance;
+    if (selectedToken.symbol === 'USDG') return usdgBalance;
+    if (selectedToken.symbol === 'USDC') return usdcBalance;
+    return ethBalance;
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -217,11 +220,12 @@ export default function TransferPage() {
                   <button
                     key={t.symbol}
                     onClick={() => setSelectedToken(t)}
-                    className={`flex items-center gap-2 px-4 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                    className={`flex items-center gap-2 px-3.5 h-11 rounded-[4px] border text-xs sm:text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                     type="button"
                   >
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
                     {t.symbol}
+                    {t.isNative && <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded font-semibold">Native</span>}
                   </button>
                 ))}
               </div>

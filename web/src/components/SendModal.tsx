@@ -4,14 +4,15 @@ import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 
 const TOKENS = [
-  { symbol: 'ETH', name: 'Ether', address: null, decimals: 18, color: '#0284c7' },
-  { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA' },
-  { symbol: 'ARB', name: 'Arbitrum', address: '0x912CE59144191C1204E64559FE8253a0e49E6548' as `0x${string}`, decimals: 18, color: '#28A0F0' },
+  { symbol: 'USDG', name: 'Global Dollar (Native)', address: null, decimals: 18, color: '#10B981', isNative: true },
+  { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA', isNative: false },
+  { symbol: 'ETH', name: 'Ether', address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, color: '#0284c7', isNative: false },
+  { symbol: 'ARB', name: 'Arbitrum', address: '0x912CE59144191C1204E64559FE8253a0e49E6548' as `0x${string}`, decimals: 18, color: '#28A0F0', isNative: false },
 ];
 
 export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const { address, sendTransaction } = useInvisibleWallet();
-  const { ethBalance, usdcBalance } = useBalances(address);
+  const { usdgBalance, ethBalance, usdcBalance } = useBalances(address);
   
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -50,7 +51,11 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
     }
   };
 
-  const getBalance = () => selectedToken.symbol === 'ETH' ? ethBalance : usdcBalance;
+  const getBalance = () => {
+    if (selectedToken.symbol === 'USDG') return usdgBalance;
+    if (selectedToken.symbol === 'USDC') return usdcBalance;
+    return ethBalance;
+  };
 
   if (status === 'success') {
     return (
@@ -110,10 +115,11 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                 <button
                   key={t.symbol}
                   onClick={() => setSelectedToken(t)}
-                  className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-[4px] border text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
+                  className={`flex-1 flex items-center justify-center gap-1.5 h-11 rounded-[4px] border text-xs sm:text-sm font-medium transition-all ${selectedToken.symbol === t.symbol ? 'border-accent-orange/50 bg-accent-orange/10 text-accent-orange' : 'border-border-whisper bg-surface-container text-text-muted hover:text-text-primary'}`}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                  {t.symbol}
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                  <span>{t.symbol}</span>
+                  {t.isNative && <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded font-semibold">Native</span>}
                 </button>
               ))}
             </div>

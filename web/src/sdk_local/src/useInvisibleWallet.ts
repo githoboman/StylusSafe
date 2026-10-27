@@ -7,7 +7,6 @@ import {
     toHex,
     encodeFunctionData
 } from 'viem';
-import { createSmartAccountClient } from 'permissionless';
 import { createPaymasterClient } from 'viem/account-abstraction';
 import {
     bufferToHex,
@@ -85,7 +84,7 @@ type InvisibleWallet = {
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
     login: () => Promise<void>;
     disconnect: () => void;
-    executeCrossChainSwap: (destChainId: number, fromToken: `0x${string}`, toToken: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
+    executeCrossChainSwap: (sourceChainId: number, destChainId: number, fromToken: string, toToken: string, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
     setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
@@ -325,7 +324,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 const rawSignatureBuf = await crypto.subtle.sign(
                     { name: "ECDSA", hash: "SHA-256" },
                     privateKey,
-                    finalHash
+                    finalHash as any
                 );
                 
                 return {
@@ -599,9 +598,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                     existing.unshift({
                         id: Date.now().toString(),
                         type: 'send',
-                        title: 'Send',
+                        title: tokenAddress ? 'Send' : 'Send USDG',
                         subtitle: `To ${recipient.slice(0, 6)}...${recipient.slice(-4)}`,
-                        amount: tokenAddress ? 'Token Transfer' : `-${(Number(amount) / 1e18).toFixed(4)} ETH`,
+                        amount: tokenAddress ? 'Token Transfer' : `-${(Number(amount) / 1e18).toFixed(4)} USDG`,
                         amountPositive: false,
                         status: 'pending',
                         timestamp: new Date().toISOString(),
@@ -672,7 +671,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             // If it's an ERC20 token and requires approval
             if (actualFromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
-                dests.push(actualFromToken);
+                dests.push(actualFromToken as `0x${string}`);
                 values.push(0n);
                 funcs.push(encodeFunctionData({
                     abi: [{ name: 'approve', type: 'function', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' }],
