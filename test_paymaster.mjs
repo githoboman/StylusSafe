@@ -14,7 +14,7 @@ const deployCallData = encodeFunctionData({
 
 const initCode = concat([FACTORY, deployCallData]);
 
-const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http('https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e') });
+const publicClient = createPublicClient({ transport: http('https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e') });
 
 async function main() {
     const sender = await publicClient.readContract({
