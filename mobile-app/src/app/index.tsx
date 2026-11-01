@@ -52,7 +52,7 @@ export default function OnboardingScreen() {
     if (currentIndex < SLIDES.length - 1) {
       slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
     } else {
-      router.replace('/(tabs)/portfolio');
+      router.replace('/portfolio' as any);
     }
   };
 
@@ -77,7 +77,7 @@ export default function OnboardingScreen() {
       {/* Skip Button */}
       <TouchableOpacity 
         style={styles.skipButton} 
-        onPress={() => router.replace('/(tabs)/portfolio')}
+        onPress={() => router.replace('/portfolio' as any)}
       >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>

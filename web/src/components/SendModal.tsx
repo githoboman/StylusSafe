@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { SignModal } from './SignModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
-import { useBalances } from '@/hooks/useBalances';
+import { useBalances, USDG_ADDRESS } from '@/hooks/useBalances';
 
 const TOKENS = [
-  { symbol: 'USDG', name: 'Global Dollar (Native)', address: null, decimals: 18, color: '#10B981', isNative: true },
+  { symbol: 'USDG', name: 'Global Dollar', address: USDG_ADDRESS as `0x${string}`, decimals: 6, color: '#10B981', isNative: false },
   { symbol: 'USDC', name: 'USD Coin', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d' as `0x${string}`, decimals: 6, color: '#2775CA', isNative: false },
-  { symbol: 'ETH', name: 'Ether', address: '0x0000000000000000000000000000000000000000' as `0x${string}`, decimals: 18, color: '#0284c7', isNative: false },
+  { symbol: 'ETH', name: 'Ether', address: null, decimals: 18, color: '#0284c7', isNative: true },
   { symbol: 'ARB', name: 'Arbitrum', address: '0x912CE59144191C1204E64559FE8253a0e49E6548' as `0x${string}`, decimals: 18, color: '#28A0F0', isNative: false },
 ];
 

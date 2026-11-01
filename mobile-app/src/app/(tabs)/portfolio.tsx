@@ -65,7 +65,7 @@ export default function PortfolioScreen() {
           <View style={styles.assetRow}>
             <View style={styles.assetChip}>
               <View style={[styles.assetDot, { backgroundColor: '#10B981' }]} />
-              <Text style={styles.assetText}>{usdgBalance} USDG (Native)</Text>
+              <Text style={styles.assetText}>{usdgBalance} USDG</Text>
             </View>
             <View style={styles.assetChip}>
               <View style={[styles.assetDot, { backgroundColor: Colors.secondary }]} />

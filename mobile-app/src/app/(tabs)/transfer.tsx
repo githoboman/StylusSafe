@@ -27,6 +27,7 @@ export default function TransferScreen() {
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
   const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[1]);
   const [customToToken, setCustomToToken] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { executeCrossChainSwap, isPending } = useInvisibleWallet();
 
   const handleTransfer = async () => {

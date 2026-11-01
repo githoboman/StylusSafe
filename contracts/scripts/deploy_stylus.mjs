@@ -1,16 +1,11 @@
 /**
  * deploy_stylus.mjs
- * 
- * Deploys a compiled Stylus WASM contract directly via RPC.
- * Does NOT require cargo-stylus CLI — works on Windows natively.
- * 
- * Stylus deployment is just:
- *  1. eth_sendRawTransaction with the WASM bytecode as calldata to address(0)
- *     using the Arbitrum-specific ArbWasm precompile approach
- *  2. Then activate the program via ArbWasm.activateProgram()
- * 
- * Usage:
- *   node scripts/deploy_stylus.mjs --wasm path/to/contract.wasm
+ *
+ * Deploys a compiled Stylus WASM contract (supports both single-contract and
+ * multi-chunk `0xEFF002` EOF root programs when compressed size > 24KB) and
+ * activates it via the Arbitrum `ArbWasm` precompile (`0x71`).
+ *
+ * Reads credentials from environment variables or git-ignored `secret.txt`.
  */
 
 import { ethers } from 'ethers';
@@ -18,176 +13,145 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { brotliCompressSync, constants } from 'zlib';
+import { loadLocalSecrets, getRequiredSecret } from './env_loader.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+loadLocalSecrets();
 
 function getArg(name) {
   const idx = process.argv.indexOf(name);
   return idx !== -1 ? process.argv[idx + 1] : null;
 }
 
-const RPC_URL   = 'https://sepolia-rollup.arbitrum.io/rpc';
-const PRIV_KEY  = '0xe899838ab3fe9931c0a33cb168e814168ccb88aacc6927be88e8357b41b62ebe';
+const RPC_URL   = getArg('--rpc') ?? (process.env.ALCHEMY_API_KEY ? `https://arb-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}` : (process.env.ARBITRUM_SEPOLIA_RPC_URL ?? 'https://sepolia-rollup.arbitrum.io/rpc'));
+const PRIV_KEY  = getArg('--key') ?? getRequiredSecret('DEPLOYER_PRIVATE_KEY', ['PRIVATE_KEY', 'STYLUS_DEPLOYER_PRIVATE_KEY']);
 const WASM_PATH = getArg('--wasm') ?? join(__dirname, '..', 'target', 'wasm32-unknown-unknown', 'release', 'stylus_safe.wasm');
 
-// Arbitrum precompile addresses
-const ARB_WASM          = '0x0000000000000000000000000000000000000071';
-const ARB_WASM_CACHE    = '0x0000000000000000000000000000000000000072';
-
+const ARB_WASM = '0x0000000000000000000000000000000000000071';
 const ARB_WASM_ABI = [
   'function activateProgram(address program) external payable returns (uint16 version, uint256 dataFee)',
   'function programVersion(address program) external view returns (uint16)',
   'function stylusVersion() external view returns (uint16)',
 ];
 
-async function main() {
-  console.log('🦀 StylusSafe WASM Deployment (direct RPC)');
-  console.log('═══════════════════════════════════════════');
+/**
+ * Wraps runtime bytecode in standard 43-byte EVM initcode:
+ *   PUSH32 <runtimeLen> | DUP1 | PUSH1 0x2b | PUSH1 0x00 | CODECOPY | PUSH1 0x00 | RETURN | 0x00
+ */
+function wrapInEvmInitCode(runtimeCode) {
+  const header = Buffer.alloc(43, 0);
+  header[0] = 0x7f; // PUSH32
+  header.writeUInt32BE(runtimeCode.length, 29); // last 4 bytes of 32-byte word (indices 29..32)
+  header[33] = 0x80; // DUP1
+  header[34] = 0x60; header[35] = 0x2b; // PUSH1 43
+  header[36] = 0x60; header[37] = 0x00; // PUSH1 0
+  header[38] = 0x39; // CODECOPY
+  header[39] = 0x60; header[40] = 0x00; // PUSH1 0
+  header[41] = 0xf3; // RETURN
+  header[42] = 0x00; // STOP padding
+  return Buffer.concat([header, runtimeCode]);
+}
 
-  // Resolve WASM file
-  const wasmPath = resolve(WASM_PATH);
-  
-  // Try multiple possible locations
-  const candidates = [
-    wasmPath,
-    join(__dirname, '..', 'target', 'wasm32-unknown-unknown', 'release', 'stylus_safe.wasm'),
-    join('C:\\t', 'wasm32-unknown-unknown', 'release', 'stylus_safe.wasm'),
-    join('C:\\t', 'wasm32-unknown-unknown', 'release', 'stylus-safe.wasm'),
-  ];
-
-  let wasmBytes = null;
-  let foundPath = null;
-  for (const p of candidates) {
-    if (existsSync(p)) {
-      wasmBytes = readFileSync(p);
-      foundPath = p;
-      break;
-    }
+async function deployRawContract(wallet, provider, runtimeCode, label) {
+  const payload = wrapInEvmInitCode(runtimeCode);
+  const feeData = await provider.getFeeData();
+  const tx = await wallet.sendTransaction({
+    data: '0x' + payload.toString('hex'),
+    maxFeePerGas: (feeData.maxFeePerGas ?? 100_000_000n) * 2n,
+    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? 10_000_000n,
+    gasLimit: 15_000_000n,
+  });
+  console.log(`   [${label}] Tx Hash: ${tx.hash}`);
+  const receipt = await tx.wait();
+  if (!receipt || receipt.status === 0) {
+    throw new Error(`${label} deployment reverted!`);
   }
+  console.log(`   [${label}] Deployed at: ${receipt.contractAddress} (${runtimeCode.length} bytes)`);
+  return receipt.contractAddress;
+}
 
-  if (!wasmBytes) {
-    console.error('❌ WASM file not found. Searched:');
-    candidates.forEach(c => console.error('  -', c));
-    console.error('\nRun first: cargo build --manifest-path contracts/Cargo.toml --release --target wasm32-unknown-unknown');
+async function main() {
+  console.log('🦀 StylusSafe WASM Deployment (Arbitrum Sepolia)');
+  console.log('════════════════════════════════════════════════');
+
+  const wasmPath = resolve(WASM_PATH);
+  if (!existsSync(wasmPath)) {
+    console.error(`❌ WASM file not found at ${wasmPath}`);
     process.exit(1);
   }
 
-  console.log(`✅ WASM found: ${foundPath}`);
-  console.log(`   Size: ${(wasmBytes.length / 1024).toFixed(1)} KB`);
+  const wasmBytes = readFileSync(wasmPath);
+  console.log(`✅ WASM found: ${wasmPath} (${(wasmBytes.length / 1024).toFixed(1)} KB)`);
 
   const provider = new ethers.JsonRpcProvider(RPC_URL);
   const wallet   = new ethers.Wallet(PRIV_KEY, provider);
   const balance  = await provider.getBalance(wallet.address);
 
-  console.log(`\nDeployer : ${wallet.address}`);
+  console.log(`Deployer : ${wallet.address}`);
   console.log(`Balance  : ${ethers.formatEther(balance)} ETH`);
-  console.log(`Network  : Arbitrum Sepolia (chainId 421614)`);
 
-  if (balance < ethers.parseEther('0.001')) {
-    console.error('\n❌ Need at least 0.001 ETH on Arbitrum Sepolia.');
-    console.error('   Faucet: https://www.alchemy.com/faucets/arbitrum-sepolia');
-    process.exit(1);
-  }
-
-  // Step 1: Deploy WASM bytecode
-  // 1. Brotli compress the WASM
+  // Brotli-11 compress
   console.log('\n📦 Compressing WASM using Brotli (Level 11)...');
   const compressedWasm = brotliCompressSync(wasmBytes, {
-    [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY
+    [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY,
   });
-  console.log(`   Compressed size: ${(compressedWasm.length / 1024).toFixed(1)} KB`);
+  console.log(`   Compressed size: ${compressedWasm.length} bytes (${(compressedWasm.length / 1024).toFixed(1)} KB)`);
 
-  // 2. Prefix with EOF magic bytes for Stylus (0xEFF00000)
-  const STYLUS_MAGIC = Buffer.from('eff00000', 'hex');
-  const runtimeCode = Buffer.concat([STYLUS_MAGIC, compressedWasm]);
+  let programAddress;
+  const MAX_SINGLE_RUNTIME = 24_572; // 24576 - 4 bytes magic
 
-  // 3. Construct EVM Init Code to return the runtime code
-  // 61 <len_high> <len_low> 80 60 0c 60 00 39 60 00 f3
-  const lenHigh = (runtimeCode.length >> 8) & 0xff;
-  const lenLow = runtimeCode.length & 0xff;
-  const initCode = Buffer.from([
-      0x61, lenHigh, lenLow,
-      0x80,
-      0x60, 0x0c,
-      0x60, 0x00,
-      0x39,
-      0x60, 0x00,
-      0xf3
-  ]);
-  
-  const deployPayload = Buffer.concat([initCode, runtimeCode]);
-  console.log(`   Final transaction payload size: ${(deployPayload.length / 1024).toFixed(1)} KB`);
+  if (compressedWasm.length <= MAX_SINGLE_RUNTIME) {
+    const runtimeCode = Buffer.concat([Buffer.from('eff00000', 'hex'), compressedWasm]);
+    programAddress = await deployRawContract(wallet, provider, runtimeCode, 'SingleProgram');
+  } else {
+    // Split into <= 24,573 byte chunks (each prefixed with 0xEFF001, max 24,576 bytes total)
+    const MAX_CHUNK_DATA = 24_573;
+    const chunkAddresses = [];
+    for (let offset = 0, idx = 1; offset < compressedWasm.length; offset += MAX_CHUNK_DATA, idx++) {
+      const slice = compressedWasm.slice(offset, offset + MAX_CHUNK_DATA);
+      const chunkRuntime = Buffer.concat([Buffer.from('eff001', 'hex'), slice]);
+      const addr = await deployRawContract(wallet, provider, chunkRuntime, `Chunk #${idx}`);
+      chunkAddresses.push(addr);
+    }
 
-  console.log(`   Tx payload length: ${deployPayload.length}`);
+    // Build root pointer contract: 0xEFF00200 + u16BE(numChunks) + 0x1980 + 20-byte addresses
+    const rootHeader = Buffer.alloc(8);
+    rootHeader[0] = 0xef;
+    rootHeader[1] = 0xf0;
+    rootHeader[2] = 0x02;
+    rootHeader[3] = 0x00;
+    rootHeader.writeUInt16BE(chunkAddresses.length, 4);
+    rootHeader[6] = 0x19;
+    rootHeader[7] = 0x80;
 
-  let deployTx;
-  try {
-    const feeData = await provider.getFeeData();
-    deployTx = await wallet.sendTransaction({
-      data: '0x' + deployPayload.toString('hex'),
-      maxFeePerGas: feeData.maxFeePerGas,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-      gasLimit: 15_000_000n, // Manual gas limit to bypass estimation failure
-    });
-    console.log(`   Tx Hash: ${deployTx.hash}`);
-  } catch (err) {
-    console.error(`   Tx failed: ${err.message}`);
-    process.exit(1);
+    const addrBuffers = chunkAddresses.map(a => Buffer.from(a.slice(2), 'hex'));
+    const rootRuntime = Buffer.concat([rootHeader, ...addrBuffers]);
+    programAddress = await deployRawContract(wallet, provider, rootRuntime, 'RootProgram');
   }
-  
-  const receipt = await deployTx.wait();
-  
-  if (!receipt || receipt.status === 0) {
-    console.error('❌ Deployment transaction reverted!');
-    process.exit(1);
-  }
-  
-  const programAddress = receipt.contractAddress;
-  console.log(`\n✅ WASM deployed!`);
-  console.log(`   Program address: ${programAddress}`);
-  console.log(`   Block: ${receipt.blockNumber}`);
 
-  // Step 2: Activate the program via ArbWasm precompile
-  console.log('\n⚡ Step 2: Activating Stylus program...');
-  
+  console.log(`\n⚡ Step 2: Activating Stylus program ${programAddress} via ArbWasm...`);
   const arbWasm = new ethers.Contract(ARB_WASM, ARB_WASM_ABI, wallet);
-  
-  // Check current Stylus version
   const stylusVersion = await arbWasm.stylusVersion();
-  console.log(`   Stylus version: ${stylusVersion}`);
-  
-  // Get activation data fee estimate
-  const [, dataFee] = await arbWasm.activateProgram.staticCall(programAddress, {
-    value: ethers.parseEther('0.01'),
+  console.log(`   ArbWasm Stylus version: ${stylusVersion}`);
+
+  const [ver, dataFee] = await arbWasm.activateProgram.staticCall(programAddress, {
+    value: ethers.parseEther('0.005'),
   });
-  console.log(`   Activation data fee: ${ethers.formatEther(dataFee)} ETH`);
+  console.log(`   StaticCall activateProgram succeeded! Version=${ver}, DataFee=${ethers.formatEther(dataFee)} ETH`);
 
   const activateTx = await arbWasm.activateProgram(programAddress, {
-    value: dataFee + ethers.parseEther('0.001'), // Add buffer
-    gasLimit: 5_000_000n,
+    value: dataFee + (dataFee / 5n) + ethers.parseEther('0.0002'),
+    gasLimit: 12_000_000n,
   });
-
   console.log(`   Activation tx: ${activateTx.hash}`);
   const activateReceipt = await activateTx.wait();
-
   if (!activateReceipt || activateReceipt.status === 0) {
-    console.error('❌ Activation failed! The program may already be active.');
-  } else {
-    console.log(`✅ Program activated!`);
+    throw new Error('Activation transaction reverted!');
   }
-
-  // Summary
-  console.log('\n╔══════════════════════════════════════════════════════════╗');
-  console.log('║           🎉 StylusSafe Deployed to Testnet! 🎉           ║');
-  console.log('╠══════════════════════════════════════════════════════════╣');
-  console.log(`║  Program Address: ${programAddress}`);
-  console.log(`║  Arbiscan: https://sepolia.arbiscan.io/address/${programAddress}`);
-  console.log('╚══════════════════════════════════════════════════════════╝');
-  console.log('\n📋 Add to web/.env.local:');
-  console.log(`   NEXT_PUBLIC_WASM_IMPL_ADDRESS=${programAddress}`);
+  console.log(`✅ Stylus WASM Program Activated! Address: ${programAddress}`);
 }
 
 main().catch(err => {
-  console.error('\n❌ Deployment error:', err.message ?? err);
+  console.error('\n❌ Deployment error:', err.shortMessage ?? err.message ?? err);
   process.exit(1);
 });

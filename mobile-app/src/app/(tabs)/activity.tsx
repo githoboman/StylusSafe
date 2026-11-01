@@ -68,7 +68,7 @@ export default function ActivityScreen() {
             {/* Type indicator */}
             <View style={[styles.txIconBox, { backgroundColor: (TYPE_COLORS[tx.type] || Colors.textMuted) + '18' }]}>
               <Ionicons 
-                name={tx.type === 'Bridge' ? 'arrow-up-right' : tx.type === 'Receive' ? 'arrow-down-left' : tx.type === 'DCA' ? 'repeat' : tx.type === 'Session Key' ? 'flash' : 'list'} 
+                name={tx.type === 'Bridge' ? 'arrow-up' : tx.type === 'Receive' ? 'arrow-down' : tx.type === 'DCA' ? 'repeat' : tx.type === 'Session Key' ? 'flash' : 'list'} 
                 size={20} 
                 color={TYPE_COLORS[tx.type] || Colors.textPrimary} 
               />

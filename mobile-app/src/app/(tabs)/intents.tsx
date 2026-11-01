@@ -4,19 +4,38 @@ import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 export default function IntentsScreen() {
   const router = useRouter();
+  const { executeIntentBatch } = useInvisibleWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSignBatch = async () => {
     setIsSubmitting(true);
-    // Simulate smart contract execute_batch UserOp
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    Alert.alert('Batch Executed', 'All actions successfully submitted atomically to Stylus.', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    try {
+      // Execute multi-intent atomic batch UserOp
+      const sampleIntents = [
+        {
+          dest: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', // USDG Token
+          value: 0n,
+          func: '0x095ea7b3000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // approve Uniswap
+        }
+      ];
+
+      const res = await executeIntentBatch(sampleIntents, '0000');
+      if (res?.userOpHash) {
+        Alert.alert('Batch Executed', `All actions successfully submitted atomically to Arbitrum Sepolia. Hash: ${res.userOpHash.slice(0, 10)}...`, [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      } else {
+        throw new Error('Transaction submission failed');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to submit atomic batch');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -52,7 +71,7 @@ export default function IntentsScreen() {
           <View style={styles.stepBadge}><Text style={styles.stepNum}>2</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.stepTitle}>Swap Asset</Text>
-            <Text style={styles.stepDesc}>ETH → USDC on Uniswap V3</Text>
+            <Text style={styles.stepDesc}>USDG → ETH on Uniswap V3</Text>
           </View>
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         </View>
@@ -64,7 +83,7 @@ export default function IntentsScreen() {
           <View style={styles.stepBadge}><Text style={styles.stepNum}>3</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.stepTitle}>Deposit to Protocol</Text>
-            <Text style={styles.stepDesc}>Supply USDC to Aave V3</Text>
+            <Text style={styles.stepDesc}>Supply USDG to Aave V3</Text>
           </View>
           <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         </View>

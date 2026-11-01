@@ -6,18 +6,29 @@ Cargo.lock
 sdk/node_modules/
 sdk/dist/
 
-# Frontend
+# Frontend & Mobile
+web/node_modules/
+web/.next/
+mobile-app/node_modules/
+mobile-app/.expo/
 frontend/website/node_modules/
 frontend/website/.next/
 frontend/docs/node_modules/
 frontend/docs/.next/
 
-# Misc
+# Environment & Secrets (NEVER commit)
 *.env
+.env*
+!.env.example
+secret.txt
+secrets.txt
+*.pem
+*.key
+
+# Logs & Scratch
 .DS_Store
 build_error.txt
+logs.txt
+memory.txt
 node_modules/
-
-# Generated Video and Brag Output
 brag-output/
-secrets.txt

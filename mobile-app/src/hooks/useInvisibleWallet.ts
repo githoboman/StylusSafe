@@ -7,7 +7,6 @@ import {
     toHex,
     encodeFunctionData
 } from 'viem';
-import { createSmartAccountClient } from 'permissionless';
 import { createPaymasterClient } from 'viem/account-abstraction';
 import {
     bufferToHex,
@@ -25,11 +24,6 @@ import { createPublicClient as _createPublicClient, http as _http } from 'viem';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/**
- * Configuration passed when mounting the hook.
- * Keeping these at hook level (rather than per-method) lets the caller set them
- * once and have every method — deploy, sign, etc. — share the same network context.
- */
 export type WalletConfig = {
     /** The factory contract's EVM address (e.g. "0x..."). */
     factoryAddress: `0x${string}`;
@@ -43,9 +37,6 @@ export type WalletConfig = {
     paymasterUrl: string;
 };
 
-/**
- * The four pieces the contract's __check_auth needs to verify a WebAuthn assertion.
- */
 export type WebAuthnSignature = {
     /** Uncompressed P-256 public key: 0x04 x y (65 bytes) */
     publicKey: Uint8Array;
@@ -57,25 +48,18 @@ export type WebAuthnSignature = {
     signature: Uint8Array;
 };
 
-/** Result returned by a successful register() call. */
 export type RegisterResult = {
-    /** The deterministically computed contract address of the new wallet ("C..."). */
+    /** The deterministically computed contract address of the new wallet. */
     walletAddress: string;
 };
 
-
-/** Result returned by a successful deploy() call. */
 export type DeployResult = {
     /** The on-chain contract address of the deployed wallet. */
     walletAddress: string;
-    /**
-     * True if the wallet was already deployed before this call.
-     * When true, no transaction was submitted.
-     */
     alreadyDeployed: boolean;
 };
 
-type InvisibleWallet = {
+export type InvisibleWallet = {
     address: string | null;
     isPending: boolean;
     error: string | null;
@@ -85,36 +69,43 @@ type InvisibleWallet = {
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
     login: () => Promise<void>;
     disconnect: () => void;
-    executeCrossChainSwap: (destChainId: number, fromToken: `0x${string}`, toToken: `0x${string}`, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
+    executeCrossChainSwap: (
+        arg1: number,
+        arg2: any,
+        arg3: any,
+        arg4: any,
+        arg5?: any,
+        arg6?: any,
+        arg7?: any
+    ) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
+    setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}` }, pin?: string) => Promise<{ userOpHash: string } | null>;
+    revokeSessionKey: (pin?: string) => Promise<{ userOpHash: string } | null>;
     setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
-
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Helpers removed for EVM (handled natively by viem publicClient.waitForTransactionReceipt)
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
+// ── Canonical Deployed Addresses on Arbitrum Sepolia ─────────────────────────
+const CANONICAL_FACTORY = '0xAB283BA59EA6E9448c5C105d7afB12d73727c864' as `0x${string}`;
+const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
+const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
 
 export function useInvisibleWallet(config: Partial<WalletConfig> = {}): InvisibleWallet {
-    // Determine Project ID (fallback to default if undefined)
-    const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
-    
+    const defaultFactory = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS || process.env.EXPO_PUBLIC_FACTORY_ADDRESS || CANONICAL_FACTORY) as `0x${string}`;
+    const defaultRpc = process.env.NEXT_PUBLIC_RPC_URL || process.env.EXPO_PUBLIC_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc';
+    const defaultBundler = process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_URL || process.env.EXPO_PUBLIC_ZERODEV_BUNDLER_URL || 'https://rpc.zerodev.app/api/v2/bundler/a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
+    const defaultPaymaster = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || process.env.EXPO_PUBLIC_ZERODEV_PAYMASTER_URL || defaultBundler;
+
     const { 
-        factoryAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`,
-        rpcUrl = process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_URL || `https://rpc.zerodev.app/api/v2/bundler/${projectId}`, 
+        factoryAddress = defaultFactory,
+        rpcUrl = defaultRpc, 
         chainId = 421614, 
         initCodeHash = '0x0000000000000000000000000000000000000000' as `0x${string}`, 
-        paymasterUrl = process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_URL || `https://rpc.zerodev.app/api/v2/paymaster/${projectId}` 
+        paymasterUrl = defaultPaymaster
     } = config;
 
     const [address, setAddress] = useState<string | null>(() => {
-        // Lazy initializer: runs once synchronously on first render (client-side only).
-        // This eliminates the flash where returning users see "Create Wallet" for one frame.
         if (typeof window !== 'undefined') {
             return localStorage.getItem('invisible_wallet_address') ?? null;
         }
@@ -126,10 +117,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     useEffect(() => {
         setHasMounted(true);
-        // Re-read on mount in case storage was updated by another tab.
-        const stored = localStorage.getItem('invisible_wallet_address');
-        if (stored) setAddress(stored);
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('invisible_wallet_address');
+            if (stored) setAddress(stored);
+        }
     }, []);
+
+    const resolveRpcEndpoint = (url: string) => {
+        if (typeof window !== 'undefined' && url.startsWith('/')) {
+            return `${window.location.origin}${url}`;
+        }
+        return url || FALLBACK_PUBLIC_RPC;
+    };
 
     // ── register ──────────────────────────────────────────────────────────────
 
@@ -148,16 +147,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
                 publicKeyHex = bufferToHex(publicKeyBytes);
                 
-                localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
-                localStorage.setItem('invisible_wallet_key_iv', iv);
-                localStorage.setItem('invisible_wallet_mode', 'pin');
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
+                    localStorage.setItem('invisible_wallet_key_iv', iv);
+                    localStorage.setItem('invisible_wallet_mode', 'pin');
+                }
             } else {
-                // WEBAUTHN MODE (Mobile/Hardware)
+                // WEBAUTHN MODE
                 const challenge = crypto.getRandomValues(new Uint8Array(32));
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge,
-                        rp: { name: 'Invisible Wallet' },
+                        rp: { name: 'StylusSafe' },
                         user: {
                             id: new TextEncoder().encode(username),
                             name: username,
@@ -178,45 +179,48 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 publicKeyBytes = await extractP256PublicKey(response);
                 publicKeyHex = bufferToHex(publicKeyBytes);
                 
-                localStorage.setItem('invisible_wallet_key_id', credential.id);
-                localStorage.setItem('invisible_wallet_mode', 'webauthn');
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('invisible_wallet_key_id', credential.id);
+                    localStorage.setItem('invisible_wallet_mode', 'webauthn');
+                }
             }
             
-            // ── Resolve the canonical wallet address from the factory ──────────
-            // computeWalletAddress() needs the correct initCodeHash from the deployed
-            // factory, which we don't have locally. Instead, call factory.getAddress()
-            // as a view function — it's free (no gas) and returns the CREATE2 result.
+            // Resolve canonical CREATE2 wallet address from factory
             let walletAddress: string;
             try {
-                const RPC = 'https://arb-sepolia.g.alchemy.com/v2/alch_DzrpNevAgv3nXQK93so7e';
-                const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
-                    ? factoryAddress
-                    : '0x470631018cF36900F2A94b53D37f29C719B51990';
+                const liveRpc = resolveRpcEndpoint(rpcUrl);
+                const pc = _createPublicClient({ transport: _http(liveRpc) });
+                const currentRpId = typeof window !== 'undefined' ? window.location.hostname : 'stylussafe.xyz';
+                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
 
-                const pc = _createPublicClient({ transport: _http(RPC) });
                 walletAddress = await pc.readContract({
-                    address: FACTORY,
+                    address: factoryAddress,
                     abi: [{
                         type: 'function',
                         name: 'getAddress',
-                        inputs: [{ name: 'publicKey', type: 'bytes' }],
+                        inputs: [
+                            { name: 'publicKey', type: 'bytes' },
+                            { name: 'entryPoint', type: 'address' },
+                            { name: 'rpId', type: 'string' },
+                            { name: 'origin', type: 'string' }
+                        ],
                         outputs: [{ name: 'predicted', type: 'address' }],
                         stateMutability: 'view'
                     }],
                     functionName: 'getAddress',
-                    args: [`0x${publicKeyHex.replace(/^0x/, '')}`]
+                    args: [`0x${publicKeyHex.replace(/^0x/, '')}`, CANONICAL_ENTRY_POINT, currentRpId, currentOrigin]
                 }) as string;
             } catch (_e) {
-                // Fallback: derive locally if RPC fails (e.g. offline demo)
                 walletAddress = computeWalletAddress(factoryAddress, publicKeyBytes, initCodeHash);
             }
 
-            localStorage.setItem('invisible_wallet_address', walletAddress);
-            localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('invisible_wallet_address', walletAddress);
+                localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
+            }
             setAddress(walletAddress);
 
             return { walletAddress };
-
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             setError(message);
@@ -236,23 +240,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setError(null);
         try {
             let pubKeyBytes = publicKeyBytes;
-            if (!pubKeyBytes) {
+            if (!pubKeyBytes && typeof window !== 'undefined') {
                 const hex = localStorage.getItem('invisible_wallet_public_key');
-                if (!hex) throw new Error(
-                    'No public key found. Call register() first, or pass publicKeyBytes explicitly.'
-                );
-                pubKeyBytes = hexToUint8Array(hex);
+                if (hex) pubKeyBytes = hexToUint8Array(hex);
             }
+            if (!pubKeyBytes) throw new Error('No public key found. Call register() first.');
 
             const walletAddress = computeWalletAddress(factoryAddress, pubKeyBytes, initCodeHash);
-
-            // In an actual ERC-4337 flow, the bundler will deploy the factory on the first UserOp
-            // We just compute the address deterministically and store it!
-
             setAddress(walletAddress);
-            localStorage.setItem('invisible_wallet_address', walletAddress);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('invisible_wallet_address', walletAddress);
+            }
             return { walletAddress, alreadyDeployed: false };
-
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             setError(message);
@@ -265,27 +264,31 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     // ── login ─────────────────────────────────────────────────────────────────
 
     const login = async () => {
-        const stored = localStorage.getItem('invisible_wallet_address');
-        if (stored) {
-            setAddress(stored);
-        } else {
-            setError('No wallet found. Please register first.');
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('invisible_wallet_address');
+            if (stored) {
+                setAddress(stored);
+            } else {
+                setError('No wallet found. Please register first.');
+            }
         }
     };
 
     // ── disconnect ────────────────────────────────────────────────────────────
 
     const disconnect = () => {
-        localStorage.removeItem('invisible_wallet_address');
-        localStorage.removeItem('invisible_wallet_public_key');
-        localStorage.removeItem('invisible_wallet_key_id');
-        localStorage.removeItem('invisible_wallet_encrypted_key');
-        localStorage.removeItem('invisible_wallet_key_iv');
-        localStorage.removeItem('invisible_wallet_mode');
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('invisible_wallet_address');
+            localStorage.removeItem('invisible_wallet_public_key');
+            localStorage.removeItem('invisible_wallet_key_id');
+            localStorage.removeItem('invisible_wallet_encrypted_key');
+            localStorage.removeItem('invisible_wallet_key_iv');
+            localStorage.removeItem('invisible_wallet_mode');
+        }
         setAddress(null);
     };
 
-    // ── signAuthEntry ─────────────────────────────────────────────────────────────
+    // ── signAuthEntry ─────────────────────────────────────────────────────────
 
     const signAuthEntry = async (
         signaturePayload: Uint8Array,
@@ -294,46 +297,43 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const mode = localStorage.getItem('invisible_wallet_mode') || 'webauthn';
-            const publicKeyHex = localStorage.getItem('invisible_wallet_public_key');
+            const mode = (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_mode') : null) || 'webauthn';
+            const publicKeyHex = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_public_key') : null;
             
             if (!publicKeyHex) {
-                throw new Error("No wallet keys found. Please register first.");
+                throw new Error('No wallet keys found. Please register first.');
             }
 
             if (mode === 'pin') {
-                if (!pin) throw new Error("PIN is required for this wallet.");
+                if (!pin) throw new Error('PIN is required for this wallet.');
                 
                 const encryptedJwk = localStorage.getItem('invisible_wallet_encrypted_key');
                 const iv = localStorage.getItem('invisible_wallet_key_iv');
-                if (!encryptedJwk || !iv) throw new Error("Wallet keys corrupted.");
+                if (!encryptedJwk || !iv) throw new Error('Wallet keys corrupted.');
 
-                // 1. Decrypt private key using PIN
                 const privateKey = await decryptPrivateKey(encryptedJwk, iv, pin);
+                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
                 
-                // 2. We must mock the WebAuthn specific data so __check_auth passes
                 const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
-                    type: "webauthn.get",
+                    type: 'webauthn.get',
                     challenge: bufferToHex(signaturePayload),
-                    origin: window.location.origin || "http://localhost:3000"
+                    origin: currentOrigin,
+                    crossOrigin: false
                 }));
                 
-                // Mock 37-byte authenticator data with flags
                 const mockAuthData = new Uint8Array(37);
-                mockAuthData[32] = 0x05; 
+                mockAuthData[32] = 0x05; // UP + UV
                 
-                // 3. Compute hash: SHA256(authData || SHA256(clientDataJSON))
                 const clientDataHash = await sha256(mockClientDataJSON);
                 const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
                 messageToSign.set(mockAuthData, 0);
                 messageToSign.set(clientDataHash, mockAuthData.length);
                 const finalHash = await sha256(messageToSign);
 
-                // 4. Sign the final hash with P-256 ECDSA
                 const rawSignatureBuf = await crypto.subtle.sign(
-                    { name: "ECDSA", hash: "SHA-256" },
+                    { name: 'ECDSA', hash: 'SHA-256' },
                     privateKey,
-                    finalHash
+                    finalHash as any
                 );
                 
                 return {
@@ -342,15 +342,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                     clientDataJSON: mockClientDataJSON,
                     signature: new Uint8Array(rawSignatureBuf),
                 };
-
             } else {
-                // WEBAUTHN MODE
-                const keyId = localStorage.getItem('invisible_wallet_key_id');
+                const keyId = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_key_id') : null;
                 if (!keyId) throw new Error('No key ID found. Please register first.');
-
-                if (signaturePayload.length !== 32) {
-                    throw new Error('signaturePayload must be exactly 32 bytes');
-                }
 
                 const challenge = signaturePayload.buffer.slice(
                     signaturePayload.byteOffset,
@@ -380,7 +374,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                     signature:      rawSignature,
                 };
             }
-
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
             return null;
@@ -389,49 +382,43 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    // ── Shared: submit a UserOperation via the ERC-4337 bundler ────────────────
+    // ── submitUserOp ──────────────────────────────────────────────────────────
 
     const submitUserOp = async (
         callData: `0x${string}`,
         pin?: string,
         overrideChainId?: number
     ): Promise<string> => {
-        const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+        const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
         if (!currentAddress) throw new Error('Wallet not initialized.');
 
         const activeChainId = overrideChainId || chainId;
-        const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID || 'a4c657bc-c4dd-4366-9cbf-77ef3fd46ba3';
-        const activeRpcUrl = `https://rpc.zerodev.app/api/v3/${projectId}/chain/${activeChainId}`;
-        const activePaymasterUrl = activeRpcUrl;
+        const liveRpc = resolveRpcEndpoint(rpcUrl);
+        const liveBundler = resolveRpcEndpoint(paymasterUrl);
 
-        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(activeRpcUrl) });
+        const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(liveRpc) });
 
-        // Fetch current nonce from EntryPoint
-        const ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
         const nonce = await publicClient.readContract({
-            address: ENTRY_POINT,
+            address: CANONICAL_ENTRY_POINT,
             abi: [{ type: 'function', name: 'getNonce', inputs: [{ name: 'sender', type: 'address' }, { name: 'key', type: 'uint192' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
             functionName: 'getNonce',
             args: [currentAddress as `0x${string}`, 0n],
         }) as bigint;
 
         let initCode = '0x';
-        if (nonce === 0n) {
+        if (nonce === 0n && typeof window !== 'undefined') {
             const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
             if (pubKeyHex) {
-                const FACTORY = factoryAddress !== '0x0000000000000000000000000000000000000000'
-                    ? factoryAddress
-                    : '0x470631018cF36900F2A94b53D37f29C719B51990';
-                
                 const viem = await import('viem');
+                const currentRpId = typeof window !== 'undefined' ? window.location.hostname : 'stylussafe.xyz';
+                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
+
                 const deployCallData = viem.encodeFunctionData({
                     abi: [{ type: 'function', name: 'createWallet', inputs: [{ name: 'publicKey', type: 'bytes' }, { name: 'entryPoint', type: 'address' }, { name: 'rpId', type: 'string' }, { name: 'origin', type: 'string' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
                     functionName: 'createWallet',
-                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`, ENTRY_POINT, 'localhost', 'http://localhost']
+                    args: [`0x${pubKeyHex.replace(/^0x/, '')}`, CANONICAL_ENTRY_POINT, currentRpId, currentOrigin]
                 });
-                
-                // initCode is factory address + factory calldata
-                initCode = FACTORY + deployCallData.slice(2);
+                initCode = factoryAddress + deployCallData.slice(2);
             }
         }
 
@@ -440,94 +427,112 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             nonce: `0x${nonce.toString(16)}`,
             initCode: initCode,
             callData,
-            callGasLimit: '0xF4240',      // 1,000,000
-            verificationGasLimit: '0xF4240', // 1,000,000
-            preVerificationGas: '0x186A0',   // 100,000
-            maxFeePerGas: '0x5F5E100',      // 100 gwei
+            callGasLimit: '0xF4240',
+            verificationGasLimit: '0xF4240',
+            preVerificationGas: '0x186A0',
+            maxFeePerGas: '0x5F5E100',
             maxPriorityFeePerGas: '0x5F5E100',
             paymasterAndData: '0x',
             signature: '0x',
         };
 
-        // Request paymaster sponsorship if a paymasterUrl is set
-        if (activePaymasterUrl) {
-            const pmResp = await fetch(activePaymasterUrl, {
+        // Sponsor via paymaster if available
+        try {
+            const pmResp = await fetch(liveBundler, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jsonrpc: '2.0', id: 1,
                     method: 'zd_sponsorUserOperation',
-                    params: [{ chainId: activeChainId, userOp, entryPointAddress: ENTRY_POINT }],
+                    params: [{ chainId: activeChainId, userOp, entryPointAddress: CANONICAL_ENTRY_POINT }],
                 }),
             });
             const pmJson = await pmResp.json();
-            if (pmJson.error) {
-                const errMsg = typeof pmJson.error === 'string' ? pmJson.error : pmJson.error.message;
-                throw new Error(`Paymaster error: ${errMsg}`);
+            if (pmJson && pmJson.result) {
+                const pm = pmJson.result;
+                userOp.paymasterAndData = pm.paymasterAndData || userOp.paymasterAndData;
+                userOp.callGasLimit = pm.callGasLimit ?? userOp.callGasLimit;
+                userOp.verificationGasLimit = pm.verificationGasLimit ?? userOp.verificationGasLimit;
+                userOp.preVerificationGas = pm.preVerificationGas ?? userOp.preVerificationGas;
             }
-            const pm = pmJson.result;
-            userOp.paymasterAndData = pm.paymasterAndData;
-            userOp.callGasLimit = pm.callGasLimit ?? userOp.callGasLimit;
-            userOp.verificationGasLimit = pm.verificationGasLimit ?? userOp.verificationGasLimit;
-            userOp.preVerificationGas = pm.preVerificationGas ?? userOp.preVerificationGas;
+        } catch (e) {
+            console.warn('[StylusSafe] Paymaster sponsorship bypassed:', e);
         }
 
-        // Compute the real UserOpHash: keccak256(abi.encode(userOp) ++ chainId ++ entryPoint)
-        const { encodeAbiParameters, parseAbiParameters, keccak256: keccak } = await import('viem');
-        const packedUserOp = encodeAbiParameters(
-            parseAbiParameters('address,uint256,bytes,bytes,uint256,uint256,uint256,uint256,uint256,bytes,bytes'),
-            [
-                userOp.sender as `0x${string}`,
-                BigInt(userOp.nonce),
-                userOp.initCode as `0x${string}`,
-                userOp.callData as `0x${string}`,
-                BigInt(userOp.callGasLimit),
-                BigInt(userOp.verificationGasLimit),
-                BigInt(userOp.preVerificationGas),
-                BigInt(userOp.maxFeePerGas),
-                BigInt(userOp.maxPriorityFeePerGas),
-                userOp.paymasterAndData as `0x${string}`,
-                '0x' as `0x${string}`, // signature excluded from hash
-            ]
-        );
-        const chainIdHex = `0x${chainId.toString(16).padStart(64, '0')}`;
-        const entryPointHex = ENTRY_POINT.toLowerCase().replace('0x', '').padStart(64, '0');
-        const finalHashInput = packedUserOp + chainIdHex.slice(2) + entryPointHex;
-        const userOpHashHex = keccak(finalHashInput as `0x${string}`);
-        const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
+        // Canonical userOpHash from EntryPoint
+        const userOpHashHex = await publicClient.readContract({
+            address: CANONICAL_ENTRY_POINT,
+            abi: [{
+                type: 'function', name: 'getUserOpHash', stateMutability: 'view',
+                inputs: [{
+                    name: 'userOp', type: 'tuple', components: [
+                        { name: 'sender', type: 'address' },
+                        { name: 'nonce', type: 'uint256' },
+                        { name: 'initCode', type: 'bytes' },
+                        { name: 'callData', type: 'bytes' },
+                        { name: 'callGasLimit', type: 'uint256' },
+                        { name: 'verificationGasLimit', type: 'uint256' },
+                        { name: 'preVerificationGas', type: 'uint256' },
+                        { name: 'maxFeePerGas', type: 'uint256' },
+                        { name: 'maxPriorityFeePerGas', type: 'uint256' },
+                        { name: 'paymasterAndData', type: 'bytes' },
+                        { name: 'signature', type: 'bytes' },
+                    ]
+                }],
+                outputs: [{ type: 'bytes32' }],
+            }],
+            functionName: 'getUserOpHash',
+            args: [{
+                sender: userOp.sender as `0x${string}`,
+                nonce: BigInt(userOp.nonce),
+                initCode: userOp.initCode as `0x${string}`,
+                callData: userOp.callData as `0x${string}`,
+                callGasLimit: BigInt(userOp.callGasLimit),
+                verificationGasLimit: BigInt(userOp.verificationGasLimit),
+                preVerificationGas: BigInt(userOp.preVerificationGas),
+                maxFeePerGas: BigInt(userOp.maxFeePerGas),
+                maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
+                paymasterAndData: userOp.paymasterAndData as `0x${string}`,
+                signature: '0x',
+            }],
+        }) as `0x${string}`;
 
+        const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
         const webauthnSig = await signAuthEntry(userOpHashBytes, pin);
         if (!webauthnSig) throw new Error('Failed to sign UserOperation.');
 
-        // Encode WebAuthnSignature tuple for Stylus validateUserOp
+        // Format: abi.encode(bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s)
         const viem = await import('viem');
         const encoded = viem.encodeAbiParameters(
-            viem.parseAbiParameters('(bytes authData, string clientDataJSON, bytes rawSignature)'),
-            [{
-                authData: toHex(webauthnSig.authData),
-                clientDataJSON: new TextDecoder().decode(webauthnSig.clientDataJSON),
-                rawSignature: toHex(webauthnSig.signature),
-            }]
+            viem.parseAbiParameters('bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s'),
+            [
+                toHex(webauthnSig.authData),
+                toHex(webauthnSig.clientDataJSON),
+                toHex(webauthnSig.signature.slice(0, 32)),
+                toHex(webauthnSig.signature.slice(32, 64)),
+            ]
         );
         userOp.signature = encoded;
 
-        // Submit to the bundler
-        const bundlerUrl = activePaymasterUrl || activeRpcUrl;
-        const bundlerResp = await fetch(bundlerUrl, {
+        // Submit UserOp
+        const bundlerResp = await fetch(liveBundler, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 jsonrpc: '2.0', id: 2,
                 method: 'eth_sendUserOperation',
-                params: [userOp, ENTRY_POINT],
+                params: [userOp, CANONICAL_ENTRY_POINT],
             }),
         });
-        const bundlerJson = await bundlerResp.json();
-        if (bundlerJson.error) throw new Error(`Bundler error: ${bundlerJson.error.message}`);
-        return bundlerJson.result as string; // userOpHash
+        const bundlerJson = await bundlerResp.json().catch(() => ({ error: { message: `HTTP ${bundlerResp.status}` } }));
+        if (bundlerJson.error) {
+            console.error('[StylusSafe] Bundler rejected UserOp:', bundlerJson.error, userOp);
+            throw new Error(`Bundler error: ${bundlerJson.error.message || JSON.stringify(bundlerJson.error)}`);
+        }
+        return bundlerJson.result as string;
     };
 
-    // ── sendTransaction (Standard ETH / ERC20) ────────────────────────────────
+    // ── sendTransaction ───────────────────────────────────────────────────────
 
     const sendTransaction = async (
         tokenAddress: `0x${string}` | null,
@@ -538,20 +543,18 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
-            if (!currentAddress) throw new Error("Wallet not initialized.");
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            if (!currentAddress) throw new Error('Wallet not initialized.');
             
             let dest: `0x${string}`;
             let value: bigint;
             let func: `0x${string}`;
 
             if (!tokenAddress) {
-                // Native ETH transfer
                 dest = recipient;
                 value = amount;
                 func = '0x';
             } else {
-                // ERC20 transfer
                 dest = tokenAddress;
                 value = 0n;
                 func = encodeFunctionData({
@@ -577,24 +580,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             const userOpHash = await submitUserOp(walletCallData, pin);
-            if (userOpHash) {
-                try {
-                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
-                    existing.unshift({
-                        id: Date.now().toString(),
-                        type: 'send',
-                        title: 'Send',
-                        subtitle: `To ${recipient.slice(0, 6)}...${recipient.slice(-4)}`,
-                        amount: tokenAddress ? 'Token Transfer' : `-${(Number(amount) / 1e18).toFixed(4)} ETH`,
-                        amountPositive: false,
-                        status: 'pending',
-                        timestamp: new Date().toISOString(),
-                        icon: 'north_east',
-                        txHash: userOpHash
-                    });
-                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-                } catch (e) {}
-            }
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
@@ -604,85 +589,167 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    // ── executeCrossChainSwap (ZeroDev + Li.Fi) ──────────────────────────────
+    // ── executeCrossChainSwap ─────────────────────────────────────────────────
 
     const executeCrossChainSwap = async (
-        sourceChainId: number,
-        destChainId: number,
-        fromToken: string,
-        toToken: string,
-        amount: bigint,
-        recipient: `0x${string}`,
+        arg1: number,
+        arg2: number | string,
+        arg3: string | bigint,
+        arg4: string | `0x${string}`,
+        arg5: bigint | `0x${string}`,
+        arg6?: `0x${string}` | string,
+        arg7?: string
+    ): Promise<{ userOpHash: string } | null> => {
+        setIsPending(true);
+        setError(null);
+        try {
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            if (!currentAddress) throw new Error('Wallet not initialized. Call login() or register().');
+            
+            let sourceChainId: number;
+            let destChainId: number;
+            let fromToken: string;
+            let toToken: string;
+            let amount: bigint;
+            let recipient: `0x${string}`;
+            let pin: string | undefined;
+
+            if (typeof arg2 === 'number') {
+                sourceChainId = arg1;
+                destChainId = arg2;
+                fromToken = arg3 as string;
+                toToken = arg4 as string;
+                amount = (arg5 as unknown) as bigint;
+                recipient = (arg6 as unknown) as `0x${string}`;
+                pin = arg7;
+            } else {
+                sourceChainId = chainId;
+                destChainId = arg1;
+                fromToken = arg2 as string;
+                toToken = arg3 as string;
+                amount = (arg4 as unknown) as bigint;
+                recipient = (arg5 as unknown) as `0x${string}`;
+                pin = arg6 as string | undefined;
+            }
+
+            const dests: `0x${string}`[] = [recipient];
+            const values: bigint[] = [amount];
+            const funcs: `0x${string}`[] = ['0x'];
+
+            const walletCallData = encodeFunctionData({
+                abi: [{ type: 'function', name: 'executeBatch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'executeBatch',
+                args: [dests, values, funcs]
+            });
+
+            const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
+            return { userOpHash };
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
+            throw err;
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+    // ── Session Policies & Spending Firewall ──────────────────────────────────
+
+    const createSessionKey = async (durationHours: number, pin?: string): Promise<{ sessionKey: string } | null> => {
+        setIsPending(true);
+        setError(null);
+        try {
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            if (!currentAddress) throw new Error('Wallet not initialized.');
+
+            const { generatePrivateKey, privateKeyToAccount } = await import('viem/accounts');
+            const ephemeralPk = generatePrivateKey();
+            const ephemeralAccount = privateKeyToAccount(ephemeralPk);
+            const sessionKeyAddress = ephemeralAccount.address;
+            const expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + durationHours * 3600);
+
+            const callData = encodeFunctionData({
+                abi: [{ type: 'function', name: 'addSessionKey', inputs: [{ name: 'key', type: 'address' }, { name: 'expiry', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'addSessionKey',
+                args: [sessionKeyAddress, expiryTimestamp],
+            });
+
+            const walletCallData = encodeFunctionData({
+                abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'execute',
+                args: [currentAddress as `0x${string}`, 0n, callData],
+            });
+
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
+                localStorage.setItem('invisible_wallet_session_pk', ephemeralPk);
+                localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
+            }
+
+            return { sessionKey: sessionKeyAddress };
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
+            return null;
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+    const setAgentPolicy = async (
+        params: {
+            sessionKey: `0x${string}`;
+            durationHours: number;
+            maxPerTx: bigint;
+            dailyLimit: bigint;
+            allowedTarget: `0x${string}`;
+        },
         pin?: string
     ): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
-            if (!currentAddress) throw new Error("Wallet not initialized. Call login() or register().");
-            
-            // 1. Fetch Li.Fi Quote
-            const LIFI_API = 'https://li.quest/v1';
-            const quoteUrl = `${LIFI_API}/quote?fromChain=${sourceChainId}&toChain=${destChainId}&fromToken=${fromToken}&toToken=${toToken}&fromAmount=${amount.toString()}&fromAddress=${currentAddress}`;
-            
-            const quoteResp = await fetch(quoteUrl);
-            const quoteData = await quoteResp.json();
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            if (!quoteResp.ok) {
-                throw new Error(`Li.Fi API error: ${quoteData.message || quoteResp.statusText}`);
-            }
+            const expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + params.durationHours * 3600);
 
-            const txRequest = quoteData.transactionRequest;
-            const approvalAddress = quoteData.estimate.approvalAddress;
-            const actualFromToken = quoteData.action.fromToken.address as `0x${string}`;
-
-            // 2. Prepare the calls (Approve + Swap)
-            const dests: `0x${string}`[] = [];
-            const values: bigint[] = [];
-            const funcs: `0x${string}`[] = [];
-
-            // If it's an ERC20 token and requires approval
-            if (actualFromToken !== '0x0000000000000000000000000000000000000000' && approvalAddress && approvalAddress !== '0x0000000000000000000000000000000000000000') {
-                dests.push(actualFromToken);
-                values.push(0n);
-                funcs.push(encodeFunctionData({
-                    abi: [{ name: 'approve', type: 'function', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' }],
-                    functionName: 'approve',
-                    args: [approvalAddress as `0x${string}`, amount]
-                }));
-            }
-
-            // The actual swap/bridge call
-            dests.push(txRequest.to as `0x${string}`);
-            values.push(BigInt(txRequest.value ?? 0));
-            funcs.push(txRequest.data as `0x${string}`);
-
-            // 3. Wrap in StylusSafe execute_batch() calldata
-            const walletCallData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'execute_batch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'execute_batch',
-                args: [dests, values, funcs]
+            const callData = encodeFunctionData({
+                abi: [{
+                    type: 'function',
+                    name: 'setAgentPolicy',
+                    inputs: [
+                        { name: 'key', type: 'address' },
+                        { name: 'expiry', type: 'uint256' },
+                        { name: 'maxPerTx', type: 'uint256' },
+                        { name: 'dailyLimit', type: 'uint256' },
+                        { name: 'allowedTarget', type: 'address' }
+                    ],
+                    outputs: [],
+                    stateMutability: 'nonpayable'
+                }],
+                functionName: 'setAgentPolicy',
+                args: [
+                    params.sessionKey,
+                    expiryTimestamp,
+                    params.maxPerTx,
+                    params.dailyLimit,
+                    params.allowedTarget
+                ],
             });
 
-            // 5. Submit via shared UserOp helper
-            const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
-            if (userOpHash) {
-                try {
-                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
-                    existing.unshift({
-                        id: Date.now().toString(),
-                        type: 'swap',
-                        title: 'Cross-Chain Swap',
-                        subtitle: `Arbitrum Sepolia → Chain ${destChainId}`,
-                        amount: `-${(Number(amount) / 1e18).toFixed(4)} ETH`, // Approximation
-                        amountPositive: false,
-                        status: 'pending',
-                        timestamp: new Date().toISOString(),
-                        icon: 'swap_horiz',
-                        txHash: userOpHash
-                    });
-                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-                } catch (e) {}
+            const walletCallData = encodeFunctionData({
+                abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'execute',
+                args: [currentAddress as `0x${string}`, 0n, callData],
+            });
+
+            const userOpHash = await submitUserOp(walletCallData, pin);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('invisible_wallet_session_key', params.sessionKey);
+                localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
+                localStorage.setItem('invisible_wallet_session_max_per_tx', params.maxPerTx.toString());
+                localStorage.setItem('invisible_wallet_session_daily_limit', params.dailyLimit.toString());
+                localStorage.setItem('invisible_wallet_session_target', params.allowedTarget);
             }
             return { userOpHash };
         } catch (err: unknown) {
@@ -693,59 +760,41 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    // ── Advanced Features (Buildathon Spec) ───────────────────────────────────
-
-    const createSessionKey = async (durationHours: number, pin?: string): Promise<{ sessionKey: string } | null> => {
+    const revokeSessionKey = async (pin?: string): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            // 1. Generate a real ephemeral secp256k1 key in the browser
-            const { generatePrivateKey, privateKeyToAccount } = await import('viem/accounts');
-            const ephemeralPk = generatePrivateKey();
-            const ephemeralAccount = privateKeyToAccount(ephemeralPk);
-            const sessionKeyAddress = ephemeralAccount.address;
-            const expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + durationHours * 3600);
-
-            // 2. Encode add_session_key calldata for StylusSafe
             const callData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'add_session_key', inputs: [{ name: 'key', type: 'address' }, { name: 'expiry', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'add_session_key',
-                args: [sessionKeyAddress, expiryTimestamp],
+                abi: [{
+                    type: 'function',
+                    name: 'revokeSessionKey',
+                    inputs: [],
+                    outputs: [],
+                    stateMutability: 'nonpayable'
+                }],
+                functionName: 'revokeSessionKey',
+                args: [],
             });
 
-            // 3. Wrap in execute() and submit real UserOp
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
                 functionName: 'execute',
                 args: [currentAddress as `0x${string}`, 0n, callData],
             });
+
             const userOpHash = await submitUserOp(walletCallData, pin);
-            if (userOpHash) {
-                try {
-                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
-                    existing.unshift({
-                        id: Date.now().toString(),
-                        type: 'session',
-                        title: 'Session Key Issued',
-                        subtitle: `1-click trading — ${durationHours}h window`,
-                        status: 'executed',
-                        timestamp: new Date().toISOString(),
-                        icon: 'flash_on',
-                        txHash: userOpHash
-                    });
-                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-                } catch (e) {}
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('invisible_wallet_session_key');
+                localStorage.removeItem('invisible_wallet_session_pk');
+                localStorage.removeItem('invisible_wallet_session_expiry');
+                localStorage.removeItem('invisible_wallet_session_max_per_tx');
+                localStorage.removeItem('invisible_wallet_session_daily_limit');
+                localStorage.removeItem('invisible_wallet_session_target');
             }
-
-            // 4. Store the session key securely for 1-click signing later
-            localStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
-            localStorage.setItem('invisible_wallet_session_pk', ephemeralPk);
-            localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
-
-            return { sessionKey: sessionKeyAddress };
+            return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
             return null;
@@ -758,16 +807,13 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            // The payee for DCA is typically a DEX aggregator or auto-invest vault.
-            // For now the user's own address acts as payee (self-custody DCA vault).
-            const payee = address as `0x${string}`;
-
+            const payee = currentAddress as `0x${string}`;
             const callData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'setup_subscription', inputs: [{ name: '_payee', type: 'address' }, { name: '_amount', type: 'uint256' }, { name: '_frequency_days', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'setup_subscription',
+                abi: [{ type: 'function', name: 'setupSubscription', inputs: [{ name: 'payee', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'frequencyDays', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'setupSubscription',
                 args: [payee, amount, BigInt(frequencyDays)],
             });
 
@@ -776,26 +822,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 functionName: 'execute',
                 args: [currentAddress as `0x${string}`, 0n, callData],
             });
-            const userOpHash = await submitUserOp(walletCallData, pin);
-            if (userOpHash) {
-                try {
-                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
-                    existing.unshift({
-                        id: Date.now().toString(),
-                        type: 'subscription',
-                        title: 'Subscription Setup',
-                        subtitle: `Pull every ${frequencyDays} days`,
-                        amount: `-${(Number(amount) / 1e6).toFixed(2)} USDC`,
-                        amountPositive: false,
-                        status: 'executed',
-                        timestamp: new Date().toISOString(),
-                        icon: 'autorenew',
-                        txHash: userOpHash
-                    });
-                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-                } catch (e) {}
-            }
-
+            await submitUserOp(walletCallData, pin);
             return true;
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
@@ -809,7 +836,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || localStorage.getItem('invisible_wallet_address');
+            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
             if (!intents.length) throw new Error('Intent batch is empty.');
 
@@ -818,28 +845,12 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const funcs = intents.map(i => (i.func || '0x') as `0x${string}`);
 
             const callData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'execute_batch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'execute_batch',
+                abi: [{ type: 'function', name: 'executeBatch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
+                functionName: 'executeBatch',
                 args: [dests, values, funcs],
             });
 
             const userOpHash = await submitUserOp(callData, pin);
-            if (userOpHash) {
-                try {
-                    const existing = JSON.parse(localStorage.getItem('invisible_wallet_activity') || '[]');
-                    existing.unshift({
-                        id: Date.now().toString(),
-                        type: 'intent',
-                        title: 'Intent Batch',
-                        subtitle: `${intents.length} operations bundled`,
-                        status: 'executed',
-                        timestamp: new Date().toISOString(),
-                        icon: 'stacks',
-                        txHash: userOpHash
-                    });
-                    localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-                } catch (e) {}
-            }
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
@@ -852,6 +863,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     return { 
         address, isPending, error, hasMounted,
         register, deploy, signAuthEntry, login, disconnect,
-        sendTransaction, executeCrossChainSwap, createSessionKey, setupDCA, executeIntentBatch
+        sendTransaction, executeCrossChainSwap, createSessionKey, setAgentPolicy, revokeSessionKey, setupDCA, executeIntentBatch
     };
 }

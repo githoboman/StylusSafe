@@ -1,23 +1,38 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 export default function DCAScreen() {
   const router = useRouter();
+  const { setupDCA } = useInvisibleWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [freqIndex, setFreqIndex] = useState(1); // Weekly by default
+  const [amountStr, setAmountStr] = useState('100.00');
 
   const handleCreate = async () => {
     setIsSubmitting(true);
-    // Simulate smart contract setup_subscription UserOp
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    Alert.alert('DCA Strategy Created', 'Your recurring swap has been scheduled on-chain.', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    try {
+      const freqDays = freqIndex === 0 ? 1 : freqIndex === 1 ? 7 : 30;
+      const parsedAmount = BigInt(Math.floor((Number(amountStr) || 100) * 1_000_000));
+      const usdgToken = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string}`;
+      
+      const success = await setupDCA(usdgToken, parsedAmount, freqDays, '0000');
+      if (success) {
+        Alert.alert('DCA Strategy Created', `Recurring swap of $${amountStr} USDG scheduled every ${freqDays} days on-chain.`, [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      } else {
+        throw new Error('On-chain subscription registration failed');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to submit DCA subscription');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -31,17 +46,23 @@ export default function DCAScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.pageSubtitle}>
-          Automatically swap assets on a recurring basis, powered entirely on-chain by Stylus intents.
+          Automatically swap assets on a recurring basis, powered entirely on-chain by StylusSafe subscription intents.
         </Text>
 
         <View style={styles.card}>
           <View style={styles.row}>
             <Text style={styles.label}>Pay With</Text>
-            <View style={styles.chip}><Text style={styles.chipText}>USDC</Text></View>
+            <View style={styles.chip}><Text style={styles.chipText}>USDG</Text></View>
           </View>
           <View style={styles.inputContainer}>
             <Text style={styles.currency}>$</Text>
-            <TextInput style={styles.input} placeholder="100.00" keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted} />
+            <TextInput 
+              style={styles.input} 
+              value={amountStr} 
+              onChangeText={setAmountStr}
+              keyboardType="decimal-pad" 
+              placeholderTextColor={Colors.textMuted} 
+            />
           </View>
         </View>
 
