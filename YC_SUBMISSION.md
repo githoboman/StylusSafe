@@ -3,12 +3,12 @@
 **Company Name:** StylusSafe  
 **URL:** [https://stylussafe.xyz](https://stylussafe.xyz)  
 **Repository:** [https://github.com/githoboman/StylusSafe](https://github.com/githoboman/StylusSafe)  
-**One-Liner:** The On-Chain Policy Engine and Spending Firewall for Autonomous AI Agents.
+**One-Liner:** The Universal Cross-Chain Intent Engine & On-Chain Spending Firewall for Autonomous AI Agents.
 
 ---
 
 ## 1. What does your company do?
-StylusSafe is an on-chain security boundary and programmable intent infrastructure for autonomous AI agents. We combine hardware-grade WebAuthn passkey authentication (secp256r1 via RIP-7212) for human owners with immutable, on-chain policy firewalls for autonomous agents. Humans retain master sovereignty via FaceID/TouchID in their Secure Enclave, while agents operate autonomously within hard smart-contract guardrails: rolling 24-hour daily spend caps, per-transaction maximums, strict destination contract allowlists, and instant 1-click panic-button revocation. All agent operations settle in standard USDG stablecoin liquidity with sponsored ERC-4337 gas abstraction.
+StylusSafe is a universal cross-chain intent engine and on-chain security firewall for autonomous AI agents. We combine 1-click cross-chain swaps (swapping any asset across Arbitrum, Base, Optimism, Ethereum, and Polygon with sponsored gas) with hardware-grade WebAuthn passkey authentication (secp256r1 via RIP-7212) for human owners and immutable on-chain policy firewalls for autonomous agents. Humans retain master sovereignty via FaceID/TouchID in their Secure Enclave, while agents operate autonomously within hard smart-contract guardrails: rolling 24-hour daily spend caps, per-transaction maximums, strict destination contract allowlists, and instant 1-click panic-button revocation. All operations settle in standard USDG stablecoin liquidity with sponsored ERC-4337 gas abstraction.
 
 ---
 

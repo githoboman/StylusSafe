@@ -2,7 +2,7 @@
   <img src="./web/public/logo.jpg" alt="StylusSafe Logo" width="160" style="border-radius: 24px;" />
   <br />
   <h1>StylusSafe</h1>
-  <p><strong>The On-Chain Intent & Spending Firewall for Autonomous AI Agents</strong></p>
+  <p><strong>The Universal Cross-Chain Intent Engine &amp; Autonomous Agent Firewall</strong></p>
   <p><em>Built for the Y Combinator Crypto Request for Startups (October 2026)</em></p>
 
   <p>
@@ -15,23 +15,23 @@
 
 ---
 
-## 🎯 Executive Thesis: Solving the AI Agent Security Crisis
+## 🎯 Executive Thesis: Cross-Chain Liquidity Meets AI Agent Sovereignty
 
-Autonomous AI agents (trading bots, DCA executors, liquidity rebalancers, workflow automation) are proliferating across Web3. However, every existing agent setup relies on **fatal security compromises**:
-1. **Raw Private Keys**: Agents store unencrypted or software private keys in environment variables or cloud memory, making them trivial to compromise via prompt injection, server exploits, or malicious dependency attacks.
-2. **Uncapped Blast Radius**: If a trading agent hallucinates or gets manipulated by an adversarial MEV bot, it can drain 100% of the funds in the wallet in a single block.
-3. **Volatile Gas & Speculative Drift**: Agents forced to hold and manage multiple native gas tokens (ETH, MATIC, AVAX) suffer from fee volatility and slippage.
+Crypto today suffers from two critical friction points:
+1. **The Multichain Bridging Nightmare**: Moving funds between Arbitrum, Base, Optimism, and Ethereum requires finding bridges, buying native gas tokens on new chains, waiting 20 minutes, and risking bridge exploits.
+2. **The AI Agent Security Crisis**: Autonomous trading bots (DCA, rebalancing, market making) are forced to hold raw private keys in cloud servers or memory, exposing user wallets to total drainage via prompt injection, server compromises, or hallucinated executions.
 
 ### The StylusSafe Solution
-StylusSafe introduces the **On-Chain Policy Engine & Intent Firewall for Autonomous AI Agents**:
-- **Hardware Enclave WebAuthn (RIP-7212)**: Human owners retain root master ownership secured by Apple Secure Enclave / Android StrongBox (FaceID/TouchID). Zero seed phrases to leak.
-- **On-Chain Policy Engine**: AI agents are granted **cryptographically scoped session keys** governed by immutable smart contract constraints:
+StylusSafe combines **1-Click Universal Cross-Chain Intents** with an **On-Chain Policy Engine & Spending Firewall for AI Agents**:
+- **1-Click Universal Cross-Chain Swaps**: Powered by Li.Fi aggregation and ERC-4337 Account Abstraction. Users and agents declare an *Intent* (e.g. *"Swap Arbitrum USDG into Base DEGEN"*), and StylusSafe batches approvals, routes optimal bridges, executes swaps, and sponsors gas—all in 1 click in 3 seconds.
+- **Hardware Enclave WebAuthn Sovereignty (RIP-7212)**: Humans retain root master ownership secured by Apple Secure Enclave / Android StrongBox (FaceID/TouchID). Zero seed phrases to leak.
+- **On-Chain Policy Engine for AI Agents**: Agents receive **cryptographically scoped session keys** governed by immutable smart contract constraints:
   - Strict rolling 24-hour daily spending limits
   - Hard per-transaction maximum caps
   - Target contract allowlists (e.g. Uniswap Router, GMX Exchange, USDG only)
   - Strict expiration timestamps
   - Instant 1-click on-chain panic button revocation
-- **USDG Stablecoin Settlement**: Institutional-grade standard ERC-20 token (6 decimals) acting as the dedicated non-volatile treasury liquidity layer for autonomous agents, powered by sponsored ERC-4337 Paymasters.
+- **USDG Multi-Chain Settlement**: Institutional-grade standard ERC-20 token (6 decimals) acting as the dedicated non-volatile treasury liquidity layer for autonomous agents, powered by sponsored ERC-4337 Paymasters.
 
 ---
 
@@ -39,6 +39,7 @@ StylusSafe introduces the **On-Chain Policy Engine & Intent Firewall for Autonom
 
 | YC CRFS Priority Area | StylusSafe Implementation | Technical Proof & Mechanism |
 | :--- | :--- | :--- |
+| **Core: Cross-Chain Intents** | 1-Click universal multi-chain swap engine eliminating bridging delays and native gas tokens. | Li.Fi dynamic multi-chain routing + ZeroDev Paymaster gas sponsorship. |
 | **Category 1: Agent Infrastructure** | Hardware-grade security boundary between human principals and autonomous agents. | RIP-7212 precompile verification at `0x0100` + WebAuthn authenticator flags (`UP`, `UV`, `signCount`). |
 | **Category 2: Agents (Trading / DeFi)** | Autonomous execution of trading intents (DCA, rebalancing, market making) bounded by programmatic guardrails. | Smart contract methods `setAgentPolicy()`, `executeAsAgent()`, `executeWithPolicy()`. |
 | **Category 3: Stablecoins & Treasury** | Institutional programmable dollar liquidity layer for AI agent workflows. | Production standard ERC-20 `USDG.sol` (6 decimals) deployed at `0xDa4D...` with zero mock balances. |
