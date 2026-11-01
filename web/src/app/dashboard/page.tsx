@@ -10,11 +10,11 @@ import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 
 const CHAINS = [
-  { name: 'Arbitrum Sepolia', id: 421614, color: '#12AAFF' },
-  { name: 'Base', id: 8453, color: '#0052FF' },
-  { name: 'Optimism', id: 10, color: '#FF0420' },
-  { name: 'Polygon', id: 137, color: '#8247E5' },
-  { name: 'Ethereum', id: 1, color: '#627EEA' },
+  { name: 'Arbitrum Sepolia', id: 421614 },
+  { name: 'Base', id: 8453 },
+  { name: 'Optimism', id: 10 },
+  { name: 'Polygon', id: 137 },
+  { name: 'Ethereum', id: 1 },
 ];
 
 export default function Dashboard() {
@@ -26,63 +26,57 @@ export default function Dashboard() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   
   const [selectedChain, setSelectedChain] = useState(421614);
-  const { address, register, signAuthEntry, disconnect, login } = useInvisibleWallet();
+  const { address, register, disconnect, login } = useInvisibleWallet();
   const { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, addCustomToken } = useBalances(address, selectedChain);
 
   const handleImportToken = (addr: string) => {
     addCustomToken(addr);
   };
 
-  // Calculate Net Worth with USDG as native stable token ($1.00 USD)
   const usdgValue = parseFloat((usdgBalance || '0').replace(/,/g, '')) * 1.0;
   const usdcValue = parseFloat((usdcBalance || '0').replace(/,/g, '')) * 1.0;
   const netWorth = (usdgValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="p-4 md:p-10 w-full max-w-7xl mx-auto flex flex-col gap-8 md:gap-10 animate-in fade-in duration-300">
+    <div className="p-6 md:p-10 w-full max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
 
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/[0.08] pb-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-text-primary">
-              Multi-Chain Treasury Vault
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">
-              Hardware Enclave Protected
-            </span>
-          </div>
-          <p className="text-text-muted text-sm mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Treasury Vault
+          </h1>
+          <p className="text-sm text-[#8e8e98] mt-1">
             {address ? (
               <span className="flex items-center gap-2 flex-wrap font-mono text-xs">
-                <span>Account: <strong className="text-text-primary">{address}</strong></span>
+                <span>Account: <strong className="text-white">{address}</strong></span>
                 <button
+                  type="button"
                   onClick={disconnect}
                   title="Disconnect"
-                  className="text-red-400 hover:underline uppercase text-[10px]"
+                  className="text-red-400 hover:underline text-[11px]"
                 >
                   [disconnect]
                 </button>
               </span>
             ) : (
-              'Universal Intent & Agent Treasury. Zero seed phrases.'
+              'Universal Intent & Multi-Chain Treasury Vault.'
             )}
           </p>
         </div>
 
-        {/* Network & Status Pills */}
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-2 bg-[#121216] border border-white/[0.08] px-3.5 py-2 rounded-xl text-xs font-mono">
-            <span className={`w-2 h-2 rounded-full ${address ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></span>
-            <span className="text-text-primary font-medium">
-              {address ? 'RIP-7212 Enclave Active' : 'Not Connected'}
+        <div className="flex items-center gap-3 self-start sm:self-auto text-xs">
+          <div className="flex items-center gap-2 bg-[#141418] border border-white/[0.08] px-3 py-1.5 rounded-md font-mono">
+            <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+            <span className="text-white">
+              {address ? 'RIP-7212 Enclave' : 'Disconnected'}
             </span>
           </div>
 
           <select
             value={selectedChain}
             onChange={(e) => setSelectedChain(Number(e.target.value))}
-            className="h-10 bg-[#121216] border border-white/[0.08] rounded-xl px-3 text-xs font-mono text-text-primary outline-none focus:border-accent-orange cursor-pointer"
+            className="h-8 bg-[#141418] border border-white/[0.08] rounded-md px-2 text-xs font-mono text-white outline-none cursor-pointer"
           >
             {CHAINS.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -92,123 +86,121 @@ export default function Dashboard() {
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
         {/* Left Column (8 Cols) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="lg:col-span-8 space-y-6">
 
-          {/* Consolidated Treasury Card */}
-          <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-accent-orange/10 rounded-full blur-[90px] pointer-events-none" />
-
-            <div className="flex items-center justify-between relative z-10">
-              <span className="text-xs font-mono uppercase tracking-widest text-text-muted">
-                Consolidated Portfolio Value
-              </span>
+          {/* Consolidated Value Card */}
+          <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-6 md:p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#8e8e98]">Consolidated Treasury Balance</span>
               {isFetching && (
-                <span className="flex items-center gap-1.5 text-xs font-mono text-accent-orange">
-                  <span className="w-2 h-2 rounded-full bg-accent-orange animate-ping" />
-                  Syncing RPC...
-                </span>
+                <span className="text-xs text-[#ff4500] font-mono">Syncing RPC...</span>
               )}
             </div>
 
-            <div className="flex items-baseline gap-3 my-4 relative z-10">
-              <span className="text-5xl md:text-7xl font-bold font-mono tracking-tight text-text-primary">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl sm:text-6xl font-bold font-mono tracking-tight text-white tabular-nums">
                 ${address ? netWorth : '0.00'}
               </span>
-              <span className="text-lg font-mono text-text-muted">USDG</span>
+              <span className="text-base font-mono text-[#8e8e98]">USDG</span>
             </div>
 
-            {/* Asset Breakdown Row */}
-            <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-white/[0.06] relative z-10">
-              <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-xl border border-white/[0.06]">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="font-mono text-sm font-semibold">{address ? usdgBalance : '0.00'} USDG</span>
-                <span className="text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-bold">Treasury</span>
+            {/* Asset Row */}
+            <div className="flex flex-wrap items-center gap-3 pt-5 border-t border-white/[0.06] text-xs">
+              <div className="flex items-center gap-2 bg-[#0d0d10] px-3 py-1.5 rounded-md border border-white/[0.04]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="font-mono font-medium text-white tabular-nums">{address ? usdgBalance : '0.00'} USDG</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">(Treasury)</span>
               </div>
 
-              <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-xl border border-white/[0.06]">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                <span className="font-mono text-sm font-semibold">{address ? usdcBalance : '0.00'} USDC</span>
+              <div className="flex items-center gap-2 bg-[#0d0d10] px-3 py-1.5 rounded-md border border-white/[0.04]">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="font-mono font-medium text-white tabular-nums">{address ? usdcBalance : '0.00'} USDC</span>
               </div>
 
-              <div className="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-xl border border-white/[0.06]">
-                <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                <span className="font-mono text-sm font-semibold">{address ? ethBalance : '0.00'} ETH</span>
+              <div className="flex items-center gap-2 bg-[#0d0d10] px-3 py-1.5 rounded-md border border-white/[0.04]">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span className="font-mono font-medium text-white tabular-nums">{address ? ethBalance : '0.00'} ETH</span>
               </div>
 
               <button
+                type="button"
                 onClick={() => setIsImportModalOpen(true)}
-                className="font-mono text-xs text-text-muted hover:text-accent-orange ml-auto transition-colors"
+                className="text-xs text-[#8e8e98] hover:text-white ml-auto transition-colors"
               >
                 + Import Token
               </button>
             </div>
           </div>
 
-          {/* Quick Action Navigation Bar */}
+          {/* Quick Actions */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Link
               href="/transfer"
-              className="h-14 bg-gradient-to-r from-accent-orange to-red-600 hover:from-accent-orange/90 hover:to-red-600/90 text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-accent-orange/20 transition-all hover:scale-[1.02]"
+              className="h-11 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
             >
-              <span className="material-symbols-outlined text-lg">sync_alt</span>
-              1-Click Swap
+              <span className="material-symbols-outlined text-base">sync_alt</span>
+              <span>1-Click Swap</span>
             </Link>
 
             <Link
               href="/trading"
-              className="h-14 bg-surface-container hover:bg-surface-container-high border border-white/[0.08] text-text-primary rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
             >
-              <span className="material-symbols-outlined text-lg text-emerald-400">shield</span>
-              Agent Firewall
+              <span className="material-symbols-outlined text-base text-emerald-400">shield</span>
+              <span>Agent Firewall</span>
             </Link>
 
             <button
+              type="button"
               onClick={() => setIsFundModalOpen(true)}
               disabled={!address}
-              className="h-14 bg-surface-container hover:bg-surface-container-high disabled:opacity-40 border border-white/[0.08] text-text-primary rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
             >
-              <span className="material-symbols-outlined text-lg text-blue-400">qr_code</span>
-              Receive
+              <span className="material-symbols-outlined text-base text-blue-400">qr_code</span>
+              <span>Receive</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setIsSendModalOpen(true)}
               disabled={!address}
-              className="h-14 bg-surface-container hover:bg-surface-container-high disabled:opacity-40 border border-white/[0.08] text-text-primary rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
             >
-              <span className="material-symbols-outlined text-lg">send</span>
-              Send
+              <span className="material-symbols-outlined text-base">send</span>
+              <span>Send</span>
             </button>
           </div>
 
-          {/* Auth CTA if Not Connected */}
+          {/* Connect Bar if Unconnected */}
           {!address && (
-            <div className="p-6 bg-gradient-to-r from-surface-zinc to-surface-container rounded-3xl border border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="p-6 bg-[#141418] rounded-xl border border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg font-bold">No Hardware Wallet Connected</h3>
-                <p className="text-text-muted text-sm mt-1">Create a seedless vault in 2 seconds with TouchID or FaceID.</p>
+                <h3 className="text-sm font-semibold text-white">No Hardware Enclave Key Connected</h3>
+                <p className="text-xs text-[#8e8e98] mt-0.5">Create a seedless vault in seconds via FaceID or TouchID.</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2.5">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsRegistering(true);
                     setIsSigningIn(false);
                     setIsSignModalOpen(true);
                   }}
-                  className="h-11 px-6 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-xl text-sm font-semibold transition-all shadow-md"
+                  className="h-9 px-4 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md text-xs font-semibold transition-colors"
                 >
                   Create Vault
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setIsRegistering(false);
                     setIsSigningIn(true);
                     setIsSignModalOpen(true);
                   }}
-                  className="h-11 px-6 bg-surface-container hover:bg-surface-container-high border border-white/[0.1] rounded-xl text-sm font-semibold transition-all"
+                  className="h-9 px-4 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md text-xs font-medium transition-colors"
                 >
                   Sign In
                 </button>
@@ -216,90 +208,73 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Recent Intents & Swaps Feed */}
-          <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <span className="text-xs font-mono uppercase tracking-wider text-text-muted font-semibold">
-                Live Intent Stream &amp; Swaps
-              </span>
-              <Link href="/activity" className="text-xs font-mono text-accent-orange hover:underline">
-                View All Activity →
+          {/* Activity Placeholder */}
+          <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] text-xs">
+              <span className="font-semibold text-white">Intent Stream &amp; Swaps</span>
+              <Link href="/activity" className="text-[#ff4500] hover:underline">
+                View Activity →
               </Link>
             </div>
-
-            <div className="p-8 text-center bg-black/30 rounded-2xl border border-dashed border-white/[0.08] space-y-2">
-              <span className="material-symbols-outlined text-text-muted text-3xl">swap_calls</span>
-              <h4 className="text-sm font-semibold text-text-primary">Ready for 1-Click Execution</h4>
-              <p className="text-xs text-text-muted max-w-sm mx-auto">
-                Execute cross-chain swaps or delegate trading tasks to AI agents. Your transaction receipts will stream here in real time.
-              </p>
+            <div className="py-6 text-center text-xs text-[#8e8e98]">
+              Ready for execution. Mined cross-chain swaps and agent operations will stream here.
             </div>
           </div>
 
         </div>
 
         {/* Right Column (4 Cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4 space-y-5">
 
-          {/* Agent Firewall Guardrail Widget */}
-          <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 space-y-4 font-mono text-xs shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <span className="font-semibold text-text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined text-emerald-400 text-base">shield</span>
-                Agent Guardrails
-              </span>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-semibold">
-                ACTIVE
-              </span>
+          {/* Agent Guardrails Widget */}
+          <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-5 space-y-3 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+              <span className="font-semibold text-white">Agent Guardrails</span>
+              <span className="text-emerald-400 font-mono text-[11px]">Enforced</span>
             </div>
 
-            <p className="text-text-muted text-[11px] leading-relaxed">
-              Autonomous bots can trade within strict on-chain limits. Zero risk of complete wallet drainage.
+            <p className="text-[#8e8e98] leading-relaxed">
+              Autonomous bots execute intents under immutable on-chain caps. Zero risk of total treasury drainage.
             </p>
 
-            <div className="p-3 bg-black/40 rounded-xl border border-white/[0.04] space-y-2 text-[11px]">
-              <div className="flex justify-between">
-                <span className="text-text-muted">Daily Spend Limit:</span>
-                <span className="text-text-primary font-bold">$500.00 USDG</span>
+            <div className="p-3 bg-[#0d0d10] rounded-md space-y-2 border border-white/[0.04]">
+              <div className="flex justify-between text-[#8e8e98]">
+                <span>Daily Limit:</span>
+                <span className="text-white font-mono font-medium">$500.00 USDG</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-muted">Spent Today:</span>
-                <span className="text-emerald-400 font-bold">$0.00 USDG</span>
+              <div className="flex justify-between text-[#8e8e98]">
+                <span>Spent Today:</span>
+                <span className="text-emerald-400 font-mono font-medium tabular-nums">$0.00 USDG</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-muted">Target Allowlist:</span>
-                <span className="text-text-primary">Uniswap V3 / USDG</span>
+              <div className="flex justify-between text-[#8e8e98]">
+                <span>Whitelisted:</span>
+                <span className="text-white">Uniswap V3 / USDG</span>
               </div>
             </div>
 
             <Link
               href="/trading"
-              className="w-full h-10 bg-surface-container hover:bg-surface-container-high border border-white/[0.08] text-text-primary rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+              className="w-full h-9 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
             >
-              <span>Manage Agent Policies</span>
+              <span>Manage Agent Policy</span>
               <span className="material-symbols-outlined text-sm">arrow_forward</span>
             </Link>
           </div>
 
-          {/* Cross-Chain Quick Swap Shortcut */}
-          <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 space-y-4 font-mono text-xs shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-              <span className="font-semibold text-text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined text-accent-orange text-base">sync_alt</span>
-                1-Click Cross Swap
-              </span>
-              <span className="text-[10px] text-accent-orange bg-accent-orange/10 px-2 py-0.5 rounded border border-accent-orange/20 font-semibold">
-                Gasless
-              </span>
+          {/* 1-Click Cross Swap Quick Shortcut */}
+          <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-5 space-y-3 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+              <span className="font-semibold text-white">Cross-Chain Routing</span>
+              <span className="text-[#ff4500] font-mono text-[11px]">Sponsored Gas</span>
             </div>
 
-            <p className="text-text-muted text-[11px] leading-relaxed">
-              Move funds from Arbitrum into Base, Optimism, or Ethereum instantly without bridging delays.
+            <p className="text-[#8e8e98] leading-relaxed">
+              Move assets from Arbitrum Sepolia into Base, Optimism, or Ethereum in one biometric touch.
             </p>
 
             <Link
               href="/transfer"
-              className="w-full h-10 bg-accent-orange/10 hover:bg-accent-orange/20 text-accent-orange border border-accent-orange/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+              className="w-full h-9 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
             >
               <span>Open Swap Terminal</span>
               <span className="material-symbols-outlined text-sm">north_east</span>

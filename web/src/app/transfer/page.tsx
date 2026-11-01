@@ -7,22 +7,22 @@ import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 
 const TOKENS = [
-  { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, color: '#10B981', isNative: true },
-  { symbol: 'USDC', name: 'USD Coin', decimals: 6, color: '#2775CA', isNative: false },
-  { symbol: 'ETH', name: 'Ether', decimals: 18, color: '#0284c7', isNative: false },
-  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, color: '#28A0F0', isNative: false },
-  { symbol: 'USDT', name: 'Tether USD', decimals: 6, color: '#26A17B', isNative: false },
-  { symbol: 'DEGEN', name: 'Degen Base', decimals: 18, color: '#A855F7', isNative: false },
-  { symbol: 'UNI', name: 'Uniswap', decimals: 18, color: '#FF007A', isNative: false },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, color: '#F7931A', isNative: false },
+  { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, isNative: true },
+  { symbol: 'USDC', name: 'USD Coin', decimals: 6, isNative: false },
+  { symbol: 'ETH', name: 'Ether', decimals: 18, isNative: false },
+  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, isNative: false },
+  { symbol: 'USDT', name: 'Tether USD', decimals: 6, isNative: false },
+  { symbol: 'DEGEN', name: 'Degen Base', decimals: 18, isNative: false },
+  { symbol: 'UNI', name: 'Uniswap', decimals: 18, isNative: false },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, isNative: false },
 ];
 
 const CHAINS = [
-  { name: 'Arbitrum Sepolia', id: 421614, color: '#12AAFF', icon: 'arbitrum' },
-  { name: 'Base', id: 8453, color: '#0052FF', icon: 'base' },
-  { name: 'Optimism', id: 10, color: '#FF0420', icon: 'optimism' },
-  { name: 'Polygon', id: 137, color: '#8247E5', icon: 'polygon' },
-  { name: 'Ethereum', id: 1, color: '#627EEA', icon: 'ethereum' },
+  { name: 'Arbitrum Sepolia', id: 421614 },
+  { name: 'Base', id: 8453 },
+  { name: 'Optimism', id: 10 },
+  { name: 'Polygon', id: 137 },
+  { name: 'Ethereum', id: 1 },
 ];
 
 type AcrossFee = { relayFeeTotal: string; estimatedFillTimeSec: number } | null;
@@ -31,10 +31,10 @@ export default function TransferPage() {
   const { address, executeCrossChainSwap, isPending } = useInvisibleWallet();
   const [amount, setAmount] = useState('100');
   const [recipient, setRecipient] = useState('');
-  const [selectedToken, setSelectedToken] = useState(TOKENS[0]); // Default source USDG
-  const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[1]); // Default dest USDC
+  const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
+  const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[1]);
   const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
-  const [selectedDestChain, setSelectedDestChain] = useState(CHAINS[1]); // Default dest Base
+  const [selectedDestChain, setSelectedDestChain] = useState(CHAINS[1]);
   const [executionMode, setExecutionMode] = useState<'personal' | 'agent'>('personal');
 
   const { usdgBalance, ethBalance, usdcBalance } = useBalances(address, selectedSourceChain.id);
@@ -52,7 +52,6 @@ export default function TransferPage() {
   const [txHash, setTxHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch live Li.Fi quote whenever amount, chain, or tokens change
   const fetchLifiQuote = useCallback(async () => {
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) { setAcrossFee(null); return; }
@@ -111,7 +110,7 @@ export default function TransferPage() {
         setStatus('success');
       } else {
         setStatus('error');
-        setErrorMsg('Cross-chain swap failed. Check network connectivity or policy caps.');
+        setErrorMsg('Cross-chain swap failed. Check network connectivity or policy limits.');
       }
     } catch (e: any) {
       console.error('Transfer execution failed:', e);
@@ -123,77 +122,72 @@ export default function TransferPage() {
   };
 
   return (
-    <div className="p-4 md:p-10 w-full max-w-6xl mx-auto flex flex-col gap-8 animate-in fade-in duration-400">
+    <div className="p-6 md:p-10 w-full max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
       
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
+      {/* Calm Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-text-primary">
-              1-Click Cross-Chain Swap
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase bg-accent-orange/10 text-accent-orange border border-accent-orange/30 font-semibold">
-              Li.Fi • ERC-4337
-            </span>
-          </div>
-          <p className="text-text-muted text-sm mt-1 max-w-xl">
-            Swap ANY token across Arbitrum, Base, Optimism, and Ethereum. Zero native gas tokens needed — sponsored by StylusSafe Paymaster.
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Cross-Chain Swap
+          </h1>
+          <p className="text-sm text-[#8e8e98] mt-1">
+            Execute 1-click cross-chain intents with sponsored gas. No native bridge tokens needed.
           </p>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex items-center gap-2 p-1.5 bg-[#121216] border border-white/[0.08] rounded-xl self-start md:self-auto">
+        {/* Execution Mode Segment */}
+        <div className="flex items-center gap-1 p-1 bg-[#141418] border border-white/[0.08] rounded-lg self-start sm:self-auto text-xs font-medium">
           <button
+            type="button"
             onClick={() => setExecutionMode('personal')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded transition-colors ${
               executionMode === 'personal'
-                ? 'bg-accent-orange text-white shadow-md shadow-accent-orange/20'
-                : 'text-text-muted hover:text-text-primary'
+                ? 'bg-white/[0.1] text-white font-semibold'
+                : 'text-[#8e8e98] hover:text-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">fingerprint</span>
-            Personal FaceID
+            Personal (FaceID)
           </button>
           <button
+            type="button"
             onClick={() => setExecutionMode('agent')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded transition-colors ${
               executionMode === 'agent'
-                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                : 'text-text-muted hover:text-text-primary'
+                ? 'bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30'
+                : 'text-[#8e8e98] hover:text-white'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">shield</span>
-            Agent Firewall Active
+            Guarded Agent Mode
           </button>
         </div>
       </div>
 
       {status === 'success' ? (
-        <div className="bg-[#111116] border border-emerald-500/30 rounded-3xl p-8 max-w-lg mx-auto text-center space-y-6 animate-in zoom-in duration-300">
-          <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-            <span className="material-symbols-outlined text-4xl">check_circle</span>
+        <div className="bg-[#141418] border border-emerald-500/30 rounded-xl p-8 max-w-lg mx-auto text-center space-y-5">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+            <span className="material-symbols-outlined text-2xl">check</span>
           </div>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Intent Executed Successfully</h2>
-            <p className="text-text-muted text-sm max-w-sm mx-auto">
-              Your cross-chain UserOp was submitted and mined. Assets are en route to {selectedDestChain.name}.
+            <h2 className="text-xl font-bold text-white">Intent Submitted</h2>
+            <p className="text-sm text-[#8e8e98] mt-1 max-w-sm mx-auto">
+              Your cross-chain UserOperation was submitted to the bundler. Funds are en route to {selectedDestChain.name}.
             </p>
           </div>
           {txHash && (
-            <div className="p-3 bg-black/40 rounded-xl border border-white/[0.08] font-mono text-xs text-text-muted break-all">
-              UserOp: <span className="text-accent-orange">{txHash}</span>
+            <div className="p-3 bg-[#09090b] rounded-lg border border-white/[0.06] text-xs font-mono text-[#8e8e98] break-all">
+              Hash: {txHash}
             </div>
           )}
           <div className="flex justify-center gap-3 pt-2">
             <button
               onClick={() => setStatus('idle')}
-              className="h-11 px-6 bg-accent-orange hover:bg-accent-orange/90 text-white rounded-xl text-sm font-semibold transition-all"
+              className="h-10 px-5 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md text-xs font-semibold transition-colors"
             >
               New Swap
             </button>
             <Link
               href="/activity"
-              className="h-11 px-6 bg-surface-container hover:bg-surface-container-high border border-white/[0.1] rounded-xl text-sm font-semibold flex items-center transition-all"
+              className="h-10 px-5 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md text-xs font-semibold flex items-center transition-colors"
             >
               View Activity
             </Link>
@@ -202,27 +196,28 @@ export default function TransferPage() {
       ) : (
         <div className="grid lg:grid-cols-12 gap-8 items-start">
           
-          {/* Main Swap Card (Left 7 Cols) */}
-          <div className="lg:col-span-7 bg-[#111116] border border-white/[0.08] rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative">
+          {/* Main Swap Card (7 Cols) */}
+          <div className="lg:col-span-7 bg-[#141418] border border-white/[0.08] rounded-xl p-6 space-y-5 shadow-sm">
             
             {status === 'error' && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono flex items-center justify-between">
+              <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between">
                 <span>{errorMsg}</span>
-                <button onClick={() => setStatus('idle')} className="text-text-muted hover:text-white">✕</button>
+                <button onClick={() => setStatus('idle')} className="text-[#8e8e98] hover:text-white">✕</button>
               </div>
             )}
 
-            {/* Source Asset & Chain Box */}
-            <div className="bg-surface-container-low border border-white/[0.08] rounded-2xl p-5 space-y-3">
-              <div className="flex justify-between items-center text-xs font-mono text-text-muted">
-                <span>You Pay</span>
+            {/* Source Panel */}
+            <div className="bg-[#0d0d10] p-4 rounded-lg space-y-2.5 border border-white/[0.04]">
+              <div className="flex justify-between items-center text-xs text-[#8e8e98]">
+                <span>You pay</span>
                 <div className="flex items-center gap-2">
-                  <span>Balance: <strong className="text-text-primary">{getBalanceForToken()}</strong></span>
+                  <span>Balance: <strong className="text-white tabular-nums">{getBalanceForToken()}</strong></span>
                   <button 
+                    type="button"
                     onClick={() => setAmount(getBalanceForToken())}
-                    className="text-accent-orange hover:underline font-semibold"
+                    className="text-[#ff4500] hover:underline font-medium"
                   >
-                    MAX
+                    Max
                   </button>
                 </div>
               </div>
@@ -233,28 +228,26 @@ export default function TransferPage() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="bg-transparent text-4xl font-bold font-mono text-text-primary outline-none w-full"
+                  className="bg-transparent text-3xl font-mono font-bold text-white outline-none w-full tabular-nums"
                 />
 
-                {/* Token Selector */}
                 <select
                   value={selectedToken.symbol}
                   onChange={(e) => setSelectedToken(TOKENS.find(t => t.symbol === e.target.value) || TOKENS[0])}
-                  className="h-12 bg-surface-container border border-white/[0.1] rounded-xl px-4 text-base font-semibold text-text-primary outline-none focus:border-accent-orange font-mono cursor-pointer"
+                  className="h-10 bg-[#141418] border border-white/[0.1] rounded-md px-3 text-sm font-semibold text-white outline-none focus:border-[#ff4500] font-mono cursor-pointer shrink-0"
                 >
                   {TOKENS.map(t => (
-                    <option key={t.symbol} value={t.symbol}>{t.symbol} ({t.name})</option>
+                    <option key={t.symbol} value={t.symbol}>{t.symbol}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Source Chain Selector */}
-              <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between">
-                <span className="text-xs font-mono text-text-muted">From Network:</span>
+              <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-xs text-[#8e8e98]">
+                <span>Origin network:</span>
                 <select
                   value={selectedSourceChain.id}
                   onChange={(e) => setSelectedSourceChain(CHAINS.find(c => c.id === Number(e.target.value)) || CHAINS[0])}
-                  className="bg-transparent text-xs font-mono text-text-primary font-semibold outline-none cursor-pointer text-right"
+                  className="bg-transparent text-white font-medium outline-none cursor-pointer text-right"
                 >
                   {CHAINS.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -263,49 +256,47 @@ export default function TransferPage() {
               </div>
             </div>
 
-            {/* Direction Flip Button */}
-            <div className="flex justify-center -my-3 relative z-10">
+            {/* Direction Flip */}
+            <div className="flex justify-center -my-2 relative z-10">
               <button
                 type="button"
                 onClick={handleFlipDirection}
-                className="w-10 h-10 rounded-full bg-surface-container-high border border-white/[0.15] text-accent-orange hover:text-white hover:bg-accent-orange flex items-center justify-center transition-all shadow-lg active:scale-95"
-                title="Swap source and destination"
+                className="w-8 h-8 rounded-full bg-[#1b1b21] hover:bg-[#ff4500] text-[#8e8e98] hover:text-white border border-white/[0.1] flex items-center justify-center transition-colors shadow-sm"
+                title="Swap origin and destination"
               >
-                <span className="material-symbols-outlined text-lg">swap_vert</span>
+                <span className="material-symbols-outlined text-sm">swap_vert</span>
               </button>
             </div>
 
-            {/* Destination Asset & Chain Box */}
-            <div className="bg-surface-container-low border border-white/[0.08] rounded-2xl p-5 space-y-3">
-              <div className="flex justify-between items-center text-xs font-mono text-text-muted">
-                <span>You Receive (Estimated)</span>
-                <span>Slippage: <strong className="text-text-primary">0.5%</strong></span>
+            {/* Destination Panel */}
+            <div className="bg-[#0d0d10] p-4 rounded-lg space-y-2.5 border border-white/[0.04]">
+              <div className="flex justify-between items-center text-xs text-[#8e8e98]">
+                <span>You receive (estimated)</span>
+                <span>Slippage: <strong className="text-white">0.5%</strong></span>
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <div className="text-4xl font-bold font-mono text-text-primary">
-                  ~{(parseFloat(amount || '0') * 0.998).toFixed(selectedDestToken.decimals === 6 ? 2 : 4)}
+                <div className="text-3xl font-mono font-bold text-white tabular-nums">
+                  {(parseFloat(amount || '0') * 0.998).toFixed(selectedDestToken.decimals === 6 ? 2 : 4)}
                 </div>
 
-                {/* Dest Token Selector */}
                 <select
                   value={selectedDestToken.symbol}
                   onChange={(e) => setSelectedDestToken(TOKENS.find(t => t.symbol === e.target.value) || TOKENS[1])}
-                  className="h-12 bg-surface-container border border-white/[0.1] rounded-xl px-4 text-base font-semibold text-text-primary outline-none focus:border-accent-orange font-mono cursor-pointer"
+                  className="h-10 bg-[#141418] border border-white/[0.1] rounded-md px-3 text-sm font-semibold text-white outline-none focus:border-[#ff4500] font-mono cursor-pointer shrink-0"
                 >
                   {TOKENS.map(t => (
-                    <option key={t.symbol} value={t.symbol}>{t.symbol} ({t.name})</option>
+                    <option key={t.symbol} value={t.symbol}>{t.symbol}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Dest Chain Selector */}
-              <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between">
-                <span className="text-xs font-mono text-text-muted">To Network:</span>
+              <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-xs text-[#8e8e98]">
+                <span>Destination network:</span>
                 <select
                   value={selectedDestChain.id}
                   onChange={(e) => setSelectedDestChain(CHAINS.find(c => c.id === Number(e.target.value)) || CHAINS[1])}
-                  className="bg-transparent text-xs font-mono text-blue-400 font-semibold outline-none cursor-pointer text-right"
+                  className="bg-transparent text-white font-medium outline-none cursor-pointer text-right"
                 >
                   {CHAINS.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -314,103 +305,80 @@ export default function TransferPage() {
               </div>
             </div>
 
-            {/* Optional Recipient */}
+            {/* Destination Address Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-mono text-text-muted uppercase">Destination Address (Optional)</label>
+              <label className="text-xs text-[#8e8e98]">Destination Address (optional)</label>
               <input
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                placeholder={address ? `Defaults to your smart account (${address.slice(0, 8)}...)` : '0x...'}
-                className="w-full h-11 bg-surface-container-low border border-white/[0.08] rounded-xl px-3 text-xs font-mono text-text-primary outline-none focus:border-accent-orange"
+                placeholder={address ? `Defaults to your smart account (${address.slice(0, 6)}...${address.slice(-4)})` : '0x...'}
+                className="w-full h-10 bg-[#0d0d10] border border-white/[0.06] rounded-md px-3 text-xs font-mono text-white outline-none focus:border-[#ff4500]"
               />
             </div>
 
             {/* Action Button */}
             <button
+              type="button"
               onClick={() => setIsModalOpen(true)}
               disabled={!amount || isPending || !address}
-              className="w-full h-14 bg-gradient-to-r from-accent-orange to-red-600 hover:from-accent-orange/90 hover:to-red-600/90 disabled:opacity-40 text-white rounded-xl font-bold text-base flex items-center justify-center gap-2.5 transition-all shadow-xl shadow-accent-orange/25 active:scale-[0.99]"
+              className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] disabled:opacity-40 text-white rounded-md font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
             >
               {isPending ? (
-                <>
-                  <span className="material-symbols-outlined animate-spin text-xl">refresh</span>
-                  <span>Executing 1-Click Intent...</span>
-                </>
+                <span>Executing UserOp...</span>
               ) : (
-                <>
-                  <span className="material-symbols-outlined text-xl">fingerprint</span>
-                  <span>
-                    {executionMode === 'personal' ? 'Execute 1-Click Cross Swap' : 'Execute as Guarded Agent'}
-                  </span>
-                </>
+                <span>
+                  {executionMode === 'personal' ? 'Execute Cross-Chain Swap' : 'Execute as Guarded Agent'}
+                </span>
               )}
             </button>
           </div>
 
-          {/* Telemetry & Route Details (Right 5 Cols) */}
-          <div className="lg:col-span-5 space-y-6">
+          {/* Route Intelligence Panel (5 Cols) */}
+          <div className="lg:col-span-5 space-y-5">
             
-            {/* Route Card */}
-            <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 space-y-4 font-mono text-xs">
-              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-                <span className="font-semibold text-text-primary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-accent-orange text-base">route</span>
-                  Optimal Intent Route
-                </span>
-                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Best Return
-                </span>
+            <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-5 space-y-4 text-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <span className="font-semibold text-white">Route Intelligence</span>
+                <span className="text-emerald-400 font-mono text-[11px]">Direct Intent</span>
               </div>
 
-              <div className="space-y-3 text-text-muted">
+              <div className="space-y-2.5 text-[#8e8e98]">
                 <div className="flex justify-between">
-                  <span>Routing Aggregator:</span>
-                  <span className="text-text-primary font-semibold">Li.Fi Bridge Engine</span>
+                  <span>Routing Engine</span>
+                  <span className="text-white">Li.Fi Aggregation</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Primary Bridge:</span>
-                  <span className="text-text-primary">Stargate / Across V3</span>
+                  <span>Bridge Provider</span>
+                  <span className="text-white">Stargate / Across</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Estimated Fill Time:</span>
-                  <span className="text-text-primary">~{acrossFee?.estimatedFillTimeSec || 30} seconds</span>
+                  <span>Estimated Fill Time</span>
+                  <span className="text-white tabular-nums">~{acrossFee?.estimatedFillTimeSec || 30} seconds</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Network Gas Fee:</span>
-                  <span className="text-accent-orange font-bold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">ev_station</span>
-                    Sponsored ($0.00)
-                  </span>
+                  <span>Network Gas Fee</span>
+                  <span className="text-[#ff4500] font-medium">Sponsored ($0.00)</span>
                 </div>
-                <div className="pt-2 border-t border-white/[0.04] flex justify-between text-text-primary font-semibold">
-                  <span>Guaranteed Output:</span>
-                  <span>~{(parseFloat(amount || '0') * 0.995).toFixed(2)} {selectedDestToken.symbol}</span>
+                <div className="pt-2 border-t border-white/[0.04] flex justify-between text-white font-medium">
+                  <span>Minimum Output</span>
+                  <span className="tabular-nums">{(parseFloat(amount || '0') * 0.995).toFixed(2)} {selectedDestToken.symbol}</span>
                 </div>
               </div>
             </div>
 
-            {/* Agent Firewall Policy Card */}
-            <div className="bg-[#111116] border border-white/[0.08] rounded-3xl p-6 space-y-3 font-mono text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-text-primary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-base">shield</span>
-                  On-Chain Guardrails
-                </span>
-                <span className="text-emerald-400 font-bold text-[10px]">ARMED</span>
+            {/* Guardrail Policy Status */}
+            <div className="bg-[#141418] border border-white/[0.08] rounded-xl p-5 space-y-3 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+                <span className="font-semibold text-white">Agent Guardrails</span>
+                <span className="text-emerald-400 font-mono text-[11px]">Enforced On-Chain</span>
               </div>
-              <p className="text-text-muted text-[11px] leading-relaxed">
-                If executing as an agent, this swap is strictly constrained by your on-chain policy. Rogue spends beyond the daily cap will automatically revert on-chain.
+              <p className="text-[#8e8e98] leading-relaxed">
+                If executing in Guarded Agent Mode, this swap is bounded by your 24-hour daily budget cap. Reverts on-chain if limits are exceeded.
               </p>
-              <div className="p-3 bg-black/40 rounded-xl border border-white/[0.04] space-y-1 text-[11px]">
-                <div className="flex justify-between text-text-muted">
-                  <span>Remaining Daily Budget:</span>
-                  <span className="text-text-primary font-semibold">$500.00 USDG</span>
-                </div>
-                <div className="flex justify-between text-text-muted">
-                  <span>Target Whitelist:</span>
-                  <span className="text-text-primary">Li.Fi / Uniswap V3</span>
-                </div>
+              <div className="pt-2 flex justify-between text-[#8e8e98]">
+                <span>Daily Remaining Cap:</span>
+                <span className="text-white font-mono font-medium">$500.00 USDG</span>
               </div>
             </div>
 
@@ -422,7 +390,7 @@ export default function TransferPage() {
       <SignModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        actionText="Confirm 1-Click Swap"
+        actionText="Confirm Cross-Chain Swap"
         amountText={`${amount} ${selectedToken.symbol} (${selectedSourceChain.name}) → ${selectedDestToken.symbol} (${selectedDestChain.name})`}
         onSign={handleTransfer}
       />
