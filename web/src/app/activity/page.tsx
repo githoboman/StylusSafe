@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { IconArrowLeft } from '@/components/Icons';
 
 type TxStatus = 'executed' | 'pending' | 'failed';
 type TxType = 'swap' | 'subscription' | 'receive' | 'send' | 'intent' | 'signer' | 'session';
@@ -82,8 +83,8 @@ export default function ActivityPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border-whisper pb-6">
         <div className="flex items-center gap-4">
-          <Link href="/" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary">
-            <span className="material-symbols-outlined">arrow_back</span>
+          <Link href="/" className="w-9 h-9 rounded-lg bg-surface-container inline-flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary border border-white/[0.06] shrink-0" title="Back">
+            <IconArrowLeft size={16} />
           </Link>
           <div>
             <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-1">Activity Log</h1>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
+import { IconSwap, IconSwapVert, IconCheck, IconShield, IconFingerprint } from '@/components/Icons';
 
 const TOKENS = [
   { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, isNative: true },
@@ -165,7 +166,7 @@ export default function TransferPage() {
       {status === 'success' ? (
         <div className="bg-[#141418] border border-emerald-500/30 rounded-xl p-8 max-w-lg mx-auto text-center space-y-5">
           <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-            <span className="material-symbols-outlined text-2xl">check</span>
+            <IconCheck size={24} />
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Intent Submitted</h2>
@@ -261,10 +262,10 @@ export default function TransferPage() {
               <button
                 type="button"
                 onClick={handleFlipDirection}
-                className="w-8 h-8 rounded-full bg-[#1b1b21] hover:bg-[#ff4500] text-[#8e8e98] hover:text-white border border-white/[0.1] flex items-center justify-center transition-colors shadow-sm"
+                className="w-8 h-8 rounded-full bg-[#1b1b21] hover:bg-[#ff4500] text-[#8e8e98] hover:text-white border border-white/[0.1] inline-flex items-center justify-center transition-colors shadow-sm active:scale-95"
                 title="Swap origin and destination"
               >
-                <span className="material-symbols-outlined text-sm">swap_vert</span>
+                <IconSwapVert size={15} />
               </button>
             </div>
 
@@ -322,13 +323,26 @@ export default function TransferPage() {
               type="button"
               onClick={() => setIsModalOpen(true)}
               disabled={!amount || isPending || !address}
-              className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] disabled:opacity-40 text-white rounded-md font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
+              className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] disabled:opacity-40 text-white rounded-md font-semibold text-sm inline-flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.99]"
             >
               {isPending ? (
-                <span>Executing UserOp...</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Executing UserOp...</span>
+                </span>
               ) : (
-                <span>
-                  {executionMode === 'personal' ? 'Execute Cross-Chain Swap' : 'Execute as Guarded Agent'}
+                <span className="inline-flex items-center gap-2">
+                  {executionMode === 'personal' ? (
+                    <>
+                      <IconFingerprint size={16} />
+                      <span>Execute Cross-Chain Swap (FaceID)</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconShield size={16} />
+                      <span>Execute as Guarded Agent</span>
+                    </>
+                  )}
                 </span>
               )}
             </button>

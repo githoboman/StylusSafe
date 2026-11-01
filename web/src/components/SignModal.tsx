@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { IconCheck, IconFace, IconFingerprint, IconDialpad } from '@/components/Icons';
 
 type SignModalProps = {
   isOpen: boolean;
@@ -147,15 +148,15 @@ export function SignModal({
                         animate={{ scale: 1, opacity: 1 }}
                         className="text-emerald-400"
                       >
-                        <span className="material-symbols-outlined text-[42px]">check_circle</span>
+                        <IconCheck size={36} />
                       </motion.div>
                     ) : (
                       <>
-                        <span className={`material-symbols-outlined text-[38px] transition-colors ${
+                        <div className={`transition-colors ${
                           status === 'scanning' ? 'text-[#ff4500]' : 'text-white/80'
                         }`}>
-                          face
-                        </span>
+                          <IconFace size={38} />
+                        </div>
 
                         {/* Animated Laser Sweep Line */}
                         {status === 'scanning' && (
@@ -197,12 +198,12 @@ export function SignModal({
                     </>
                   ) : status === 'success' ? (
                     <>
-                      <span className="material-symbols-outlined text-sm">verified</span>
+                      <IconCheck size={16} />
                       <span>Authorized</span>
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-base">passkey</span>
+                      <IconFingerprint size={16} />
                       <span>Authenticate with Face ID</span>
                     </>
                   )}
@@ -213,9 +214,9 @@ export function SignModal({
                   type="button"
                   onClick={() => setMode('pin')}
                   disabled={status === 'scanning'}
-                  className="mt-4 text-xs text-[#8e8e98] hover:text-white transition-colors flex items-center gap-1 font-mono"
+                  className="mt-4 text-xs text-[#8e8e98] hover:text-white transition-colors inline-flex items-center gap-1.5 font-mono"
                 >
-                  <span className="material-symbols-outlined text-sm">dialpad</span>
+                  <IconDialpad size={14} />
                   <span>Use 6-digit PIN instead</span>
                 </button>
               </motion.div>
@@ -230,7 +231,7 @@ export function SignModal({
                 className="w-full flex flex-col items-center"
               >
                 <div className="w-12 h-12 rounded-full bg-[#1b1b21] text-white flex items-center justify-center mb-2">
-                  <span className="material-symbols-outlined text-[20px]">dialpad</span>
+                  <IconDialpad size={18} />
                 </div>
 
                 <h3 className="text-lg font-semibold text-white tracking-tight mb-0.5">Enter Security PIN</h3>
@@ -284,7 +285,7 @@ export function SignModal({
                     disabled={status === 'scanning' || pin.length === 0}
                     className="h-11 rounded-lg bg-[#1b1b21]/60 hover:bg-[#1b1b21] text-[#8e8e98] hover:text-white transition-colors flex items-center justify-center disabled:opacity-30"
                   >
-                    <span className="material-symbols-outlined text-base">backspace</span>
+                    <span className="font-mono text-sm">DEL</span>
                   </button>
                 </div>
 
@@ -314,9 +315,9 @@ export function SignModal({
                   type="button"
                   onClick={() => setMode('faceid')}
                   disabled={status === 'scanning'}
-                  className="mt-3 text-xs text-[#8e8e98] hover:text-white transition-colors flex items-center gap-1 font-mono"
+                  className="mt-3 text-xs text-[#8e8e98] hover:text-white transition-colors inline-flex items-center gap-1.5 font-mono"
                 >
-                  <span className="material-symbols-outlined text-sm">face</span>
+                  <IconFace size={15} />
                   <span>Switch back to Face ID</span>
                 </button>
               </motion.div>

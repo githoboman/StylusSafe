@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { SignModal } from '@/components/SignModal';
 import Link from 'next/link';
+import { IconArrowLeft } from '@/components/Icons';
 
 const POPULAR_TARGETS = [
   { name: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
@@ -141,8 +142,8 @@ export default function TradingPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-whisper pb-6">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary">
-            <span className="material-symbols-outlined">arrow_back</span>
+          <Link href="/dashboard" className="w-9 h-9 rounded-lg bg-surface-container inline-flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary border border-white/[0.06] shrink-0" title="Back to Dashboard">
+            <IconArrowLeft size={16} />
           </Link>
           <div>
             <div className="flex items-center gap-2">

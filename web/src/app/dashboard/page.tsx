@@ -8,6 +8,7 @@ import { SendModal } from '@/components/SendModal';
 import { ImportTokenModal } from '@/components/ImportTokenModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
+import { IconSwap, IconShield, IconSend, IconArrowRight, IconArrowUpRight, IconFingerprint } from '@/components/Icons';
 
 const CHAINS = [
   { name: 'Arbitrum Sepolia', id: 421614 },
@@ -139,17 +140,17 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Link
               href="/transfer"
-              className="h-11 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+              className="h-11 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs inline-flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-base">sync_alt</span>
+              <IconSwap size={15} />
               <span>1-Click Swap</span>
             </Link>
 
             <Link
               href="/trading"
-              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-base text-emerald-400">shield</span>
+              <IconShield size={15} className="text-emerald-400" />
               <span>Agent Firewall</span>
             </Link>
 
@@ -157,9 +158,9 @@ export default function Dashboard() {
               type="button"
               onClick={() => setIsFundModalOpen(true)}
               disabled={!address}
-              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-base text-blue-400">qr_code</span>
+              <IconFingerprint size={15} className="text-blue-400" />
               <span>Receive</span>
             </button>
 
@@ -167,9 +168,9 @@ export default function Dashboard() {
               type="button"
               onClick={() => setIsSendModalOpen(true)}
               disabled={!address}
-              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-2 transition-colors"
+              className="h-11 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white border border-white/[0.08] rounded-md font-medium text-xs inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-base">send</span>
+              <IconSend size={15} />
               <span>Send</span>
             </button>
           </div>
@@ -254,10 +255,10 @@ export default function Dashboard() {
 
             <Link
               href="/trading"
-              className="w-full h-9 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full h-9 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md font-medium text-xs inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
             >
               <span>Manage Agent Policy</span>
-              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              <IconArrowRight size={14} />
             </Link>
           </div>
 
@@ -274,10 +275,10 @@ export default function Dashboard() {
 
             <Link
               href="/transfer"
-              className="w-full h-9 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full h-9 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md font-medium text-xs inline-flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98]"
             >
               <span>Open Swap Terminal</span>
-              <span className="material-symbols-outlined text-sm">north_east</span>
+              <IconArrowUpRight size={14} />
             </Link>
           </div>
 

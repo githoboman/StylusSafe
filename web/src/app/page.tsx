@@ -2,7 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
+import { BrandLogo } from '@/components/BrandLogo';
+import {
+  IconSwap,
+  IconArrowRight,
+  IconArrowUpRight,
+  IconSwapVert,
+  IconCheck,
+} from '@/components/Icons';
 
 export default function LandingPage() {
   const [swapAmount, setSwapAmount] = useState('500');
@@ -42,10 +50,9 @@ export default function LandingPage() {
       
       {/* Navigation Bar */}
       <header className="border-b border-white/[0.08] bg-[#09090b]/90 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <img src="/logo.jpg" alt="StylusSafe" className="w-7 h-7 rounded-md transition-transform group-hover:scale-105" />
-            <span className="text-lg font-semibold tracking-tight text-white">StylusSafe</span>
+            <BrandLogo size={28} />
             <span className="text-xs text-[#8e8e98] pl-2 border-l border-white/[0.1] hidden sm:inline font-mono">
               Arbitrum Sepolia
             </span>
@@ -66,16 +73,16 @@ export default function LandingPage() {
             </Link>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link
               href="/transfer"
-              className="h-9 px-4 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md flex items-center transition-all active:scale-[0.98]"
+              className="h-9 px-4 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center transition-all active:scale-[0.98]"
             >
               Open Swap
             </Link>
             <Link
               href="/dashboard"
-              className="h-9 px-4 text-xs font-medium text-white bg-[#ff4500] hover:bg-[#e03d00] rounded-md flex items-center transition-all shadow-sm active:scale-[0.98]"
+              className="h-9 px-4 text-xs font-medium text-white bg-[#ff4500] hover:bg-[#e03d00] rounded-md inline-flex items-center transition-all shadow-sm active:scale-[0.98]"
             >
               Enter Vault
             </Link>
@@ -84,15 +91,15 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-20 pb-24 md:pt-28 md:pb-32 px-6 max-w-7xl mx-auto">
+      <section className="pt-16 pb-20 md:pt-24 md:pb-28 px-6 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start">
           
           {/* Left Column: Thesis & Statement */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-7 space-y-8"
+            transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+            className="lg:col-span-7 space-y-7"
           >
             <div className="space-y-4">
               <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-[1.08]">
@@ -103,24 +110,24 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-4 pt-2">
+            <div className="flex flex-wrap gap-3.5 pt-1">
               <Link
                 href="/transfer"
-                className="h-12 px-6 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-md font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
+                className="h-11 px-6 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-md font-medium text-sm inline-flex items-center justify-center gap-2 transition-all shadow-sm"
               >
                 <span>Launch Cross-Chain Swap</span>
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
+                <IconArrowRight size={16} />
               </Link>
               <Link
                 href="/trading"
-                className="h-12 px-6 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.98] text-white border border-white/[0.08] rounded-md font-medium text-sm flex items-center justify-center gap-2 transition-all"
+                className="h-11 px-6 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.98] text-white border border-white/[0.08] rounded-md font-medium text-sm inline-flex items-center justify-center gap-2 transition-all"
               >
                 <span>Configure Agent Policy</span>
               </Link>
             </div>
 
             {/* Core Metrics Strip */}
-            <div className="pt-8 border-t border-white/[0.08] grid grid-cols-3 gap-6">
+            <div className="pt-7 border-t border-white/[0.08] grid grid-cols-3 gap-6">
               <div>
                 <div className="text-2xl font-bold font-mono tracking-tight text-white tabular-nums">3.2s</div>
                 <div className="text-xs text-[#8e8e98] mt-1">Average Intent Fill</div>
@@ -138,16 +145,16 @@ export default function LandingPage() {
 
           {/* Right Column: Precision Working Swap Terminal */}
           <motion.div
-            initial={{ opacity: 0, y: 28 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
             className="lg:col-span-5 w-full"
           >
             <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-6 shadow-xl space-y-5">
               
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
                 <span className="text-xs font-semibold text-white tracking-tight flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base text-[#ff4500]">sync_alt</span>
+                  <IconSwap size={15} className="text-[#ff4500]" />
                   Universal Intent Terminal
                 </span>
                 <button
@@ -167,7 +174,7 @@ export default function LandingPage() {
               <div className="bg-[#0d0d10] p-4 rounded-xl space-y-2 border border-white/[0.04]">
                 <div className="flex justify-between text-xs text-[#8e8e98]">
                   <span>You Pay</span>
-                  <span>Network: <strong className="text-white">{sourceChain}</strong></span>
+                  <span>Network: <strong className="text-white font-medium">{sourceChain}</strong></span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <input
@@ -183,17 +190,17 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Direction Switcher with Rotation Motion */}
+              {/* Direction Switcher with Precision Center Alignment */}
               <div className="flex justify-center -my-2.5 relative z-10">
                 <motion.button
                   type="button"
                   onClick={flipDirection}
                   animate={{ rotate: rotation }}
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-8 h-8 rounded-full bg-[#1b1b21] hover:bg-[#ff4500] text-[#8e8e98] hover:text-white border border-white/[0.1] flex items-center justify-center transition-colors shadow-md"
+                  className="w-8 h-8 rounded-full bg-[#1b1b21] hover:bg-[#ff4500] text-[#8e8e98] hover:text-white border border-white/[0.1] inline-flex items-center justify-center transition-colors shadow-md"
                   title="Swap direction"
                 >
-                  <span className="material-symbols-outlined text-sm">swap_vert</span>
+                  <IconSwapVert size={15} />
                 </motion.button>
               </div>
 
@@ -201,7 +208,7 @@ export default function LandingPage() {
               <div className="bg-[#0d0d10] p-4 rounded-xl space-y-2 border border-white/[0.04]">
                 <div className="flex justify-between text-xs text-[#8e8e98]">
                   <span>You Receive</span>
-                  <span>Destination: <strong className="text-white">{destChain}</strong></span>
+                  <span>Destination: <strong className="text-white font-medium">{destChain}</strong></span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-3xl font-mono font-bold text-white tabular-nums">
@@ -237,10 +244,10 @@ export default function LandingPage() {
                 type="button"
                 onClick={handleSimulateSwap}
                 disabled={isExecuting}
-                className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.99] text-white rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full h-11 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.99] text-white rounded-lg font-semibold text-sm inline-flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
                 {isExecuting ? (
-                  <span className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Submitting UserOperation...</span>
                   </span>
@@ -248,10 +255,10 @@ export default function LandingPage() {
                   <motion.span
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="text-white font-semibold flex items-center gap-1.5"
+                    className="text-white font-semibold inline-flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-base">check_circle</span>
-                    Swap Settled on Arbitrum Sepolia
+                    <IconCheck size={16} />
+                    <span>Swap Settled on Arbitrum Sepolia</span>
                   </motion.span>
                 ) : (
                   <span>Execute 1-Click Swap</span>
@@ -313,7 +320,7 @@ export default function LandingPage() {
                   <span className="text-red-400">Gas: $1.80</span>
                 </div>
                 <div className="p-3 bg-[#0d0d10] rounded border border-white/[0.04] flex items-center justify-between">
-                  <span className="text-[#8e8e98]">6. Swap Wrapped Token $\to$ Target Asset</span>
+                  <span className="text-[#8e8e98]">6. Swap Wrapped Token → Target Asset</span>
                   <span className="text-red-400">Gas: $2.40</span>
                 </div>
               </div>
@@ -386,9 +393,10 @@ export default function LandingPage() {
                   href="https://sepolia.arbiscan.io/address/0xd364b7339099E7633015FD5Cda7e21d4c40833f7"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-white hover:text-[#ff4500] transition-colors truncate"
+                  className="text-white hover:text-[#ff4500] transition-colors inline-flex items-center gap-1.5 truncate"
                 >
-                  0xd364b7339099E7633015FD5Cda7e21d4c40833f7 ↗
+                  <span className="truncate">0xd364b7339099E7633015FD5Cda7e21d4c40833f7</span>
+                  <IconArrowUpRight size={13} className="shrink-0" />
                 </a>
               </div>
               <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.02] transition-colors">
@@ -397,9 +405,10 @@ export default function LandingPage() {
                   href="https://sepolia.arbiscan.io/address/0x0D666af60c511a65d7fe704090632AFE05C932fA"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-white hover:text-[#ff4500] transition-colors truncate"
+                  className="text-white hover:text-[#ff4500] transition-colors inline-flex items-center gap-1.5 truncate"
                 >
-                  0x0D666af60c511a65d7fe704090632AFE05C932fA ↗
+                  <span className="truncate">0x0D666af60c511a65d7fe704090632AFE05C932fA</span>
+                  <IconArrowUpRight size={13} className="shrink-0" />
                 </a>
               </div>
               <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.02] transition-colors">
@@ -408,14 +417,15 @@ export default function LandingPage() {
                   href="https://sepolia.arbiscan.io/address/0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-white hover:text-[#ff4500] transition-colors truncate"
+                  className="text-white hover:text-[#ff4500] transition-colors inline-flex items-center gap-1.5 truncate"
                 >
-                  0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36 ↗
+                  <span className="truncate">0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36</span>
+                  <IconArrowUpRight size={13} className="shrink-0" />
                 </a>
               </div>
               <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white/[0.02] transition-colors">
                 <span className="text-[#8e8e98]">Native RIP-7212 P-256 Precompile</span>
-                <span className="text-emerald-400 font-semibold">
+                <span className="text-emerald-400 font-semibold font-mono">
                   0x0000000000000000000000000000000000000100 (Native L2)
                 </span>
               </div>

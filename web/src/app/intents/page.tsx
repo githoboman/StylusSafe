@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { SignModal } from '@/components/SignModal';
 import Link from 'next/link';
+import { IconArrowLeft } from '@/components/Icons';
 
 export default function IntentsPage() {
   const { executeIntentBatch } = useInvisibleWallet();
@@ -31,8 +32,8 @@ export default function IntentsPage() {
     <div className="p-4 md:p-10 w-full max-w-4xl mx-auto flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
       
       <div className="flex items-center gap-4 border-b border-border-whisper pb-6">
-        <Link href="/" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary">
-          <span className="material-symbols-outlined">arrow_back</span>
+        <Link href="/" className="w-9 h-9 rounded-lg bg-surface-container inline-flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary border border-white/[0.06] shrink-0" title="Back">
+          <IconArrowLeft size={16} />
         </Link>
         <div>
           <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-2">Intent Batching</h1>

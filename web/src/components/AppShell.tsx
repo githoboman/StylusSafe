@@ -1,24 +1,50 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
+import { BrandLogo } from '@/components/BrandLogo';
+import {
+  IconSwap,
+  IconShield,
+  IconWallet,
+  IconAutoRenew,
+  IconStacks,
+  IconFingerprint,
+  IconActivity,
+  IconLogout,
+} from '@/components/Icons';
 
-const navItems = [
-  { href: '/transfer', icon: 'sync_alt', label: 'Cross-Chain Swap' },
-  { href: '/trading', icon: 'shield', label: 'Agent Firewall' },
-  { href: '/dashboard', icon: 'account_balance_wallet', label: 'Treasury Vault' },
-  { href: '/subscription', icon: 'autorenew', label: 'DCA & Recurring' },
-  { href: '/intents', icon: 'stacks', label: 'Intent Batches' },
-  { href: '/security', icon: 'fingerprint', label: 'Enclave Security' },
-  { href: '/activity', icon: 'receipt_long', label: 'Activity Log' },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+};
+
+const navExecution: NavItem[] = [
+  { href: '/transfer', label: 'Cross-Chain Swap', icon: IconSwap },
+  { href: '/trading', label: 'Agent Firewall', icon: IconShield },
+  { href: '/dashboard', label: 'Treasury Vault', icon: IconWallet },
 ];
 
-const mobileNavItems = [
-  { href: '/transfer', icon: 'sync_alt', label: 'Swap' },
-  { href: '/trading', icon: 'shield', label: 'Firewall' },
-  { href: '/dashboard', icon: 'account_balance_wallet', label: 'Vault' },
-  { href: '/activity', icon: 'receipt_long', label: 'Activity' },
+const navAutomations: NavItem[] = [
+  { href: '/subscription', label: 'DCA & Recurring', icon: IconAutoRenew },
+  { href: '/intents', label: 'Intent Batches', icon: IconStacks },
+];
+
+const navSecurity: NavItem[] = [
+  { href: '/security', label: 'Enclave Security', icon: IconFingerprint },
+  { href: '/activity', label: 'Activity Log', icon: IconActivity },
+];
+
+const allNavItems = [...navExecution, ...navAutomations, ...navSecurity];
+
+const mobileNavItems: NavItem[] = [
+  { href: '/transfer', label: 'Swap', icon: IconSwap },
+  { href: '/trading', label: 'Firewall', icon: IconShield },
+  { href: '/dashboard', label: 'Vault', icon: IconWallet },
+  { href: '/activity', label: 'Activity', icon: IconActivity },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -33,118 +59,83 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
+  const renderNavGroup = (title: string, items: NavItem[]) => (
+    <div className="space-y-1">
+      <div className="text-[11px] font-mono text-[#8e8e98] uppercase tracking-wider px-3 mb-1.5 font-medium">
+        {title}
+      </div>
+      {items.map((item) => {
+        const active = pathname === item.href;
+        const IconComponent = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              active
+                ? 'bg-white/[0.08] text-white shadow-sm'
+                : 'text-[#8e8e98] hover:bg-white/[0.04] hover:text-white'
+            }`}
+          >
+            <span className={`inline-flex items-center justify-center shrink-0 ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
+              <IconComponent size={18} />
+            </span>
+            <span className="leading-none">{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white">
+    <div className="min-h-screen bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white font-sans">
       
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.08] bg-[#0d0d10] p-5 justify-between h-screen sticky top-0 z-30">
-        <div className="space-y-6">
+      <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.08] bg-[#0d0d10] p-5 justify-between h-screen sticky top-0 z-30 shrink-0">
+        <div className="space-y-6 overflow-y-auto">
           
-          {/* Brand & Network */}
+          {/* Brand Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
-            <Link href="/" className="flex items-center gap-2.5">
-              <img src="/logo.jpg" alt="StylusSafe" className="w-6 h-6 rounded-md" />
-              <span className="text-base font-semibold tracking-tight text-white">StylusSafe</span>
+            <Link href="/" className="hover:opacity-90 transition-opacity">
+              <BrandLogo size={28} />
             </Link>
-            <span className="text-[11px] font-mono text-[#8e8e98]">
+            <span className="text-[11px] font-mono text-[#8e8e98] bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
               Arb Sepolia
             </span>
           </div>
 
-          {/* Navigation Items */}
-          <nav className="space-y-1">
-            <div className="text-xs text-[#8e8e98] font-medium px-3 mb-2">
-              Execution
-            </div>
-            {navItems.slice(0, 3).map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-[#8e8e98] hover:bg-white/[0.04] hover:text-white'
-                  }`}
-                >
-                  <span className={`material-symbols-outlined text-[18px] ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-
-            <div className="text-xs text-[#8e8e98] font-medium px-3 pt-5 mb-2">
-              Automations
-            </div>
-            {navItems.slice(3, 5).map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-[#8e8e98] hover:bg-white/[0.04] hover:text-white'
-                  }`}
-                >
-                  <span className={`material-symbols-outlined text-[18px] ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-
-            <div className="text-xs text-[#8e8e98] font-medium px-3 pt-5 mb-2">
-              Security
-            </div>
-            {navItems.slice(5).map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'bg-white/[0.08] text-white'
-                      : 'text-[#8e8e98] hover:bg-white/[0.04] hover:text-white'
-                  }`}
-                >
-                  <span className={`material-symbols-outlined text-[18px] ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+          {/* Navigation Groups */}
+          <nav className="space-y-5">
+            {renderNavGroup('Execution', navExecution)}
+            {renderNavGroup('Automations', navAutomations)}
+            {renderNavGroup('Security', navSecurity)}
           </nav>
         </div>
 
-        {/* User Account / Identity Bar */}
+        {/* User Account Bar */}
         <div className="pt-4 border-t border-white/[0.06]">
-          <div className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] flex items-center justify-between">
+          <div className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 overflow-hidden">
-              <span className="material-symbols-outlined text-[#8e8e98] text-[18px]">fingerprint</span>
+              <span className="w-7 h-7 rounded-md bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-[#ff4500] shrink-0">
+                <IconFingerprint size={16} />
+              </span>
               <div className="truncate">
-                <div className="font-mono text-xs text-white truncate">
+                <div className="font-mono text-xs text-white truncate font-medium">
                   {address ? formatAddress(address) : 'No Wallet'}
                 </div>
-                <div className="text-[11px] text-[#8e8e98]">
-                  {address ? 'Hardware Passkey' : 'Guest'}
+                <div className="text-[10px] text-[#8e8e98] leading-tight">
+                  {address ? 'Hardware Enclave' : 'Connect Vault'}
                 </div>
               </div>
             </div>
             {address && (
               <button
+                type="button"
                 onClick={disconnect}
                 title="Disconnect"
-                className="text-[#8e8e98] hover:text-red-400 p-1 transition-colors"
+                className="w-7 h-7 rounded-md hover:bg-white/[0.06] text-[#8e8e98] hover:text-red-400 flex items-center justify-center transition-colors shrink-0"
               >
-                <span className="material-symbols-outlined text-[16px]">logout</span>
+                <IconLogout size={15} />
               </button>
             )}
           </div>
@@ -155,39 +146,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 flex flex-col min-h-screen pb-16 md:pb-0 overflow-x-hidden">
         
         {/* Top App Header */}
-        <header className="sticky top-0 z-40 bg-[#09090b]/85 backdrop-blur-md border-b border-white/[0.08] px-6 h-14 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-6 h-16 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="md:hidden flex items-center gap-2">
-              <img src="/logo.jpg" alt="StylusSafe" className="w-5 h-5 rounded" />
-              <span className="font-semibold text-sm">StylusSafe</span>
+              <Link href="/">
+                <BrandLogo size={24} />
+              </Link>
             </div>
             <div className="hidden md:flex items-center gap-2 text-xs text-[#8e8e98]">
-              <span>Intent Infrastructure</span>
-              <span>/</span>
-              <span className="text-white">
-                {navItems.find(i => i.href === pathname)?.label || 'App'}
+              <span className="font-normal">StylusSafe</span>
+              <span className="text-white/20">/</span>
+              <span className="text-white font-medium">
+                {allNavItems.find(i => i.href === pathname)?.label || 'App'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link
               href="/transfer"
-              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded flex items-center gap-1.5 transition-colors"
+              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-sm text-[#ff4500]">sync_alt</span>
-              Swap
+              <IconSwap size={14} className="text-[#ff4500]" />
+              <span>Swap</span>
             </Link>
             <Link
               href="/trading"
-              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded flex items-center gap-1.5 transition-colors"
+              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-sm text-emerald-400">shield</span>
-              Firewall
+              <IconShield size={14} className="text-emerald-400" />
+              <span>Firewall</span>
             </Link>
             <Link
               href="/"
-              className="h-8 px-2.5 text-xs text-[#8e8e98] hover:text-white flex items-center transition-colors"
+              className="h-8 px-3 text-xs text-[#8e8e98] hover:text-white rounded-md inline-flex items-center transition-colors"
             >
               Overview
             </Link>
@@ -198,22 +190,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 w-full z-50 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08]">
-        <div className="flex justify-around items-center h-14 px-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08] px-2 py-1">
+        <div className="flex justify-around items-center h-13">
           {mobileNavItems.map((item) => {
             const active = pathname === item.href;
+            const IconComponent = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center min-w-[56px] min-h-[40px] transition-colors ${
+                className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition-colors ${
                   active ? 'text-white font-medium' : 'text-[#8e8e98]'
                 }`}
               >
-                <span className={`material-symbols-outlined text-[20px] ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
-                  {item.icon}
+                <span className={`inline-flex items-center justify-center ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
+                  <IconComponent size={19} />
                 </span>
-                <span className="text-[10px] mt-0.5">{item.label}</span>
+                <span className="text-[10px] mt-1 leading-none">{item.label}</span>
               </Link>
             );
           })}
