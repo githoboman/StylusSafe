@@ -52,3 +52,4 @@ export function BrandLogo({ size = 28, className = '', showText = true }: BrandL
     </div>
   );
 }
+
