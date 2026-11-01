@@ -1,5 +1,7 @@
 'use client';
+
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 type SignModalProps = {
   isOpen: boolean;
@@ -7,22 +9,51 @@ type SignModalProps = {
   onSign?: (pin: string) => Promise<void>;
   actionText?: string;
   amountText?: string;
+  defaultMode?: 'faceid' | 'pin';
 };
 
-export function SignModal({ isOpen, onClose, onSign, actionText = "Bridge & Swap", amountText = "-1.50 ETH" }: SignModalProps) {
+export function SignModal({
+  isOpen,
+  onClose,
+  onSign,
+  actionText = 'Authorize Transaction',
+  amountText = 'Free / Sponsored Gas',
+  defaultMode = 'faceid',
+}: SignModalProps) {
+  const [mode, setMode] = useState<'faceid' | 'pin'>(defaultMode);
   const [pin, setPin] = useState('');
-  const [isSigning, setIsSigning] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       setPin('');
       setError(null);
-      setIsSigning(false);
+      setStatus('idle');
+      setMode(defaultMode);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultMode]);
 
   if (!isOpen) return null;
+
+  const handleFaceIDAuth = async () => {
+    setStatus('scanning');
+    setError(null);
+    try {
+      if (onSign) {
+        // Calling with empty string tells useInvisibleWallet to use native WebAuthn / Face ID
+        await onSign('');
+      }
+      setStatus('success');
+      setTimeout(() => {
+        onClose();
+      }, 900);
+    } catch (err: any) {
+      console.error('Face ID Error:', err);
+      setStatus('error');
+      setError(err?.message || 'Face ID authentication was cancelled or unavailable.');
+    }
+  };
 
   const handleKeyPress = (num: number) => {
     if (pin.length < 6) {
@@ -36,125 +67,274 @@ export function SignModal({ isOpen, onClose, onSign, actionText = "Bridge & Swap
     setError(null);
   };
 
-  const handleSubmit = async () => {
+  const handlePinSubmit = async () => {
     if (pin.length !== 6) return;
-    
-    setIsSigning(true);
+    setStatus('scanning');
     setError(null);
     try {
       if (onSign) {
         await onSign(pin);
       }
-      onClose();
+      setStatus('success');
+      setTimeout(() => {
+        onClose();
+      }, 900);
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-      setPin(''); // Reset PIN on error
-    } finally {
-      setIsSigning(false);
+      setStatus('error');
+      setError(err?.message || 'Authentication failed. Please verify your PIN.');
+      setPin('');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-background-ink/80 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-sm bg-surface-zinc rounded-[24px] border border-border-whisper shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 font-sans">
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-[#09090b]/80 backdrop-blur-md"
+        onClick={status === 'scanning' ? undefined : onClose}
+      />
+
+      {/* Modal Surface */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-sm bg-[#141418] rounded-2xl border border-white/[0.1] shadow-2xl overflow-hidden text-white"
+      >
         <div className="p-6 flex flex-col items-center text-center">
-          <div className="w-14 h-14 rounded-full bg-surface-container text-text-primary flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-[24px]">dialpad</span>
-          </div>
-          
-          <h3 className="text-xl font-semibold text-text-primary tracking-tight mb-1">Enter PIN</h3>
-          <p className="text-sm text-text-muted mb-6">Authorize this transaction</p>
-          
-          <div className="w-full bg-surface-container rounded-[12px] p-4 mb-6 border border-border-whisper text-left space-y-3">
+
+          {/* Action & Amount Context Card */}
+          <div className="w-full bg-[#0d0d10] rounded-xl p-3.5 mb-5 border border-white/[0.06] text-left space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs text-text-muted uppercase tracking-wider">Action</span>
-              <span className="text-sm font-medium text-text-primary">{actionText}</span>
+              <span className="text-[#8e8e98] font-mono text-[11px] uppercase tracking-wider">Action</span>
+              <span className="text-white font-medium truncate max-w-[200px]">{actionText}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs text-text-muted uppercase tracking-wider">Amount</span>
-              <span className="text-sm font-medium text-text-primary">{amountText}</span>
+              <span className="text-[#8e8e98] font-mono text-[11px] uppercase tracking-wider">Parameters</span>
+              <span className="text-white font-mono text-[11px] truncate max-w-[200px]">{amountText}</span>
             </div>
           </div>
-          
-          {/* PIN Dots */}
-          <div className="flex items-center justify-center gap-3 mb-8 h-8">
-            {[0, 1, 2, 3, 4, 5].map((index) => (
-              <div 
-                key={index} 
-                className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
-                  index < pin.length 
-                    ? 'bg-accent-orange scale-110' 
-                    : 'bg-surface-container-high'
-                }`}
-              />
-            ))}
-          </div>
 
-          {error && (
-             <div className="w-full py-2 mb-4 bg-error/10 text-red-400 text-sm rounded-[8px] font-medium border border-red-500/20">
-               {error}
-             </div>
-          )}
-
-          {/* Keypad */}
-          <div className="grid grid-cols-3 gap-2 w-full mb-6">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
-              <button
-                key={num}
-                onClick={() => handleKeyPress(num)}
-                disabled={isSigning}
-                className="h-14 rounded-[12px] bg-surface-container hover:bg-surface-container-high active:bg-surface-container-high/80 text-xl font-medium text-text-primary transition-colors flex items-center justify-center disabled:opacity-50"
+          <AnimatePresence mode="wait">
+            {mode === 'faceid' ? (
+              /* ── Face ID Biometric View ────────────────────────────────────────── */
+              <motion.div
+                key="faceid-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full flex flex-col items-center"
               >
-                {num}
-              </button>
-            ))}
-            <div className="h-14"></div>
-            <button
-              onClick={() => handleKeyPress(0)}
-              disabled={isSigning}
-              className="h-14 rounded-[12px] bg-surface-container hover:bg-surface-container-high active:bg-surface-container-high/80 text-xl font-medium text-text-primary transition-colors flex items-center justify-center disabled:opacity-50"
-            >
-              0
-            </button>
-            <button
-              onClick={handleBackspace}
-              disabled={isSigning || pin.length === 0}
-              className="h-14 rounded-[12px] bg-surface-container/50 hover:bg-surface-container text-text-muted hover:text-text-primary transition-colors flex items-center justify-center disabled:opacity-30"
-            >
-              <span className="material-symbols-outlined">backspace</span>
-            </button>
-          </div>
-          
-          <button 
-            onClick={handleSubmit}
-            disabled={isSigning || pin.length !== 6}
-            className={`w-full h-14 rounded-[12px] font-semibold text-base transition-all flex items-center justify-center gap-2
-              ${pin.length === 6 && !isSigning 
-                ? 'bg-accent-orange hover:bg-accent-orange/90 text-white shadow-lg shadow-accent-orange/20' 
-                : 'bg-surface-container text-text-muted cursor-not-allowed'}
-            `}
-          >
-            {isSigning ? (
-              <>
-                <span className="w-5 h-5 border-2 border-border-whisper border-t-white rounded-full animate-spin"></span>
-                Authorizing...
-              </>
+                {/* Biometric Scanner HUD Target */}
+                <div className="relative w-28 h-28 my-2 flex items-center justify-center">
+                  
+                  {/* Corner Target Reticles */}
+                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/40 rounded-tl-md" />
+                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/40 rounded-tr-md" />
+                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/40 rounded-bl-md" />
+                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/40 rounded-br-md" />
+
+                  {/* Pulsing Center Biometric Glyphs */}
+                  <div className="relative w-20 h-20 rounded-2xl bg-[#1b1b21] border border-white/[0.08] flex items-center justify-center overflow-hidden">
+                    {status === 'success' ? (
+                      <motion.div
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="text-emerald-400"
+                      >
+                        <span className="material-symbols-outlined text-[42px]">check_circle</span>
+                      </motion.div>
+                    ) : (
+                      <>
+                        <span className={`material-symbols-outlined text-[38px] transition-colors ${
+                          status === 'scanning' ? 'text-[#ff4500]' : 'text-white/80'
+                        }`}>
+                          face
+                        </span>
+
+                        {/* Animated Laser Sweep Line */}
+                        {status === 'scanning' && (
+                          <motion.div
+                            animate={{ y: [-36, 36, -36] }}
+                            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                            className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#ff4500] to-transparent shadow-[0_0_12px_#ff4500]"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-white tracking-tight mt-3 mb-1">
+                  {status === 'scanning' && 'Scanning Face ID...'}
+                  {status === 'success' && 'Biometrics Verified'}
+                  {status === 'error' && 'Verification Needed'}
+                  {status === 'idle' && 'Biometric Authentication'}
+                </h3>
+                <p className="text-xs text-[#8e8e98] mb-5 max-w-[240px]">
+                  {status === 'scanning' && 'Hold device steady to authorize via Secure Enclave.'}
+                  {status === 'success' && 'Signed with native RIP-7212 P-256 precompile.'}
+                  {status === 'error' && (error || 'Please scan Face ID or switch to PIN.')}
+                  {status === 'idle' && 'Authorize using Apple Face ID, Touch ID, or Windows Hello.'}
+                </p>
+
+                {/* Face ID Action Button */}
+                <button
+                  type="button"
+                  onClick={handleFaceIDAuth}
+                  disabled={status === 'scanning' || status === 'success'}
+                  className="w-full h-12 rounded-lg bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.99] text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#ff4500]/20 disabled:opacity-50"
+                >
+                  {status === 'scanning' ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Verifying Biometrics...</span>
+                    </>
+                  ) : status === 'success' ? (
+                    <>
+                      <span className="material-symbols-outlined text-sm">verified</span>
+                      <span>Authorized</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-base">passkey</span>
+                      <span>Authenticate with Face ID</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Fallback to PIN */}
+                <button
+                  type="button"
+                  onClick={() => setMode('pin')}
+                  disabled={status === 'scanning'}
+                  className="mt-4 text-xs text-[#8e8e98] hover:text-white transition-colors flex items-center gap-1 font-mono"
+                >
+                  <span className="material-symbols-outlined text-sm">dialpad</span>
+                  <span>Use 6-digit PIN instead</span>
+                </button>
+              </motion.div>
             ) : (
-              'Confirm'
+              /* ── 6-Digit PIN View ──────────────────────────────────────────────── */
+              <motion.div
+                key="pin-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="w-full flex flex-col items-center"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#1b1b21] text-white flex items-center justify-center mb-2">
+                  <span className="material-symbols-outlined text-[20px]">dialpad</span>
+                </div>
+
+                <h3 className="text-lg font-semibold text-white tracking-tight mb-0.5">Enter Security PIN</h3>
+                <p className="text-xs text-[#8e8e98] mb-4">Fallback authentication method</p>
+
+                {/* PIN Dots */}
+                <div className="flex items-center justify-center gap-3 mb-5 h-6">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <div
+                      key={index}
+                      className={`w-3 h-3 rounded-full transition-all duration-150 ${
+                        index < pin.length
+                          ? 'bg-[#ff4500] scale-110'
+                          : 'bg-[#24242c]'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {error && (
+                  <div className="w-full py-1.5 px-3 mb-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-md">
+                    {error}
+                  </div>
+                )}
+
+                {/* Numeric Dialpad */}
+                <div className="grid grid-cols-3 gap-1.5 w-full mb-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => handleKeyPress(num)}
+                      disabled={status === 'scanning'}
+                      className="h-11 rounded-lg bg-[#1b1b21] hover:bg-[#24242c] active:bg-[#2c2c36] text-base font-medium text-white transition-colors flex items-center justify-center disabled:opacity-50"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  <div className="h-11" />
+                  <button
+                    type="button"
+                    onClick={() => handleKeyPress(0)}
+                    disabled={status === 'scanning'}
+                    className="h-11 rounded-lg bg-[#1b1b21] hover:bg-[#24242c] active:bg-[#2c2c36] text-base font-medium text-white transition-colors flex items-center justify-center disabled:opacity-50"
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBackspace}
+                    disabled={status === 'scanning' || pin.length === 0}
+                    className="h-11 rounded-lg bg-[#1b1b21]/60 hover:bg-[#1b1b21] text-[#8e8e98] hover:text-white transition-colors flex items-center justify-center disabled:opacity-30"
+                  >
+                    <span className="material-symbols-outlined text-base">backspace</span>
+                  </button>
+                </div>
+
+                {/* PIN Confirm Button */}
+                <button
+                  type="button"
+                  onClick={handlePinSubmit}
+                  disabled={status === 'scanning' || pin.length !== 6}
+                  className={`w-full h-11 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-2 ${
+                    pin.length === 6 && status !== 'scanning'
+                      ? 'bg-[#ff4500] hover:bg-[#e03d00] text-white shadow-md shadow-[#ff4500]/20'
+                      : 'bg-[#1b1b21] text-[#8e8e98] cursor-not-allowed'
+                  }`}
+                >
+                  {status === 'scanning' ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    'Confirm with PIN'
+                  )}
+                </button>
+
+                {/* Switch back to Face ID */}
+                <button
+                  type="button"
+                  onClick={() => setMode('faceid')}
+                  disabled={status === 'scanning'}
+                  className="mt-3 text-xs text-[#8e8e98] hover:text-white transition-colors flex items-center gap-1 font-mono"
+                >
+                  <span className="material-symbols-outlined text-sm">face</span>
+                  <span>Switch back to Face ID</span>
+                </button>
+              </motion.div>
             )}
-          </button>
-          
-          <button 
-            onClick={onClose} 
-            disabled={isSigning}
-            className="mt-5 text-sm font-mono text-text-muted hover:text-text-primary transition-colors"
+          </AnimatePresence>
+
+          {/* Cancel */}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={status === 'scanning'}
+            className="mt-4 text-xs font-mono text-[#8e8e98] hover:text-white transition-colors"
           >
             Cancel
           </button>
+
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

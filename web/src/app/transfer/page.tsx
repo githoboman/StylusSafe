@@ -103,7 +103,7 @@ export default function TransferPage() {
         selectedDestToken.symbol,
         amountRaw,
         (recipient || address) as `0x${string}`,
-        pin
+        pin || undefined
       );
       if (result) {
         setTxHash(result.userOpHash);
@@ -392,6 +392,7 @@ export default function TransferPage() {
         onClose={() => setIsModalOpen(false)}
         actionText="Confirm Cross-Chain Swap"
         amountText={`${amount} ${selectedToken.symbol} (${selectedSourceChain.name}) → ${selectedDestToken.symbol} (${selectedDestChain.name})`}
+        defaultMode="faceid"
         onSign={handleTransfer}
       />
     </div>

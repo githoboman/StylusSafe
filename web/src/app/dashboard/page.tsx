@@ -290,13 +290,13 @@ export default function Dashboard() {
         onClose={() => setIsSignModalOpen(false)}
         actionText={isRegistering ? "Register Hardware Passkey" : "Authenticate FaceID"}
         amountText="Free / Sponsored Gas"
+        defaultMode="faceid"
         onSign={async (pin) => {
           if (isRegistering) {
-            await register('stylussafe-vault', pin);
+            await register('stylussafe-vault', pin || undefined);
           } else {
             await login();
           }
-          setIsSignModalOpen(false);
         }}
       />
 
