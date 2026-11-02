@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { SignModal } from '@/components/SignModal';
 import Link from 'next/link';
-import { IconArrowLeft } from '@/components/Icons';
+import { IconArrowLeft, IconCheck, IconAutoRenew } from '@/components/Icons';
 
 export default function SubscriptionPage() {
   const { setupDCA } = useInvisibleWallet();
@@ -31,97 +32,123 @@ export default function SubscriptionPage() {
   };
 
   return (
-    <div className="p-4 md:p-10 w-full max-w-4xl mx-auto flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      
-      <div className="flex items-center gap-4 border-b border-border-whisper pb-6">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="p-4 md:p-10 w-full max-w-4xl mx-auto flex flex-col gap-8"
+    >
+      <div className="flex items-center gap-4 border-b border-white/[0.08] pb-6">
         <Link href="/" className="w-9 h-9 rounded-lg bg-surface-container inline-flex items-center justify-center hover:bg-surface-container-high transition-colors text-text-muted hover:text-text-primary border border-white/[0.06] shrink-0" title="Back">
-            <IconArrowLeft size={16} />
+          <IconArrowLeft size={16} />
         </Link>
         <div>
-          <h1 className="text-3xl md:text-5xl font-semibold text-text-primary tracking-tight mb-2">Pull Payments</h1>
-          <p className="text-text-muted max-w-xl">Configure automated, recurring on-chain transfers. No manual signatures required after setup.</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-text-primary tracking-tight mb-1">Pull Payments</h1>
+          <p className="text-text-muted text-sm max-w-xl">Configure automated, recurring on-chain transfers. No manual signatures required after setup.</p>
         </div>
       </div>
 
       <div className="w-full flex flex-col items-center justify-center min-h-[400px]">
-        {status === 'success' ? (
-          <div className="flex flex-col items-center gap-6 animate-in zoom-in duration-500 delay-150 z-10">
-            <div className="w-24 h-24 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center text-text-primary">
-              <span className="material-symbols-outlined text-[48px] text-accent-orange">check_circle</span>
-            </div>
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-text-primary mb-2">Subscription Active</h2>
-              <p className="text-text-muted max-w-sm mx-auto">{amountInput} USDC will be pulled automatically every {frequency} days.</p>
-            </div>
-            <Link href="/" className="mt-4 h-12 px-8 bg-surface-container hover:bg-surface-container-high rounded-[8px] font-medium text-text-primary flex items-center justify-center transition-all border border-border-whisper">
-              Return to Dashboard
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8 w-full max-w-md z-10">
-            
-            <div className="w-full bg-surface-zinc rounded-2xl p-6 border border-border-whisper relative">
-              <div className="space-y-5">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-text-primary">Merchant Contract / Address</label>
-                  <div className="flex items-center bg-surface-container-low border border-border-whisper rounded-[4px] px-4 focus-within:border-accent-orange transition-colors">
-                    <span className="material-symbols-outlined text-[18px] text-text-muted mr-2">storefront</span>
-                    <input 
-                      type="text" 
-                      value={merchantAddress}
-                      onChange={(e) => setMerchantAddress(e.target.value)}
-                      className="w-full h-12 bg-transparent outline-none text-text-primary font-mono text-sm"
-                    />
+        <AnimatePresence mode="wait">
+          {status === 'success' ? (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex flex-col items-center gap-6 z-10 text-center"
+            >
+              <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <IconCheck size={36} />
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-text-primary mb-2">Subscription Active</h2>
+                <p className="text-text-muted max-w-sm mx-auto text-sm">{amountInput} USDC will be pulled automatically every {frequency} days.</p>
+              </div>
+              <Link href="/" className="mt-4 h-11 px-8 bg-surface-container hover:bg-surface-container-high rounded-lg font-medium text-text-primary flex items-center justify-center transition-all border border-border-whisper text-xs">
+                Return to Dashboard
+              </Link>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col gap-6 w-full max-w-md z-10"
+            >
+              <div className="w-full bg-[#141418] rounded-2xl p-6 border border-white/[0.08] relative space-y-4">
+                <div className="space-y-4 text-xs font-mono">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">Merchant Contract / Address</label>
+                    <div className="flex items-center bg-[#0d0d10] border border-white/[0.08] rounded-lg px-3 focus-within:border-[#ff4500] transition-colors">
+                      <input 
+                        type="text" 
+                        value={merchantAddress}
+                        onChange={(e) => setMerchantAddress(e.target.value)}
+                        className="w-full h-11 bg-transparent outline-none text-text-primary font-mono text-xs"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-text-primary">Recurring Amount</label>
-                  <div className="flex items-center bg-surface-container-low border border-border-whisper rounded-[4px] px-4 focus-within:border-accent-orange transition-colors">
-                    <span className="text-text-muted font-mono">$</span>
-                    <input 
-                      type="number" 
-                      value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                      className="w-full h-12 bg-transparent outline-none px-2 text-text-primary font-mono"
-                    />
-                    <span className="text-xs text-text-muted uppercase tracking-widest">USDC</span>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">Recurring Amount</label>
+                    <div className="flex items-center bg-[#0d0d10] border border-white/[0.08] rounded-lg px-3 focus-within:border-[#ff4500] transition-colors">
+                      <span className="text-text-muted font-mono mr-1">$</span>
+                      <input 
+                        type="number" 
+                        value={amountInput}
+                        onChange={(e) => setAmountInput(e.target.value)}
+                        className="w-full h-11 bg-transparent outline-none text-text-primary font-mono text-sm"
+                      />
+                      <span className="text-xs text-text-muted uppercase tracking-widest">USDG</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-text-primary">Billing Frequency</label>
-                  <select 
-                    value={frequency}
-                    onChange={(e) => setFrequency(Number(e.target.value))}
-                    className="w-full h-12 bg-surface-container-low border border-border-whisper rounded-[4px] px-4 text-text-primary outline-none focus:border-accent-orange transition-colors font-mono"
-                  >
-                    <option value="30">Monthly (Every 30 Days)</option>
-                    <option value="7">Weekly (Every 7 Days)</option>
-                    <option value="365">Yearly (Every 365 Days)</option>
-                  </select>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-text-muted uppercase tracking-wider">Billing Frequency</label>
+                    <select 
+                      value={frequency}
+                      onChange={(e) => setFrequency(Number(e.target.value))}
+                      className="w-full h-11 bg-[#0d0d10] border border-white/[0.08] rounded-lg px-3 text-text-primary outline-none focus:border-[#ff4500] transition-colors font-mono text-xs"
+                    >
+                      <option value="30">Monthly (Every 30 Days)</option>
+                      <option value="7">Weekly (Every 7 Days)</option>
+                      <option value="365">Yearly (Every 365 Days)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] transition-all rounded-[4px] flex items-center justify-center gap-2 font-semibold text-base text-white"
-            >
-              Setup Subscription
-            </button>
-            
-          </div>
-        )}
+              <button
+                onClick={() => setIsModalOpen(true)}
+                disabled={status === 'authorizing'}
+                className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] transition-all rounded-lg flex items-center justify-center gap-2 font-semibold text-sm text-white shadow-lg shadow-[#ff4500]/20 disabled:opacity-50"
+              >
+                {status === 'authorizing' ? (
+                  <span className="inline-flex items-center gap-2 font-mono">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Signing Subscription...</span>
+                  </span>
+                ) : (
+                  <>
+                    <IconAutoRenew size={16} />
+                    <span>Setup Automated Subscription</span>
+                  </>
+                )}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <SignModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         actionText="Setup Subscription"
-        amountText={`${amountInput} USDC`}
+        amountText={`${amountInput} USDG / ${frequency} Days`}
         onSign={handleSubscribe}
       />
-    </div>
+    </motion.div>
   );
 }

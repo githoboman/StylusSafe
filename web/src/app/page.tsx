@@ -559,7 +559,15 @@ export default function LandingPage() {
                       : 'bg-[#ff4500]/10 border-[#ff4500]/30 text-[#ff4500]'
                   }`}>
                     <div className="text-sm font-bold flex items-center gap-2">
-                      <span>{simOutput.status === 'success' ? '✔' : simOutput.status === 'blocked' ? '✖' : '⚡'}</span>
+                      <span className="inline-flex items-center">
+                        {simOutput.status === 'success' ? (
+                          <IconCheck size={16} />
+                        ) : simOutput.status === 'blocked' ? (
+                          <IconAlert size={16} />
+                        ) : (
+                          <IconKey size={16} />
+                        )}
+                      </span>
                       <span>{simOutput.title}</span>
                     </div>
                     <div className="text-xs text-white/90 mt-2 font-mono leading-relaxed">

@@ -15,15 +15,18 @@
 
 ---
 
-## 🎯 Executive Thesis: Cross-Chain Liquidity Meets AI Agent Sovereignty
+## Executive Thesis: Cross-Chain Liquidity Meets AI Agent Sovereignty
 
 Crypto today suffers from two critical friction points:
+
 1. **The Multichain Bridging Nightmare**: Moving funds between Arbitrum, Base, Optimism, and Ethereum requires finding bridges, buying native gas tokens on new chains, waiting 20 minutes, and risking bridge exploits.
 2. **The AI Agent Security Crisis**: Autonomous trading bots (DCA, rebalancing, market making) are forced to hold raw private keys in cloud servers or memory, exposing user wallets to total drainage via prompt injection, server compromises, or hallucinated executions.
 
 ### The StylusSafe Solution
+
 StylusSafe combines **1-Click Universal Cross-Chain Intents** with an **On-Chain Policy Engine & Spending Firewall for AI Agents**:
-- **1-Click Universal Cross-Chain Swaps**: Powered by Li.Fi aggregation and ERC-4337 Account Abstraction. Users and agents declare an *Intent* (e.g. *"Swap Arbitrum USDG into Base DEGEN"*), and StylusSafe batches approvals, routes optimal bridges, executes swaps, and sponsors gas—all in 1 click in 3 seconds.
+
+- **1-Click Universal Cross-Chain Swaps**: Powered by Li.Fi aggregation and ERC-4337 Account Abstraction. Users and agents declare an _Intent_ (e.g. _"Swap Arbitrum USDG into Base DEGEN"_), and StylusSafe batches approvals, routes optimal bridges, executes swaps, and sponsors gas—all in 1 click in 3 seconds.
 - **Hardware Enclave WebAuthn Sovereignty (RIP-7212)**: Humans retain root master ownership secured by Apple Secure Enclave / Android StrongBox (FaceID/TouchID). Zero seed phrases to leak.
 - **On-Chain Policy Engine for AI Agents**: Agents receive **cryptographically scoped session keys** governed by immutable smart contract constraints:
   - Strict rolling 24-hour daily spending limits
@@ -35,18 +38,18 @@ StylusSafe combines **1-Click Universal Cross-Chain Intents** with an **On-Chain
 
 ---
 
-## 🏛 Mapping to the YC Crypto Request for Startups (Oct 2026)
+## Mapping to the YC Crypto Request for Startups (Oct 2026)
 
-| YC CRFS Priority Area | StylusSafe Implementation | Technical Proof & Mechanism |
-| :--- | :--- | :--- |
-| **Core: Cross-Chain Intents** | 1-Click universal multi-chain swap engine eliminating bridging delays and native gas tokens. | Li.Fi dynamic multi-chain routing + ZeroDev Paymaster gas sponsorship. |
-| **Category 1: Agent Infrastructure** | Hardware-grade security boundary between human principals and autonomous agents. | RIP-7212 precompile verification at `0x0100` + WebAuthn authenticator flags (`UP`, `UV`, `signCount`). |
-| **Category 2: Agents (Trading / DeFi)** | Autonomous execution of trading intents (DCA, rebalancing, market making) bounded by programmatic guardrails. | Smart contract methods `setAgentPolicy()`, `executeAsAgent()`, `executeWithPolicy()`. |
-| **Category 3: Stablecoins & Treasury** | Institutional programmable dollar liquidity layer for AI agent workflows. | Production standard ERC-20 `USDG.sol` (6 decimals) deployed at `0xDa4D...` with zero mock balances. |
+| YC CRFS Priority Area                   | StylusSafe Implementation                                                                                     | Technical Proof & Mechanism                                                                            |
+| :-------------------------------------- | :------------------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------- |
+| **Core: Cross-Chain Intents**           | 1-Click universal multi-chain swap engine eliminating bridging delays and native gas tokens.                  | Li.Fi dynamic multi-chain routing + ZeroDev Paymaster gas sponsorship.                                 |
+| **Category 1: Agent Infrastructure**    | Hardware-grade security boundary between human principals and autonomous agents.                              | RIP-7212 precompile verification at `0x0100` + WebAuthn authenticator flags (`UP`, `UV`, `signCount`). |
+| **Category 2: Agents (Trading / DeFi)** | Autonomous execution of trading intents (DCA, rebalancing, market making) bounded by programmatic guardrails. | Smart contract methods `setAgentPolicy()`, `executeAsAgent()`, `executeWithPolicy()`.                  |
+| **Category 3: Stablecoins & Treasury**  | Institutional programmable dollar liquidity layer for AI agent workflows.                                     | Production standard ERC-20 `USDG.sol` (6 decimals) deployed at `0xDa4D...` with zero mock balances.    |
 
 ---
 
-## 📐 System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
@@ -66,7 +69,7 @@ flowchart TD
         EntryPoint["Canonical EntryPoint v0.6 (0x5FF1...)"]
         Precompile["RIP-7212 Precompile (0x0100)"]
         PolicyEngine["On-Chain Policy Firewall\n- Daily Budget Cap\n- Max Per Tx\n- Target Allowlist\n- Panic Revoke"]
-        
+
         EntryPoint --> PolicyEngine
         Precompile --> PolicyEngine
     end
@@ -80,27 +83,27 @@ flowchart TD
     SessionKey -->|executeAsAgent| PolicyEngine
     PolicyEngine -->|Permitted| USDG
     PolicyEngine -->|Permitted| DeFi
-    PolicyEngine -.->|Over-Cap / Disallowed| Revert["❌ REVERT: StylusSafe__AgentDailyLimitExceeded()"]
+    PolicyEngine -.->|Over-Cap / Disallowed| Revert["REVERT: StylusSafe__AgentDailyLimitExceeded()"]
 ```
 
 ---
 
-## 🚀 Live Deployed Contracts (Arbitrum Sepolia)
+## Live Deployed Contracts (Arbitrum Sepolia)
 
 All contracts have been compiled with `solc` 0.8.23, deployed to Arbitrum Sepolia, and verified on-chain:
 
-| Component | Contract Address | Transaction Hash |
-| :--- | :--- | :--- |
+| Component                       | Contract Address                                                                                                               | Transaction Hash                                                     |
+| :------------------------------ | :----------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------- |
 | **StylusSafeAccount (Impl v2)** | [`0x0D666af60c511a65d7fe704090632AFE05C932fA`](https://sepolia.arbiscan.io/address/0x0D666af60c511a65d7fe704090632AFE05C932fA) | `0xbf84d82eccd43c274948af16df01e16be45762cbe23a9a4a0898519052ac89cf` |
-| **StylusSafeFactory** | [`0xd364b7339099E7633015FD5Cda7e21d4c40833f7`](https://sepolia.arbiscan.io/address/0xd364b7339099E7633015FD5Cda7e21d4c40833f7) | `0xf9c9b7e15d39c34167121315fecb09311f12bbe49557516e24da027a1aabf610` |
-| **USDG Stablecoin (ERC-20)** | [`0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36`](https://sepolia.arbiscan.io/address/0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36) | `0x2e0cb70e17621f37e6da33989c9d5f07df0a8bc02a2818c6fd5fd6f37651a5c6` |
-| **Sample Deployed Account** | [`0x9d5EA063C233b08deBF8DC4968A209a33c589Ad6`](https://sepolia.arbiscan.io/address/0x9d5EA063C233b08deBF8DC4968A209a33c589Ad6) | Counterfactual Salt `0x42` |
-| **ERC-4337 EntryPoint v0.6** | [`0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`](https://sepolia.arbiscan.io/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) | Canonical ERC-4337 |
-| **RIP-7212 Precompile** | `0x0000000000000000000000000000000000000100` | Native secp256r1 precompile |
+| **StylusSafeFactory**           | [`0xd364b7339099E7633015FD5Cda7e21d4c40833f7`](https://sepolia.arbiscan.io/address/0xd364b7339099E7633015FD5Cda7e21d4c40833f7) | `0xf9c9b7e15d39c34167121315fecb09311f12bbe49557516e24da027a1aabf610` |
+| **USDG Stablecoin (ERC-20)**    | [`0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36`](https://sepolia.arbiscan.io/address/0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36) | `0x2e0cb70e17621f37e6da33989c9d5f07df0a8bc02a2818c6fd5fd6f37651a5c6` |
+| **Sample Deployed Account**     | [`0x9d5EA063C233b08deBF8DC4968A209a33c589Ad6`](https://sepolia.arbiscan.io/address/0x9d5EA063C233b08deBF8DC4968A209a33c589Ad6) | Counterfactual Salt `0x42`                                           |
+| **ERC-4337 EntryPoint v0.6**    | [`0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789`](https://sepolia.arbiscan.io/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) | Canonical ERC-4337                                                   |
+| **RIP-7212 Precompile**         | `0x0000000000000000000000000000000000000100`                                                                                   | Native secp256r1 precompile                                          |
 
 ---
 
-## 🧪 On-Chain Invariant Test Suite (15/15 Passed)
+## On-Chain Invariant Test Suite (15/15 Passed)
 
 Our full end-to-end invariant test script (`contracts/scripts/deploy_and_verify_v2.mjs`) exercises the live contracts on Arbitrum Sepolia:
 
@@ -123,13 +126,14 @@ Our full end-to-end invariant test script (`contracts/scripts/deploy_and_verify_
 ```
 
 To re-run the verification locally:
+
 ```bash
 node contracts/scripts/deploy_and_verify_v2.mjs
 ```
 
 ---
 
-## 💻 Tech Stack & Repository Structure
+## Tech Stack & Repository Structure
 
 ```text
 StylusSafe/
@@ -159,21 +163,25 @@ StylusSafe/
 
 ---
 
-## 🛠 Getting Started
+## Getting Started
 
 ### Prerequisites
+
 - Node.js >= 18.x
 - Git
 
 ### 1. Web Application
+
 ```bash
 cd web
 npm install
 npm run dev
 ```
+
 Open [http://localhost:3000](http://localhost:3000) to view the Agent Spending Firewall portal.
 
 ### 2. Mobile Application
+
 ```bash
 cd mobile-app
 npm install
@@ -182,6 +190,6 @@ npx expo start
 
 ---
 
-## 🔒 Security & Disclosure Policy
+## Security & Disclosure Policy
 
 All RPC access, paymaster interactions, and faucet operations are proxied via server-side Next.js route handlers (`web/src/app/api/rpc/route.ts`, etc.). No private keys or provider secrets are exposed in tracked client code.

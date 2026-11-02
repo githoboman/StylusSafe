@@ -218,7 +218,7 @@ export default function TradingPage() {
           <div className="bg-surface-zinc rounded-2xl p-6 border border-border-whisper space-y-5">
             <div className="flex items-center justify-between border-b border-border-whisper pb-3">
               <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined text-accent-orange text-lg">policy</span>
+                <IconShield size={18} className="text-accent-orange" />
                 Configure Agent Guardrails
               </h2>
               <span className="text-xs font-mono text-text-muted">Arbitrum Sepolia</span>

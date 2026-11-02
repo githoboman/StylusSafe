@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SignModal } from './SignModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances, USDG_ADDRESS } from '@/hooks/useBalances';
+import { IconCheck, IconSend, IconAlert } from './Icons';
 
 const TOKENS = [
   { symbol: 'USDG', name: 'Global Dollar', address: USDG_ADDRESS as `0x${string}`, decimals: 6, color: '#10B981', isNative: false },
@@ -59,18 +60,18 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
 
   if (status === 'success') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-        <div className="bg-surface-zinc border border-border-whisper rounded-[24px] p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center">
-          <div className="w-16 h-16 rounded-full bg-surface-container border border-border-whisper flex items-center justify-center mb-6">
-            <span className="material-symbols-outlined text-[32px] text-accent-orange">check_circle</span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in font-sans">
+        <div className="bg-[#141418] border border-white/[0.1] rounded-2xl p-8 max-w-md w-full shadow-2xl relative flex flex-col items-center text-white">
+          <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-6 text-emerald-400">
+            <IconCheck size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-text-primary mb-2">Sent Successfully</h2>
-          <p className="text-text-muted text-sm text-center mb-6">Your transaction has been submitted to the bundler and will be confirmed shortly.</p>
+          <h2 className="text-xl font-bold text-white mb-2">Sent Successfully</h2>
+          <p className="text-[#8e8e98] text-xs text-center mb-6">Your transaction has been submitted to the bundler and will be confirmed shortly.</p>
           
           {txHash && (
-            <div className="bg-surface-container rounded-[8px] p-3 w-full mb-6 border border-border-whisper flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-mono tracking-widest text-text-muted">UserOp Hash</span>
-              <a href={`https://jiffyscan.su/userOpHash/${txHash}?network=arbitrum-sepolia`} target="_blank" rel="noreferrer" className="text-sm font-mono text-accent-orange truncate hover:underline">
+            <div className="bg-[#0d0d10] rounded-lg p-3 w-full mb-6 border border-white/[0.06] flex flex-col gap-1">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-[#8e8e98]">UserOp Hash</span>
+              <a href={`https://jiffyscan.su/userOpHash/${txHash}?network=arbitrum-sepolia`} target="_blank" rel="noreferrer" className="text-xs font-mono text-[#ff4500] truncate hover:underline">
                 {txHash}
               </a>
             </div>
@@ -78,7 +79,7 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           
           <button 
             onClick={() => { setStatus('idle'); onClose(); }}
-            className="w-full h-12 bg-surface-container hover:bg-surface-container-high text-text-primary rounded-[4px] font-medium transition-colors"
+            className="w-full h-11 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-md font-medium text-xs transition-colors"
           >
             Close
           </button>
@@ -89,22 +90,25 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-        <div className="bg-surface-zinc border border-border-whisper rounded-[24px] p-6 max-w-md w-full shadow-2xl relative">
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in font-sans">
+        <div className="bg-[#141418] border border-white/[0.1] rounded-2xl p-6 max-w-md w-full shadow-2xl relative text-white">
           <button 
             onClick={onClose}
-            className="absolute top-6 right-6 text-text-muted hover:text-text-primary transition-colors"
+            className="absolute top-6 right-6 text-[#8e8e98] hover:text-white transition-colors"
           >
-            <span className="material-symbols-outlined">close</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
           
           <h2 className="text-2xl font-semibold text-text-primary mb-6 tracking-tight">Send</h2>
           
           {status === 'error' && (
-            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-[4px] p-3 mb-6">
-              <span className="material-symbols-outlined text-red-400 text-[18px]">error</span>
+            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6">
+              <IconAlert size={18} className="text-red-400 shrink-0" />
               <span className="text-xs text-red-400 flex-1">{errorMsg}</span>
-              <button onClick={() => setStatus('idle')} className="text-text-muted hover:text-text-primary"><span className="material-symbols-outlined text-[16px]">close</span></button>
+              <button onClick={() => setStatus('idle')} className="text-[#8e8e98] hover:text-white">✕</button>
             </div>
           )}
 
@@ -162,10 +166,10 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
             <button
               onClick={() => setIsSignOpen(true)}
               disabled={!amount || !recipient || parseFloat(amount) <= 0}
-              className="w-full h-14 bg-accent-orange hover:bg-accent-orange/90 active:translate-y-[1px] disabled:opacity-40 text-white rounded-[4px] font-semibold text-base transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] disabled:opacity-40 text-white rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2 shadow-sm"
             >
-              <span className="material-symbols-outlined text-[20px]">send</span>
-              Send {selectedToken.symbol}
+              <IconSend size={16} />
+              <span>Send {selectedToken.symbol}</span>
             </button>
           </div>
         </div>
