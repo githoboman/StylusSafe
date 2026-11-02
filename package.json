@@ -3,5 +3,25 @@
     "ethers": "^6.17.0",
     "solc": "^0.8.37",
     "viem": "^2.57.3"
-  }
+  },
+  "name": "stylussafe",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">   <img src=\"./web/public/logo.jpg\" alt=\"StylusSafe Logo\" width=\"160\" style=\"border-radius: 24px;\" />   <br />   <h1>StylusSafe</h1>   <p><strong>The Universal Cross-Chain Intent Engine &amp; Autonomous Agent Firewall</strong></p>   <p><em>Built for the Y Combinator Crypto Request for Startups (October 2026)</em></p>",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/githoboman/StylusSafe.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/githoboman/StylusSafe/issues"
+  },
+  "homepage": "https://github.com/githoboman/StylusSafe#readme"
 }
