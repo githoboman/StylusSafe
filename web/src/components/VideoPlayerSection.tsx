@@ -191,3 +191,4 @@ export const VideoPlayerSection: React.FC = () => {
     </div>
   );
 };
+

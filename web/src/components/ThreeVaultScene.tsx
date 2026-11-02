@@ -273,3 +273,4 @@ export const ThreeVaultScene: React.FC<{ className?: string }> = ({ className = 
     </div>
   );
 };
+
