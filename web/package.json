@@ -9,11 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/three": "^0.187.0",
     "ethers": "^6.17.0",
     "motion": "^14.0.0",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "three": "^0.187.0",
     "viem": "^2.56.8"
   },
   "devDependencies": {
