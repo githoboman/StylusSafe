@@ -268,7 +268,7 @@ export const ThreeVaultScene: React.FC<{ className?: string }> = ({ className = 
 
       {/* Interactive Hint */}
       <div className="absolute bottom-4 z-10 text-[11px] font-mono text-[#8e8e98] bg-[#09090b]/80 px-3 py-1 rounded-md border border-white/[0.06] backdrop-blur-sm pointer-events-none transition-opacity duration-300">
-        {isHovered ? '⚡ Interactive 3D Enclave • Rotate with Cursor' : '3D Stylus Vault • Click to Pulse'}
+        {isHovered ? 'Interactive 3D Enclave • Rotate with Cursor' : '3D Stylus Vault • Click to Pulse'}
       </div>
     </div>
   );

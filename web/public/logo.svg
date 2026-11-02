@@ -1,0 +1,17 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="#09090B"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#141418" stroke="#27272A" stroke-width="8"/>
+  
+  <!-- Outer Secure Enclave Polygon -->
+  <path d="M256 96L384 170V342L256 416L128 342V170L256 96Z" stroke="#3F3F46" stroke-width="6" stroke-linejoin="round"/>
+  
+  <!-- Cryptographic Dual Arc (Stylus S-Curve) -->
+  <path d="M184 196C184 164 212 140 256 140H304C338 140 360 162 360 196C360 236 324 256 280 268L232 282C188 294 152 316 152 356C152 390 174 412 216 412H272C316 412 344 388 344 356" 
+        stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Human Root Hardware Node (P-256) -->
+  <circle cx="344" cy="196" r="24" fill="#FF4500"/>
+  
+  <!-- Autonomous Agent Policy Node (USDG) -->
+  <circle cx="168" cy="356" r="24" fill="#10B981"/>
+</svg>

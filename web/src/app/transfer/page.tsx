@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
@@ -109,6 +110,22 @@ export default function TransferPage() {
       if (result) {
         setTxHash(result.userOpHash);
         setStatus('success');
+        try {
+          const stored = localStorage.getItem('invisible_wallet_activity');
+          const existing = stored ? JSON.parse(stored) : [];
+          existing.unshift({
+            id: result.userOpHash || Date.now().toString(),
+            type: 'swap',
+            title: `Swapped ${amount} ${selectedToken.symbol} to ${selectedDestToken.symbol}`,
+            subtitle: `${selectedSourceChain.name} → ${selectedDestChain.name}`,
+            amount: `${amount} ${selectedToken.symbol}`,
+            amountPositive: false,
+            status: 'executed',
+            timestamp: new Date().toISOString(),
+            txHash: result.userOpHash,
+          });
+          localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
+        } catch {}
       } else {
         setStatus('error');
         setErrorMsg('Cross-chain swap failed. Check network connectivity or policy limits.');
@@ -123,7 +140,12 @@ export default function TransferPage() {
   };
 
   return (
-    <div className="p-6 md:p-10 w-full max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="p-6 md:p-10 w-full max-w-5xl mx-auto space-y-8"
+    >
       
       {/* Calm Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
@@ -141,9 +163,9 @@ export default function TransferPage() {
           <button
             type="button"
             onClick={() => setExecutionMode('personal')}
-            className={`px-3 py-1.5 rounded transition-colors ${
+            className={`px-3 py-1.5 rounded transition-all ${
               executionMode === 'personal'
-                ? 'bg-white/[0.1] text-white font-semibold'
+                ? 'bg-white/[0.1] text-white font-semibold shadow-sm'
                 : 'text-[#8e8e98] hover:text-white'
             }`}
           >
@@ -152,7 +174,7 @@ export default function TransferPage() {
           <button
             type="button"
             onClick={() => setExecutionMode('agent')}
-            className={`px-3 py-1.5 rounded transition-colors ${
+            className={`px-3 py-1.5 rounded transition-all ${
               executionMode === 'agent'
                 ? 'bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30'
                 : 'text-[#8e8e98] hover:text-white'
@@ -163,39 +185,53 @@ export default function TransferPage() {
         </div>
       </div>
 
-      {status === 'success' ? (
-        <div className="bg-[#141418] border border-emerald-500/30 rounded-xl p-8 max-w-lg mx-auto text-center space-y-5">
-          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-            <IconCheck size={24} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Intent Submitted</h2>
-            <p className="text-sm text-[#8e8e98] mt-1 max-w-sm mx-auto">
-              Your cross-chain UserOperation was submitted to the bundler. Funds are en route to {selectedDestChain.name}.
-            </p>
-          </div>
-          {txHash && (
-            <div className="p-3 bg-[#09090b] rounded-lg border border-white/[0.06] text-xs font-mono text-[#8e8e98] break-all">
-              Hash: {txHash}
+      <AnimatePresence mode="wait">
+        {status === 'success' ? (
+          <motion.div
+            key="success"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="bg-[#141418] border border-emerald-500/30 rounded-xl p-8 max-w-lg mx-auto text-center space-y-5 shadow-2xl"
+          >
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+              <IconCheck size={24} />
             </div>
-          )}
-          <div className="flex justify-center gap-3 pt-2">
-            <button
-              onClick={() => setStatus('idle')}
-              className="h-10 px-5 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-md text-xs font-semibold transition-colors"
-            >
-              New Swap
-            </button>
-            <Link
-              href="/activity"
-              className="h-10 px-5 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.08] rounded-md text-xs font-semibold flex items-center transition-colors"
-            >
-              View Activity
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="grid lg:grid-cols-12 gap-8 items-start">
+            <div>
+              <h2 className="text-xl font-bold text-white">Intent Submitted</h2>
+              <p className="text-sm text-[#8e8e98] mt-1 max-w-sm mx-auto">
+                Your cross-chain UserOperation was submitted to the bundler. Funds are en route to {selectedDestChain.name}.
+              </p>
+            </div>
+            {txHash && (
+              <div className="p-3 bg-[#09090b] rounded-lg border border-white/[0.06] text-xs font-mono text-[#8e8e98] break-all">
+                Hash: {txHash}
+              </div>
+            )}
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setStatus('idle')}
+                className="h-10 px-5 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-md text-xs font-semibold transition-all shadow-sm"
+              >
+                New Swap
+              </button>
+              <Link
+                href="/activity"
+                className="h-10 px-5 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.98] text-white border border-white/[0.08] rounded-md text-xs font-semibold flex items-center transition-all"
+              >
+                View Activity
+              </Link>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="grid lg:grid-cols-12 gap-8 items-start"
+          >
           
           {/* Main Swap Card (7 Cols) */}
           <div className="lg:col-span-7 bg-[#141418] border border-white/[0.08] rounded-xl p-6 space-y-5 shadow-sm">
@@ -398,8 +434,9 @@ export default function TransferPage() {
 
           </div>
 
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       <SignModal
         isOpen={isModalOpen}
@@ -409,6 +446,6 @@ export default function TransferPage() {
         defaultMode="faceid"
         onSign={handleTransfer}
       />
-    </div>
+    </motion.div>
   );
 }

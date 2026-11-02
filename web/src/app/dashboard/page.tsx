@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { motion } from 'motion/react';
 import { SignModal } from '@/components/SignModal';
 import { FundWalletModal } from '@/components/FundWalletModal';
 import { SendModal } from '@/components/SendModal';
@@ -39,7 +40,12 @@ export default function Dashboard() {
   const netWorth = (usdgValue + usdcValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="p-6 md:p-10 w-full max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="p-6 md:p-10 w-full max-w-6xl mx-auto space-y-8"
+    >
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
@@ -317,6 +323,6 @@ export default function Dashboard() {
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportToken}
       />
-    </div>
+    </motion.div>
   );
 }

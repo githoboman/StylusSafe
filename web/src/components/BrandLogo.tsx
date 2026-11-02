@@ -39,9 +39,9 @@ export function BrandLogo({ size = 28, className = '', showText = true }: BrandL
           strokeLinejoin="round"
         />
 
-        {/* Dynamic Stylus Core Flame (Accent Orange) */}
+        {/* Human Root Key (Orange) & Agent Guardrail Key (Emerald) Nodes */}
         <circle cx="21.5" cy="11" r="2.2" fill="#ff4500" />
-        <circle cx="10.5" cy="21" r="2.2" fill="#ff4500" />
+        <circle cx="10.5" cy="21" r="2.2" fill="#10b981" />
       </svg>
 
       {showText && (

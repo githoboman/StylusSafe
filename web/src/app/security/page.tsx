@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import {
   IconArrowLeft,
@@ -155,7 +156,12 @@ export default function SecurityPage() {
   };
 
   return (
-    <div className="p-6 md:p-10 w-full max-w-4xl mx-auto space-y-8 font-sans animate-in fade-in duration-300">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="p-6 md:p-10 w-full max-w-4xl mx-auto space-y-8 font-sans"
+    >
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
@@ -188,12 +194,19 @@ export default function SecurityPage() {
       </div>
 
       {/* Status Alert Banner */}
-      {statusBanner && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium inline-flex items-center gap-2.5 w-full">
-          <IconCheck size={16} />
-          <span>{statusBanner}</span>
-        </div>
-      )}
+      <AnimatePresence>
+        {statusBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium inline-flex items-center gap-2.5 w-full"
+          >
+            <IconCheck size={16} />
+            <span>{statusBanner}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Enclave Root of Trust Status Card */}
       <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-6 space-y-4">
@@ -398,9 +411,13 @@ export default function SecurityPage() {
                 type="button"
                 onClick={handlePanicRevoke}
                 disabled={revoking}
-                className="h-9 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/30 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 shrink-0"
+                className="h-9 px-4 bg-red-600/10 hover:bg-red-600/20 active:scale-[0.98] text-red-400 border border-red-500/30 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-50 shrink-0"
               >
-                <IconAlert size={14} />
+                {revoking ? (
+                  <span className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                ) : (
+                  <IconAlert size={14} />
+                )}
                 <span>{revoking ? 'Revoking on Stylus...' : 'Panic Revoke Key'}</span>
               </button>
             </div>
@@ -445,6 +462,6 @@ export default function SecurityPage() {
         </div>
       </div>
 
-    </div>
+    </motion.div>
   );
 }

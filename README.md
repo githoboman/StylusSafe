@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./web/public/logo.jpg" alt="StylusSafe Logo" width="160" style="border-radius: 24px;" />
+  <img src="./web/public/logo.svg" alt="StylusSafe Logo" width="120" style="border-radius: 28px;" />
   <br />
   <h1>StylusSafe</h1>
   <p><strong>The Universal Cross-Chain Intent Engine &amp; Autonomous Agent Firewall</strong></p>

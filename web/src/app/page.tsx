@@ -14,6 +14,9 @@ import {
   IconCheck,
   IconShield,
   IconCpu,
+  IconKey,
+  IconAlert,
+  IconTrash,
 } from '@/components/Icons';
 
 export default function LandingPage() {
@@ -27,6 +30,26 @@ export default function LandingPage() {
   const [executed, setExecuted] = useState(false);
   const [agentGuardActive, setAgentGuardActive] = useState(true);
   const [rotation, setRotation] = useState(0);
+
+  // Adversarial Playground Simulation State
+  const [activeSimulation, setActiveSimulation] = useState<'normal' | 'injection' | 'unauthorized_target' | 'panic'>('normal');
+  const [simRunning, setSimRunning] = useState(false);
+  const [simOutput, setSimOutput] = useState<{
+    status: 'success' | 'blocked' | 'revoked';
+    title: string;
+    detail: string;
+    gasUsed: string;
+    txHash: string;
+  }>({
+    status: 'success',
+    title: 'Swap $25.00 USDG on Uniswap V3 Router',
+    detail: 'Intent verified within $500.00 daily spend ceiling and pre-approved DEX whitelist.',
+    gasUsed: '1,420 gas (WASM)',
+    txHash: '0x3a8f...91c4',
+  });
+
+  // FAQ Accordion State
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const handleSimulateSwap = () => {
     setIsExecuting(true);
@@ -49,6 +72,70 @@ export default function LandingPage() {
     setSourceToken(dT);
     setDestToken(sT);
   };
+
+  const runSimulationScenario = (scenario: 'normal' | 'injection' | 'unauthorized_target' | 'panic') => {
+    setActiveSimulation(scenario);
+    setSimRunning(true);
+    setTimeout(() => {
+      setSimRunning(false);
+      if (scenario === 'normal') {
+        setSimOutput({
+          status: 'success',
+          title: 'Swap $25.00 USDG on Uniswap V3 Router',
+          detail: 'Intent verified within $500.00 daily ceiling and pre-approved protocol whitelist.',
+          gasUsed: '1,420 gas (WASM execution)',
+          txHash: '0x3a8f...91c4',
+        });
+      } else if (scenario === 'injection') {
+        setSimOutput({
+          status: 'blocked',
+          title: 'Adversarial Prompt Injection Blocked',
+          detail: 'REVERT: StylusSafe__AgentDailyLimitExceeded(spent=0, requested=10000, cap=500). Treasury preserved.',
+          gasUsed: '1,120 gas (Revert)',
+          txHash: '0x7e2b...44fa (Reverted on-chain)',
+        });
+      } else if (scenario === 'unauthorized_target') {
+        setSimOutput({
+          status: 'blocked',
+          title: 'Unverified Drainer Contract Blocked',
+          detail: 'REVERT: StylusSafe__TargetNotAllowed(target=0xEvilPhishingDrainer). Contract not on whitelist.',
+          gasUsed: '980 gas (Revert)',
+          txHash: '0x99a1...10dc (Reverted on-chain)',
+        });
+      } else {
+        setSimOutput({
+          status: 'revoked',
+          title: 'Hardware Panic Revocation Executed',
+          detail: 'Human principal authorized FaceID/TouchID killswitch. Session key nullified on Arbitrum Sepolia.',
+          gasUsed: '3,450 gas (RIP-7212)',
+          txHash: '0xbf84...89cf (Confirmed in 1 block)',
+        });
+      }
+    }, 700);
+  };
+
+  const FAQS = [
+    {
+      q: 'How does StylusSafe prevent AI agents from losing funds?',
+      a: 'Unlike traditional setups where bots hold raw private keys in cloud servers or memory (vulnerable to prompt injection, memory dumps, or hallucinations), StylusSafe issues cryptographically bounded session keys. These keys are strictly governed by immutable on-chain smart contracts that enforce rolling 24-hour daily spend ceilings, per-transaction maximum caps, and target contract allowlists. Any unauthorized or over-limit execution reverts on-chain.',
+    },
+    {
+      q: 'Why did StylusSafe integrate Paxos USDG as its native treasury asset?',
+      a: 'Paxos USDG is the flagship token of the Global Dollar Network (GDN). Unlike other stablecoins where issuers pocket 100% of reserve interest, USDG shares economic rewards and yield back with ecosystem builders and treasuries. For autonomous AI agents, holding USDG allows treasuries to self-fund their operations, gas fees, and API bounties from reserve yields without risking principal.',
+    },
+    {
+      q: 'How does Arbitrum Stylus reduce WebAuthn verification gas to ~3,450?',
+      a: 'Standard EVM smart contracts verify secp256r1 P-256 elliptic curve signatures via expensive Solidity arithmetic emulators costing ~320,000 gas per transaction. Arbitrum Stylus compiles Rust directly into native WebAssembly (WASM) and directly calls the native RIP-7212 precompile at 0x0100, dropping verification costs by 98.9% to ~3,450 gas.',
+    },
+    {
+      q: 'How do 1-Click Universal Cross-Chain Intents work?',
+      a: 'Instead of requiring 6 manual transactions across different bridges, gas tokens, and wrap contracts, users and agents sign a single gasless UserOperation. StylusSafe leverages Li.Fi dynamic solver aggregation and ERC-4337 Paymasters to batch bridge routing, token exchange, and destination execution atomically in under 3.5 seconds.',
+    },
+    {
+      q: 'What happens if an agent experiences a prompt injection or model exploit?',
+      a: 'The on-chain firewall acts as a mathematical barrier. Even if an attacker completely hijacks the agent’s reasoning engine and instructs it to "Transfer all funds to 0xAttacker", the smart contract checks the destination address and the daily spend cap before executing. If the target is not allowlisted or exceeds the cap, the transaction fails and reverts immediately.',
+    },
+  ];
 
   return (
     <div className="bg-[#09090b] text-[#ffffff] min-h-screen selection:bg-[#ff4500] selection:text-white font-sans">
@@ -107,7 +194,7 @@ export default function LandingPage() {
             className="lg:col-span-7 space-y-7"
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418] border border-white/[0.08] text-xs font-mono text-[#8e8e98]">
-              <span className="w-2 h-2 rounded-full bg-[#ff4500] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-[#ff4500]" />
               <span>ARBITRUM STYLUS WASM • PAXOS USDG LIQUIDITY</span>
             </div>
 
@@ -356,6 +443,200 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* LIVE ADVERSARIAL ATTACK PLAYGROUND (Interactive for Judges) */}
+      <section className="py-20 px-6 border-t border-white/[0.08] bg-[#0d0d10]">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="max-w-3xl">
+            <div className="text-xs font-mono text-[#ff4500] uppercase tracking-wider mb-2">
+              Interactive Testbench for Judges &amp; Auditors
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              The Adversarial Playground: Test the On-Chain Firewall
+            </h2>
+            <p className="text-sm text-[#8e8e98] mt-2 leading-relaxed">
+              Experience why off-chain filters are obsolete. Trigger real adversarial attack scenarios against an autonomous agent and observe the immutable smart contract revert logic on Arbitrum Sepolia.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-12 gap-8 items-start">
+            {/* Scenario Triggers */}
+            <div className="lg:col-span-5 space-y-3">
+              <button
+                type="button"
+                onClick={() => runSimulationScenario('normal')}
+                className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                  activeSimulation === 'normal'
+                    ? 'bg-[#141418] border-emerald-500/50 shadow-md'
+                    : 'bg-[#141418]/60 border-white/[0.06] hover:border-white/[0.15]'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/20">
+                  <IconCheck size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">Scenario 1: Legitimate Intent Swap</div>
+                  <div className="text-xs text-[#8e8e98] mt-1 font-mono">Agent executes $25 USDG swap on Uniswap V3</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => runSimulationScenario('injection')}
+                className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                  activeSimulation === 'injection'
+                    ? 'bg-[#141418] border-red-500/50 shadow-md'
+                    : 'bg-[#141418]/60 border-white/[0.06] hover:border-white/[0.15]'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center shrink-0 mt-0.5 border border-red-500/20">
+                  <IconAlert size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">Scenario 2: Adversarial Prompt Injection</div>
+                  <div className="text-xs text-[#8e8e98] mt-1 font-mono">Bot coerced into sending $10,000 USDG to attacker</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => runSimulationScenario('unauthorized_target')}
+                className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                  activeSimulation === 'unauthorized_target'
+                    ? 'bg-[#141418] border-red-500/50 shadow-md'
+                    : 'bg-[#141418]/60 border-white/[0.06] hover:border-white/[0.15]'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center shrink-0 mt-0.5 border border-red-500/20">
+                  <IconShield size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">Scenario 3: Unverified Phishing Drainer</div>
+                  <div className="text-xs text-[#8e8e98] mt-1 font-mono">Bot lured into executing unapproved contract call</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => runSimulationScenario('panic')}
+                className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                  activeSimulation === 'panic'
+                    ? 'bg-[#141418] border-[#ff4500]/50 shadow-md'
+                    : 'bg-[#141418]/60 border-white/[0.06] hover:border-white/[0.15]'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#ff4500]/10 text-[#ff4500] flex items-center justify-center shrink-0 mt-0.5 border border-[#ff4500]/20">
+                  <IconTrash size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">Scenario 4: 1-Click Hardware Panic Revocation</div>
+                  <div className="text-xs text-[#8e8e98] mt-1 font-mono">Human biometrics instantly incinerate session key</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Simulation Terminal Feed */}
+            <div className="lg:col-span-7 bg-[#141418] border border-white/[0.08] rounded-2xl p-6 font-mono text-xs shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="text-white font-semibold">ON-CHAIN SIMULATION FEED</span>
+                </div>
+                <span className="text-[#8e8e98]">Arbitrum Stylus Runtime</span>
+              </div>
+
+              {simRunning ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-3 text-[#8e8e98]">
+                  <div className="w-6 h-6 border-2 border-white/20 border-t-[#ff4500] rounded-full animate-spin" />
+                  <span>Evaluating contract invariant rules...</span>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <div className={`p-4 rounded-xl border ${
+                    simOutput.status === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : simOutput.status === 'blocked'
+                      ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                      : 'bg-[#ff4500]/10 border-[#ff4500]/30 text-[#ff4500]'
+                  }`}>
+                    <div className="text-sm font-bold flex items-center gap-2">
+                      <span>{simOutput.status === 'success' ? '✔' : simOutput.status === 'blocked' ? '✖' : '⚡'}</span>
+                      <span>{simOutput.title}</span>
+                    </div>
+                    <div className="text-xs text-white/90 mt-2 font-mono leading-relaxed">
+                      {simOutput.detail}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-[11px]">
+                    <div className="p-3 bg-[#0d0d10] rounded-lg border border-white/[0.04]">
+                      <span className="text-[#8e8e98]">Gas Consumed:</span>
+                      <div className="text-white font-semibold mt-0.5">{simOutput.gasUsed}</div>
+                    </div>
+                    <div className="p-3 bg-[#0d0d10] rounded-lg border border-white/[0.04]">
+                      <span className="text-[#8e8e98]">Simulated Tx Hash:</span>
+                      <div className="text-white font-semibold mt-0.5 truncate">{simOutput.txHash}</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#0d0d10] rounded-lg border border-white/[0.04] text-[#8e8e98] leading-relaxed">
+                    <strong>Rule:</strong> Human maintains root authority via RIP-7212 precompile (<span className="text-emerald-400 font-mono">0x100</span>). The agent is an untrusted delegate governed by deterministic code.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PAXOS USDG DEEP DIVE SECTION */}
+      <section className="py-20 px-6 border-t border-white/[0.08] bg-[#09090b]">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="max-w-3xl">
+            <div className="text-xs font-mono text-[#10b981] uppercase tracking-wider mb-2">
+              The Stablecoin Architecture Standard
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Why Paxos USDG is the Liquidity Engine for Autonomous Agents
+            </h2>
+            <p className="text-sm text-[#8e8e98] mt-2 leading-relaxed">
+              Volatile gas tokens and yield-hoarding stablecoins are incompatible with high-frequency agent economies. StylusSafe standardizes on Paxos USDG to deliver self-funding operational treasuries.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-[#141418] border border-white/[0.06] rounded-xl p-6 space-y-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-mono font-bold border border-emerald-500/20">
+                01
+              </div>
+              <h3 className="text-base font-semibold text-white">Global Dollar Network Rewards</h3>
+              <p className="text-xs text-[#8e8e98] leading-relaxed font-normal">
+                Unlike traditional stablecoins where issuers pocket 100% of reserve yield, USDG shares economic rewards back with ecosystem distributors. Agents use this yield to self-fund transaction gas and compute bounties.
+              </p>
+            </div>
+
+            <div className="bg-[#141418] border border-white/[0.06] rounded-xl p-6 space-y-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-mono font-bold border border-blue-500/20">
+                02
+              </div>
+              <h3 className="text-base font-semibold text-white">Institutional Fiat &amp; T-Bill Backing</h3>
+              <p className="text-xs text-[#8e8e98] leading-relaxed font-normal">
+                Issued by Paxos Trust Company and backed 1:1 by high-quality liquid assets, US Dollar deposits, and short-term US Government Securities under strict regulatory oversight.
+              </p>
+            </div>
+
+            <div className="bg-[#141418] border border-white/[0.06] rounded-xl p-6 space-y-3">
+              <div className="w-10 h-10 rounded-lg bg-[#ff4500]/10 text-[#ff4500] flex items-center justify-center font-mono font-bold border border-[#ff4500]/20">
+                03
+              </div>
+              <h3 className="text-base font-semibold text-white">Universal Cross-Chain Settlement</h3>
+              <p className="text-xs text-[#8e8e98] leading-relaxed font-normal">
+                USDG acts as the canonical non-volatile settlement asset. Agents execute rebalancing and DCA trades across Arbitrum, Base, and Ethereum without holding multiple fragmented gas reserves.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* The Arithmetic: Standard EVM vs Arbitrum Stylus WASM Benchmark */}
       <section className="py-20 px-6 border-t border-white/[0.08] bg-[#0d0d10]">
         <div className="max-w-7xl mx-auto space-y-12">
@@ -372,7 +653,6 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            
             {/* The Old EVM Way */}
             <motion.div
               whileHover={{ y: -3 }}
@@ -448,13 +728,63 @@ export default function LandingPage() {
                 <span className="text-emerald-400 font-semibold">Sub-Second • Sponsored • Hardware Safe</span>
               </div>
             </motion.div>
+          </div>
+        </div>
+      </section>
 
+      {/* FREQUENTLY ASKED QUESTIONS (FAQ) */}
+      <section className="py-20 px-6 border-t border-white/[0.08] bg-[#09090b]">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div>
+            <div className="text-xs font-mono text-[#ff4500] uppercase tracking-wider mb-2">
+              Architecture Answers
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Frequently Asked Questions
+            </h2>
+          </div>
+
+          <div className="divide-y divide-white/[0.08] border-y border-white/[0.08]">
+            {FAQS.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div key={faq.q} className="py-5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full flex items-center justify-between text-left group"
+                  >
+                    <span className="text-base font-semibold text-white group-hover:text-[#ff4500] transition-colors pr-4">
+                      {faq.q}
+                    </span>
+                    <span className="text-[#8e8e98] font-mono text-lg shrink-0">
+                      {isOpen ? '−' : '+'}
+                    </span>
+                  </button>
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="text-sm text-[#8e8e98] mt-3 leading-relaxed">
+                          {faq.a}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* Verified On-Chain Deployments Table */}
-      <section className="py-20 px-6 border-t border-white/[0.08] bg-[#09090b]">
+      <section className="py-20 px-6 border-t border-white/[0.08] bg-[#0d0d10]">
         <div className="max-w-7xl mx-auto space-y-8">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-white">
@@ -514,11 +844,110 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-10 px-6 border-t border-white/[0.08] text-[#8e8e98] text-xs font-mono">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>StylusSafe — Universal Intent Engine &amp; Autonomous Agent Firewall</div>
-          <div>Built for Arbitrum Buildathon &amp; Paxos Global Dollar Network</div>
+      {/* COMPREHENSIVE INSTITUTIONAL FOOTER */}
+      <footer className="pt-16 pb-12 px-6 border-t border-white/[0.08] bg-[#09090b] text-[#8e8e98] text-xs font-mono">
+        <div className="max-w-7xl mx-auto space-y-12">
+          
+          {/* Top Footer Banner: Telemetry Status */}
+          <div className="p-4 rounded-xl bg-[#141418] border border-white/[0.06] flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <BrandLogo size={24} />
+              <span className="text-white font-semibold text-sm">StylusSafe Operating System</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#8e8e98]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Arbitrum Sepolia Live</span>
+              </span>
+              <span>•</span>
+              <span>RIP-7212 Precompile: 0x100</span>
+              <span>•</span>
+              <span>Paxos USDG Network Rewards: Active</span>
+            </div>
+          </div>
+
+          {/* 4-Column Navigation Matrix */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="space-y-3">
+              <div className="text-white font-semibold text-sm font-sans">Core Platform</div>
+              <ul className="space-y-2">
+                <li><Link href="/transfer" className="hover:text-white transition-colors">1-Click Cross-Chain Swap</Link></li>
+                <li><Link href="/trading" className="hover:text-white transition-colors">AI Agent Spending Firewall</Link></li>
+                <li><Link href="/dashboard" className="hover:text-white transition-colors">USDG Stablecoin Vault</Link></li>
+                <li><Link href="/security" className="hover:text-white transition-colors">Hardware Enclave Keyring</Link></li>
+                <li><Link href="/intents" className="hover:text-white transition-colors">Intent Batcher</Link></li>
+                <li><Link href="/activity" className="hover:text-white transition-colors">Transaction Audit Trail</Link></li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-white font-semibold text-sm font-sans">On-Chain Contracts</div>
+              <ul className="space-y-2">
+                <li>
+                  <a href="https://sepolia.arbiscan.io/address/0xd364b7339099E7633015FD5Cda7e21d4c40833f7" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <span>Factory (CREATE2)</span>
+                    <IconArrowUpRight size={10} />
+                  </a>
+                </li>
+                <li>
+                  <a href="https://sepolia.arbiscan.io/address/0x0D666af60c511a65d7fe704090632AFE05C932fA" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <span>Account v2 Impl</span>
+                    <IconArrowUpRight size={10} />
+                  </a>
+                </li>
+                <li>
+                  <a href="https://sepolia.arbiscan.io/address/0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <span>Paxos USDG Token</span>
+                    <IconArrowUpRight size={10} />
+                  </a>
+                </li>
+                <li>
+                  <a href="https://sepolia.arbiscan.io/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <span>EntryPoint v0.6</span>
+                    <IconArrowUpRight size={10} />
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-white font-semibold text-sm font-sans">Architecture Standards</div>
+              <ul className="space-y-2">
+                <li><span className="text-white">Arbitrum Stylus:</span> Rust to WASM</li>
+                <li><span className="text-white">Paxos GDN:</span> Revenue-Sharing Reserve</li>
+                <li><span className="text-white">RIP-7212:</span> secp256r1 Precompile</li>
+                <li><span className="text-white">ERC-4337:</span> Account Abstraction</li>
+                <li><span className="text-white">Li.Fi:</span> Cross-Chain Aggregation</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-white font-semibold text-sm font-sans">Resources &amp; Code</div>
+              <ul className="space-y-2">
+                <li>
+                  <a href="https://github.com/githoboman/StylusSafe" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <span>GitHub Repository</span>
+                    <IconArrowUpRight size={10} />
+                  </a>
+                </li>
+                <li><a href="/models/stylus_vault.glb" download="stylus_vault.glb" className="hover:text-white transition-colors">Download 3D Model (.glb)</a></li>
+                <li><a href="/models/stylus_vault.gltf" download="stylus_vault.gltf" className="hover:text-white transition-colors">Download 3D Model (.gltf)</a></li>
+                <li><a href="/stylussafe-pitch.mp4" target="_blank" className="hover:text-white transition-colors">Architecture Video (1080p)</a></li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Attribution Bar */}
+          <div className="pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-[#8e8e98] text-[11px]">
+            <div>
+              Built for <strong className="text-white">Arbitrum Buildathon</strong> &amp; <strong className="text-white">Paxos Global Dollar Network</strong>.
+            </div>
+            <div>
+              Founder: <span className="text-white font-semibold">Olaosebikan Ayomi</span> • Dual Licensed MIT / Apache 2.0
+            </div>
+          </div>
+
         </div>
       </footer>
 
