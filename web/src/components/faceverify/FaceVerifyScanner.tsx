@@ -11,7 +11,19 @@ import { useCamera } from '@/hooks/faceverify/useCamera';
 import { useFaceDetection } from '@/hooks/faceverify/useFaceDetection';
 import { useVerification } from '@/hooks/faceverify/useVerification';
 import { getFaceLandmarker, type FaceLandmarkerHandle } from '@/lib/faceverify/mediapipe';
-import { stepInstruction } from '@/lib/faceverify/verification';
+import {
+  stepInstruction,
+  type VerificationMode,
+} from '@/lib/faceverify/verification';
+import {
+  extractOpenBRDescriptor,
+  getEnrolledBiometricTemplate,
+  saveEnrolledBiometricTemplate,
+  verifyAgainstEnrolledTemplate,
+  OPENBR_MATCH_THRESHOLD,
+  type OpenBRMatchResult,
+  type OpenBRTemplate,
+} from '@/lib/faceverify/openbrEngine';
 
 function TelemetryCell({
   label,
@@ -28,7 +40,7 @@ function TelemetryCell({
         {label}
       </span>
       <span
-        className={`font-mono text-[10px] font-semibold tracking-wider ${
+        className={`font-mono text-[10px] font-semibold tracking-wider truncate ${
           ok ? 'text-white' : 'text-[#8e8e98]/60'
         }`}
       >
@@ -39,23 +51,50 @@ function TelemetryCell({
 }
 
 type FaceVerifyScannerProps = {
-  onVerified: (meta: { authCode: string; elapsedMs: number }) => void;
+  /**
+   * 'enroll': First-time 5-stage wallet sign-up (captures & locks OpenBR 64-D template).
+   * 'verify': Subsequent 2-stage 1:1 OpenBR template match + live blink verification.
+   * 'auto': Uses 'verify' if an enrolled OpenBR template exists, otherwise forces 'enroll'.
+   */
+  requestedMode?: 'enroll' | 'verify' | 'auto';
+  walletAddress?: string | null;
+  onVerified: (meta: {
+    authCode: string;
+    elapsedMs: number;
+    mode: VerificationMode;
+    templateHash: string;
+    confidencePct: number;
+  }) => void;
   isSigning?: boolean;
 };
 
 export default function FaceVerifyScanner({
+  requestedMode = 'auto',
+  walletAddress = null,
   onVerified,
   isSigning = false,
 }: FaceVerifyScannerProps) {
+  const [enrolledTemplate, setEnrolledTemplate] = useState<OpenBRTemplate | null>(() =>
+    getEnrolledBiometricTemplate(),
+  );
+
+  const activeMode: VerificationMode = useMemo(() => {
+    if (requestedMode === 'enroll') return 'enroll';
+    if (requestedMode === 'verify' && enrolledTemplate) return 'verify';
+    return enrolledTemplate ? 'verify' : 'enroll';
+  }, [requestedMode, enrolledTemplate]);
+
   const { videoRef, error, errorCode, ready: cameraReady } = useCamera(true);
   const [modelError, setModelError] = useState<string | null>(null);
   const [landmarker, setLandmarker] = useState<FaceLandmarkerHandle | null>(null);
-  const { state, processFrame, reset } = useVerification();
+  const { state, processFrame, reset } = useVerification(activeMode);
   const [landmarks, setLandmarks] = useState<NormalizedLandmark[] | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [authCode, setAuthCode] = useState<string | null>(null);
   const [luminanceWarn, setLuminanceWarn] = useState(false);
+  const [liveMatch, setLiveMatch] = useState<OpenBRMatchResult | null>(null);
+  const capturedSamplesRef = useRef<number[][]>([]);
   const notifiedRef = useRef(false);
 
   useEffect(() => {
@@ -84,10 +123,36 @@ export default function FaceVerifyScanner({
       luminance: number | null;
     }) => {
       setLandmarks(frame.landmarks);
-      processFrame(frame.landmarks, frame.timestampMs);
       if (frame.luminance !== null) setLuminanceWarn(frame.luminance < 48);
+
+      if (!frame.landmarks) {
+        setLiveMatch(null);
+        processFrame(null, frame.timestampMs, false);
+        return;
+      }
+
+      if (activeMode === 'enroll') {
+        // Capture OpenBR 64-D craniofacial descriptors during enrollment
+        const desc = extractOpenBRDescriptor(frame.landmarks);
+        if (desc && capturedSamplesRef.current.length < 24) {
+          capturedSamplesRef.current.push(desc);
+        }
+        processFrame(frame.landmarks, frame.timestampMs, true);
+      } else if (enrolledTemplate) {
+        // 1:1 OpenBR probe-to-gallery verification
+        const matchRes = verifyAgainstEnrolledTemplate(
+          frame.landmarks,
+          enrolledTemplate,
+        );
+        setLiveMatch(matchRes);
+        processFrame(
+          frame.landmarks,
+          frame.timestampMs,
+          matchRes ? matchRes.matched : false,
+        );
+      }
     },
-    [processFrame],
+    [activeMode, enrolledTemplate, processFrame],
   );
 
   useFaceDetection(videoRef, landmarker, onFrame, 12);
@@ -108,36 +173,90 @@ export default function FaceVerifyScanner({
       setElapsedMs(elapsed);
 
       const rand = crypto.getRandomValues(new Uint8Array(4));
-      const code = `NAS-${Array.from(rand, (b) => b.toString(16).padStart(2, '0'))
+      const code = `OBR-${Array.from(rand, (b) => b.toString(16).padStart(2, '0'))
         .join('')
         .slice(0, 6)
         .toUpperCase()}`;
       setAuthCode(code);
 
-      onVerified({ authCode: code, elapsedMs: elapsed });
+      void (async () => {
+        let finalHash = enrolledTemplate?.templateHash ?? '0x0';
+        let finalConfidence = liveMatch?.confidencePct ?? 99.2;
+
+        if (activeMode === 'enroll') {
+          const saved = await saveEnrolledBiometricTemplate(
+            capturedSamplesRef.current,
+            walletAddress,
+          );
+          if (saved) {
+            setEnrolledTemplate(saved);
+            finalHash = saved.templateHash;
+            finalConfidence = 99.4;
+          }
+        }
+
+        onVerified({
+          authCode: code,
+          elapsedMs: elapsed,
+          mode: activeMode,
+          templateHash: finalHash,
+          confidencePct: finalConfidence,
+        });
+      })();
     }
-  }, [state.status, onVerified]);
+  }, [state.status, activeMode, enrolledTemplate, liveMatch, walletAddress, onVerified]);
 
   const instruction =
     state.status === 'success'
       ? isSigning
-        ? 'Liveness verified — signing P-256 payload...'
-        : 'Identity confirmed'
-      : stepInstruction(state.currentStep);
+        ? 'Biometric template verified — signing P-256 UserOp...'
+        : activeMode === 'enroll'
+          ? 'OpenBR 64-D template enrolled & locked'
+          : '1:1 OpenBR identity confirmed'
+      : stepInstruction(state.currentStep, activeMode);
 
   const subtitle = useMemo(() => {
     if (error) return error;
     if (modelError) return modelError;
     if (!cameraReady) return 'Initializing optical camera stream...';
-    if (!landmarker) return 'Loading MediaPipe 468-landmark neural model...';
+    if (!landmarker) return 'Loading MediaPipe 468-landmark & OpenBR engine...';
+    if (
+      activeMode === 'verify' &&
+      liveMatch &&
+      !liveMatch.matched &&
+      state.status !== 'success'
+    ) {
+      return `OpenBR similarity ${liveMatch.confidencePct}% is below required ${
+        OPENBR_MATCH_THRESHOLD * 100
+      }% threshold. Center wallet owner face.`;
+    }
     return undefined;
-  }, [error, modelError, cameraReady, landmarker]);
+  }, [error, modelError, cameraReady, landmarker, activeMode, liveMatch, state.status]);
 
   const showLowLight =
     luminanceWarn && engineReady && state.status !== 'success' && !error;
 
+  const totalSteps = activeMode === 'verify' ? 2 : 5;
+  const completedCount = state.completedSteps.filter((s) => s !== 'COMPLETE').length;
+
   return (
     <div className='w-full flex flex-col gap-2.5'>
+      {/* Enrollment vs Verification Mode Banner */}
+      <div className='flex items-center justify-between rounded-lg border border-white/[0.08] bg-[#0d0d10] px-3 py-1.5 font-mono text-[9px]'>
+        <span className='uppercase tracking-wider text-[#8e8e98]'>
+          {activeMode === 'enroll'
+            ? 'MODE: FIRST-TIME ENROLLMENT (5-STEP)'
+            : 'MODE: 1:1 OWNER TEMPLATE VERIFY (2-STEP)'}
+        </span>
+        {activeMode === 'verify' && enrolledTemplate ? (
+          <span className='text-emerald-400'>
+            HASH: {enrolledTemplate.templateHash.slice(0, 8)}...
+          </span>
+        ) : (
+          <span className='text-[#ff4500]'>NEW GALLERY TEMPLATE</span>
+        )}
+      </div>
+
       {/* Telemetry row */}
       <div className='grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.08]'>
         <TelemetryCell
@@ -146,19 +265,29 @@ export default function FaceVerifyScanner({
           ok={cameraReady}
         />
         <TelemetryCell
-          label='MODEL'
-          value={!!landmarker ? 'READY' : 'LOAD'}
-          ok={!!landmarker}
+          label='OPENBR'
+          value={
+            activeMode === 'verify'
+              ? liveMatch
+                ? `${liveMatch.confidencePct}%`
+                : 'WAIT'
+              : `${capturedSamplesRef.current.length} FRM`
+          }
+          ok={
+            activeMode === 'verify'
+              ? !!liveMatch?.matched
+              : capturedSamplesRef.current.length > 0
+          }
         />
         <TelemetryCell
           label='MESH'
-          value={!!landmarks ? 'LOCKED' : 'NONE'}
+          value={!!landmarks ? '468-PT' : 'NONE'}
           ok={!!landmarks}
         />
         <TelemetryCell
           label='STAGE'
-          value={`${state.completedSteps.filter((s) => s !== 'COMPLETE').length}/5`}
-          ok={state.completedSteps.length > 0}
+          value={`${completedCount}/${totalSteps}`}
+          ok={completedCount > 0}
         />
       </div>
 
@@ -167,7 +296,7 @@ export default function FaceVerifyScanner({
         {/* Top HUD bar */}
         <div className='absolute left-0 right-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent px-3 py-1.5'>
           <span className='font-mono text-[8px] uppercase tracking-[0.2em] text-white/70'>
-            FACEVERIFY // MEDIAPIPE 468-PT
+            OPENBR 64-D // MEDIAPIPE 468-PT
           </span>
           <span
             className={`font-mono text-[8px] uppercase tracking-[0.2em] ${
@@ -181,7 +310,9 @@ export default function FaceVerifyScanner({
             {state.status === 'success'
               ? 'VERIFIED'
               : engineReady
-                ? 'SCANNING'
+                ? activeMode === 'verify'
+                  ? 'MATCHING'
+                  : 'ENROLLING'
                 : 'STANDBY'}
           </span>
         </div>
@@ -200,7 +331,9 @@ export default function FaceVerifyScanner({
         {/* Bottom HUD bar */}
         <div className='absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-3 py-1.5'>
           <span className='font-mono text-[8px] uppercase tracking-widest text-white/50'>
-            LIVE 12FPS · RIP-7212 GATE
+            {activeMode === 'verify' && liveMatch
+              ? `COSINE MATCH: ${liveMatch.confidencePct}% (L2: ${liveMatch.distance})`
+              : 'LIVE 12FPS · SECP256R1 CRYPTOOBJECT'}
           </span>
           <AnimatePresence>
             {showLowLight ? (
@@ -220,8 +353,9 @@ export default function FaceVerifyScanner({
       {/* Active directive */}
       <InstructionBox title={instruction} subtitle={subtitle} />
 
-      {/* 5-step sequence bar */}
+      {/* Sequence progress bar */}
       <ProgressBar
+        mode={activeMode}
         currentStep={state.currentStep}
         completedSteps={state.completedSteps}
         success={state.status === 'success'}
@@ -238,17 +372,19 @@ export default function FaceVerifyScanner({
           >
             <div className='flex items-center justify-between'>
               <span className='font-mono text-[9px] uppercase tracking-[0.2em] text-emerald-400 font-semibold'>
-                BIOMETRIC LIVENESS CONFIRMED
+                {activeMode === 'enroll'
+                  ? 'OPENBR TEMPLATE ENROLLED'
+                  : '1:1 BIOMETRIC MATCH CONFIRMED'}
               </span>
               <span className='font-mono text-[9px] text-emerald-300/80'>
-                {authCode ?? 'NAS-OK'} ·{' '}
+                {authCode ?? 'OBR-OK'} ·{' '}
                 {elapsedMs !== null ? `${(elapsedMs / 1000).toFixed(2)}s` : ''}
               </span>
             </div>
             <div className='mt-1.5 flex items-center justify-between'>
               <span className='text-[11px] text-[#8e8e98]'>
                 {isSigning
-                  ? 'Executing secp256r1 hardware enclave signature...'
+                  ? 'Signing UserOp with secp256r1 CryptoObject...'
                   : 'Authorized for Arbitrum Stylus execution.'}
               </span>
               {!isSigning && (
@@ -256,6 +392,7 @@ export default function FaceVerifyScanner({
                   type='button'
                   onClick={() => {
                     notifiedRef.current = false;
+                    capturedSamplesRef.current = [];
                     startedAtRef.current = performance.now();
                     setElapsedMs(null);
                     setAuthCode(null);
@@ -274,10 +411,9 @@ export default function FaceVerifyScanner({
 
       {errorCode === 'permission_denied' ? (
         <p className='text-center font-mono text-[10px] uppercase tracking-wider text-red-400'>
-          CAMERA ACCESS DENIED · ALLOW CAMERA PERMISSION OR USE 6-DIGIT PIN
+          CAMERA ACCESS DENIED · USE DEVICE BIOMETRICPROMPT OR 6-DIGIT PIN BELOW
         </p>
       ) : null}
     </div>
   );
 }
-

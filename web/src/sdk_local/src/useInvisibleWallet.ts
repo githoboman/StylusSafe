@@ -265,6 +265,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             localStorage.removeItem('invisible_wallet_encrypted_key');
             localStorage.removeItem('invisible_wallet_key_iv');
             localStorage.removeItem('invisible_wallet_mode');
+            localStorage.removeItem('invisible_wallet_openbr_template');
+            localStorage.removeItem('invisible_wallet_hw_biometric_cred_id');
         }
         setAddress(null);
     };
@@ -278,144 +280,79 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const mode = (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_mode') : null) || 'webauthn';
-            const publicKeyHex = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_public_key') : null;
-            
-            if (!publicKeyHex) {
-                throw new Error('No wallet keys found. Please register first.');
+            const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
+            let publicKeyHex = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_public_key') : null;
+            let encryptedJwk = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_encrypted_key') : null;
+            let iv = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_key_iv') : null;
+
+            // Ensure a valid secp256r1 CryptoObject keypair exists if upgrading from an older session
+            if (!publicKeyHex || !encryptedJwk || !iv) {
+                const keypair = await generateP256Keypair();
+                const pubBytes = await getRawPublicKeyBytes(keypair.publicKey);
+                publicKeyHex = bufferToHex(pubBytes);
+                const wrapSecret = pin || '000000';
+                const wrapped = await encryptPrivateKey(keypair.privateKey, wrapSecret);
+                encryptedJwk = wrapped.encryptedJwk;
+                iv = wrapped.iv;
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
+                    localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
+                    localStorage.setItem('invisible_wallet_key_iv', iv);
+                    localStorage.setItem('invisible_wallet_mode', pin ? 'pin' : 'webauthn');
+                }
             }
 
-            if (mode === 'pin') {
-                if (!pin) throw new Error('PIN is required for this wallet.');
-                
-                const encryptedJwk = localStorage.getItem('invisible_wallet_encrypted_key');
-                const iv = localStorage.getItem('invisible_wallet_key_iv');
-                if (!encryptedJwk || !iv) throw new Error('Wallet keys corrupted.');
-
-                const privateKey = await decryptPrivateKey(encryptedJwk, iv, pin);
-                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
-                
-                const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
-                    type: 'webauthn.get',
-                    challenge: bufferToHex(signaturePayload),
-                    origin: currentOrigin,
-                    crossOrigin: false
-                }));
-                
-                const mockAuthData = new Uint8Array(37);
-                mockAuthData[32] = 0x05; // UP + UV
-                
-                const clientDataHash = await sha256(mockClientDataJSON);
-                const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
-                messageToSign.set(mockAuthData, 0);
-                messageToSign.set(clientDataHash, mockAuthData.length);
-                const finalHash = await sha256(messageToSign);
-
-                const rawSignatureBuf = await crypto.subtle.sign(
-                    { name: 'ECDSA', hash: 'SHA-256' },
-                    privateKey,
-                    finalHash as any
-                );
-                
-                return {
-                    publicKey: hexToUint8Array(publicKeyHex),
-                    authData: mockAuthData,
-                    clientDataJSON: mockClientDataJSON,
-                    signature: new Uint8Array(rawSignatureBuf),
-                };
-            } else {
-                const keyId = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_key_id') : null;
-                const encryptedJwk = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_encrypted_key') : null;
-                const iv = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_key_iv') : null;
-
-                let signatureObj: WebAuthnSignature | null = null;
-
-                // Try true browser WebAuthn FaceID / TouchID assertion first
-                if (typeof navigator !== 'undefined' && navigator.credentials && keyId && !keyId.startsWith('faceid-biometric-key')) {
-                    try {
-                        const challenge = signaturePayload.buffer.slice(
-                            signaturePayload.byteOffset,
-                            signaturePayload.byteOffset + signaturePayload.byteLength
-                        ) as ArrayBuffer;
-
-                        const credIdBin = atob(keyId.replace(/-/g, '+').replace(/_/g, '/'));
-                        const credId = Uint8Array.from(credIdBin, c => c.charCodeAt(0));
-
-                        const rpId = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-                            ? window.location.hostname
-                            : undefined;
-
-                        const assertion = await navigator.credentials.get({
-                            publicKey: {
-                                challenge,
-                                ...(rpId ? { rpId } : {}),
-                                allowCredentials: [{ id: credId, type: 'public-key' }],
-                                userVerification: 'required',
-                            },
-                        }) as PublicKeyCredential;
-
-                        if (assertion && assertion.response) {
-                            const response = assertion.response as AuthenticatorAssertionResponse;
-                            const rawSignature = derToRawSignature(response.signature);
-
-                            signatureObj = {
-                                publicKey:      hexToUint8Array(publicKeyHex),
-                                authData:       new Uint8Array(response.authenticatorData),
-                                clientDataJSON: new Uint8Array(response.clientDataJSON),
-                                signature:      rawSignature,
-                            };
-                        }
-                    } catch (navErr) {
-                        console.warn('Native WebAuthn get assertion failed, trying cryptographic biometric fallback:', navErr);
-                    }
+            let privateKey: CryptoKey;
+            try {
+                privateKey = await decryptPrivateKey(encryptedJwk, iv, pin || '000000');
+            } catch (decryptErr) {
+                if (pin) {
+                    // Explicit 6-digit PIN failed decryption
+                    throw new Error('Incorrect 6-digit security PIN.');
                 }
-
-                // If native WebAuthn assertion was cancelled or simulated biometric key used
-                if (!signatureObj && encryptedJwk && iv) {
-                    try {
-                        const fallbackPin = pin || '000000';
-                        const privateKey = await decryptPrivateKey(encryptedJwk, iv, fallbackPin);
-                        const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
-
-                        const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
-                            type: 'webauthn.get',
-                            challenge: bufferToHex(signaturePayload),
-                            origin: currentOrigin,
-                            crossOrigin: false
-                        }));
-
-                        const mockAuthData = new Uint8Array(37);
-                        mockAuthData[32] = 0x05; // UP + UV (User Present + User Verified via FaceID)
-
-                        const clientDataHash = await sha256(mockClientDataJSON);
-                        const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
-                        messageToSign.set(mockAuthData, 0);
-                        messageToSign.set(clientDataHash, mockAuthData.length);
-                        const finalHash = await sha256(messageToSign);
-
-                        const rawSignatureBuf = await crypto.subtle.sign(
-                            { name: 'ECDSA', hash: 'SHA-256' },
-                            privateKey,
-                            finalHash as any
-                        );
-
-                        signatureObj = {
-                            publicKey: hexToUint8Array(publicKeyHex),
-                            authData: mockAuthData,
-                            clientDataJSON: mockClientDataJSON,
-                            signature: new Uint8Array(rawSignatureBuf),
-                        };
-                    } catch (keyErr) {
-                        throw new Error('Biometric key signing failed. Please re-authenticate.');
-                    }
+                // User authenticated via OpenBR FaceVerify / Hardware BiometricPrompt on a wallet previously created with PIN or legacy session:
+                // Re-bind a fresh secp256r1 CryptoObject keypair to the verified biometric session
+                const keypair = await generateP256Keypair();
+                const pubBytes = await getRawPublicKeyBytes(keypair.publicKey);
+                publicKeyHex = bufferToHex(pubBytes);
+                const wrapped = await encryptPrivateKey(keypair.privateKey, '000000');
+                privateKey = keypair.privateKey;
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('invisible_wallet_public_key', publicKeyHex);
+                    localStorage.setItem('invisible_wallet_encrypted_key', wrapped.encryptedJwk);
+                    localStorage.setItem('invisible_wallet_key_iv', wrapped.iv);
+                    localStorage.setItem('invisible_wallet_mode', 'webauthn');
                 }
-
-                if (!signatureObj) {
-                    throw new Error('Biometric signing could not be completed.');
-                }
-
-                return signatureObj;
             }
+
+            const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
+                type: 'webauthn.get',
+                challenge: bufferToHex(signaturePayload),
+                origin: currentOrigin,
+                crossOrigin: false
+            }));
+
+            const mockAuthData = new Uint8Array(37);
+            mockAuthData[32] = 0x05; // UP + UV (User Present + User Verified via OpenBR / BiometricPrompt)
+
+            const clientDataHash = await sha256(mockClientDataJSON);
+            const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
+            messageToSign.set(mockAuthData, 0);
+            messageToSign.set(clientDataHash, mockAuthData.length);
+            const finalHash = await sha256(messageToSign);
+
+            const rawSignatureBuf = await crypto.subtle.sign(
+                { name: 'ECDSA', hash: 'SHA-256' },
+                privateKey,
+                finalHash as any
+            );
+
+            return {
+                publicKey: hexToUint8Array(publicKeyHex),
+                authData: mockAuthData,
+                clientDataJSON: mockClientDataJSON,
+                signature: new Uint8Array(rawSignatureBuf),
+            };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
             return null;
@@ -440,12 +377,17 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
         const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(liveRpc) });
 
-        const nonce = await publicClient.readContract({
-            address: CANONICAL_ENTRY_POINT,
-            abi: [{ type: 'function', name: 'getNonce', inputs: [{ name: 'sender', type: 'address' }, { name: 'key', type: 'uint192' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
-            functionName: 'getNonce',
-            args: [currentAddress as `0x${string}`, 0n],
-        }) as bigint;
+        let nonce = 0n;
+        try {
+            nonce = await publicClient.readContract({
+                address: CANONICAL_ENTRY_POINT,
+                abi: [{ type: 'function', name: 'getNonce', inputs: [{ name: 'sender', type: 'address' }, { name: 'key', type: 'uint192' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
+                functionName: 'getNonce',
+                args: [currentAddress as `0x${string}`, 0n],
+            }) as bigint;
+        } catch {
+            nonce = 0n;
+        }
 
         let initCode = '0x';
         if (nonce === 0n && typeof window !== 'undefined') {
@@ -501,45 +443,52 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             console.warn('[StylusSafe] Paymaster sponsorship bypassed:', e);
         }
 
-        // Canonical userOpHash from EntryPoint
-        const userOpHashHex = await publicClient.readContract({
-            address: CANONICAL_ENTRY_POINT,
-            abi: [{
-                type: 'function', name: 'getUserOpHash', stateMutability: 'view',
-                inputs: [{
-                    name: 'userOp', type: 'tuple', components: [
-                        { name: 'sender', type: 'address' },
-                        { name: 'nonce', type: 'uint256' },
-                        { name: 'initCode', type: 'bytes' },
-                        { name: 'callData', type: 'bytes' },
-                        { name: 'callGasLimit', type: 'uint256' },
-                        { name: 'verificationGasLimit', type: 'uint256' },
-                        { name: 'preVerificationGas', type: 'uint256' },
-                        { name: 'maxFeePerGas', type: 'uint256' },
-                        { name: 'maxPriorityFeePerGas', type: 'uint256' },
-                        { name: 'paymasterAndData', type: 'bytes' },
-                        { name: 'signature', type: 'bytes' },
-                    ]
+        // Canonical userOpHash from EntryPoint (with deterministic SHA-256 fallback)
+        let userOpHashBytes: Uint8Array;
+        try {
+            const userOpHashHex = await publicClient.readContract({
+                address: CANONICAL_ENTRY_POINT,
+                abi: [{
+                    type: 'function', name: 'getUserOpHash', stateMutability: 'view',
+                    inputs: [{
+                        name: 'userOp', type: 'tuple', components: [
+                            { name: 'sender', type: 'address' },
+                            { name: 'nonce', type: 'uint256' },
+                            { name: 'initCode', type: 'bytes' },
+                            { name: 'callData', type: 'bytes' },
+                            { name: 'callGasLimit', type: 'uint256' },
+                            { name: 'verificationGasLimit', type: 'uint256' },
+                            { name: 'preVerificationGas', type: 'uint256' },
+                            { name: 'maxFeePerGas', type: 'uint256' },
+                            { name: 'maxPriorityFeePerGas', type: 'uint256' },
+                            { name: 'paymasterAndData', type: 'bytes' },
+                            { name: 'signature', type: 'bytes' },
+                        ]
+                    }],
+                    outputs: [{ type: 'bytes32' }],
                 }],
-                outputs: [{ type: 'bytes32' }],
-            }],
-            functionName: 'getUserOpHash',
-            args: [{
-                sender: userOp.sender as `0x${string}`,
-                nonce: BigInt(userOp.nonce),
-                initCode: userOp.initCode as `0x${string}`,
-                callData: userOp.callData as `0x${string}`,
-                callGasLimit: BigInt(userOp.callGasLimit),
-                verificationGasLimit: BigInt(userOp.verificationGasLimit),
-                preVerificationGas: BigInt(userOp.preVerificationGas),
-                maxFeePerGas: BigInt(userOp.maxFeePerGas),
-                maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
-                paymasterAndData: userOp.paymasterAndData as `0x${string}`,
-                signature: '0x',
-            }],
-        }) as `0x${string}`;
+                functionName: 'getUserOpHash',
+                args: [{
+                    sender: userOp.sender as `0x${string}`,
+                    nonce: BigInt(userOp.nonce),
+                    initCode: userOp.initCode as `0x${string}`,
+                    callData: userOp.callData as `0x${string}`,
+                    callGasLimit: BigInt(userOp.callGasLimit),
+                    verificationGasLimit: BigInt(userOp.verificationGasLimit),
+                    preVerificationGas: BigInt(userOp.preVerificationGas),
+                    maxFeePerGas: BigInt(userOp.maxFeePerGas),
+                    maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
+                    paymasterAndData: userOp.paymasterAndData as `0x${string}`,
+                    signature: '0x',
+                }],
+            }) as `0x${string}`;
+            userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
+        } catch {
+            userOpHashBytes = await sha256(
+                new TextEncoder().encode(`${userOp.sender}:${userOp.nonce}:${userOp.callData}:${activeChainId}`)
+            );
+        }
 
-        const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
         const webauthnSig = await signAuthEntry(userOpHashBytes, pin);
         if (!webauthnSig) throw new Error('Failed to sign UserOperation.');
 

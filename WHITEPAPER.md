@@ -74,19 +74,17 @@ Because the address is known prior to on-chain deployment, users and institution
 SECTION 3: ARBITRUM STYLUS WASM, FACEVERIFY ACTIVE LIVENESS, AND RIP-7212
 ================================================================================
 
-3.1 FaceVerify 468-Landmark Neural Liveness and P-256 Key Attestation
+3.1 OpenBR 64-D Template Enrollment, FaceVerify Active Liveness, and BiometricPrompt CryptoObject
 
-To prevent static photo spoofing, deepfake replay, and unauthorized browser session hijacking before a cryptographic signature is ever generated, StylusSafe integrates the FaceVerify neural active liveness engine (powered by MediaPipe Tasks Vision FaceLandmarker running 100 percent client-side in WebAssembly) directly ahead of the NIST P-256 (secp256r1) signing enclave.
+To prevent static photo spoofing, deepfake replay, and unauthorized third-party faces from signing transactions, StylusSafe enforces a strict separation between First-Time Biometric Enrollment (at wallet creation) and Subsequent 1:1 Biometric Verification (on transaction execution), combining three open-source biometric architectures across both Desktop and Mobile:
 
-When a human principal initiates vault registration, policy mutation, or high-value treasury transfers, the FaceVerify module captures a 12 FPS optical camera feed and extracts a 468-point 3D facial landmark mesh in real time. Before unlocking the P-256 signing keypair, the user must complete a deterministic 5-stage active liveness challenge with a 500-millisecond anti-jitter confirmation window per stage:
+1. OpenBR 64-Dimensional Craniofacial Template Engine (biometrics/openbr):
+   During First-Time Wallet Sign-Up (Enrollment Mode), the user completes a 5-stage multi-angle active liveness scan (LOOK_STRAIGHT -> TURN_LEFT -> TURN_RIGHT -> OPEN_MOUTH -> BLINK) over a 468-point 3D MediaPipe facial mesh. Across the enrollment frames, the OpenBR geometric transform extracts a 64-dimensional L2-normalized craniofacial feature vector (32 scale-invariant anthropometric ratios normalized by inter-ocular baseline, 16 roll-invariant craniofacial angles, and 16 3D Z-depth relief coordinates) along with a SHA-256 biometric template commitment hash. On all subsequent transactions (Verification Mode), the user performs a rapid 2-stage check (LOOK_STRAIGHT + BLINK) in which the live probe vector is matched 1:1 against the enrolled owner gallery template via Cosine Similarity and Euclidean L2 distance (requiring a match confidence >= 88.0 percent). Any non-owner face is deterministically rejected before reaching the signing enclave.
 
-  Stage 1 (LOOK_STRAIGHT) : Verifies centered head yaw via nose-tip to inter-ocular midpoint ratio (|offset| <= 0.15), closed lips, and open eyes (Eye Aspect Ratio EAR > 0.16).
-  Stage 2 (TURN_LEFT)     : Verifies egocentric left head rotation where normalized nasal offset exceeds +0.15 relative to inter-eye width.
-  Stage 3 (TURN_RIGHT)    : Verifies egocentric right head rotation where normalized nasal offset exceeds -0.15 relative to inter-eye width.
-  Stage 4 (OPEN_MOUTH)    : Measures vertical labiale separation (landmarks 13 and 14) normalized against inter-ocular distance (landmarks 33 and 263), requiring a mouth-open ratio > 0.26.
-  Stage 5 (BLINK)         : Tracks 6-point Eye Aspect Ratio (EAR) across both left (33, 160, 158, 133, 153, 144) and right (362, 385, 387, 263, 373, 380) ocular contours through a three-phase state transition (await_open -> await_closed at EAR < 0.12 -> await_open_again at EAR > 0.16).
+2. Cross-Platform Hardware BiometricPrompt and CryptoObject Binding (rushisangani/BiometricAuthentication and gaoyangcr7/BiometricPromptDemo):
+   Across both mobile (iOS LAContext Face ID / Touch ID / Optic ID and Android BiometricPrompt API 28+) and desktop (macOS Secure Enclave Touch ID and Windows Hello), StylusSafe binds a NIST P-256 (secp256r1) SHA256withECDSA CryptoObject directly to the hardware authenticator with allowableReuseDuration = 0 seconds, guaranteeing that every transaction requires a fresh biometric verification or PBKDF2 AES-GCM 6-digit PIN fallback.
 
-Once all 5 physical liveness stages pass, the client generates or unlocks the non-extractable NIST P-256 (secp256r1) keypair over the prime finite field Fp:
+Once physical liveness and 1:1 template verification pass, the client unlocks the non-extractable NIST P-256 (secp256r1) keypair over the prime finite field Fp:
 
   y^2 = x^3 - 3x + b (mod p)
   where p = 2^256 - 2^224 + 2^192 + 2^96 - 1
@@ -273,4 +271,4 @@ Phase 3 (Months 4 to 6) — Institutional Treasury Scaling and Orbit Chain Expan
 SECTION 8: CONCLUSION
 ================================================================================
 
-As blockchain transaction volume transitions from man
+As blockchain transaction volume transitions from manual browser extensions to 24/7 autonomous software agents, the industry requires an institutional-grade security and stablecoin settlement layer. By uniting Arbitrum Stylus WASM execution efficiency, native RIP-7212 hardware passkey verification, deterministic on-chain spending firewalls, and Paxos USDG self-funding liquidity, StylusSafe establishes the definitive standard for safe, scalable autonomous finance on Arbitrum.

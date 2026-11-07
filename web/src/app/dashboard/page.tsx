@@ -295,9 +295,10 @@ export default function Dashboard() {
       <SignModal 
         isOpen={isSignModalOpen}
         onClose={() => setIsSignModalOpen(false)}
-        actionText={isRegistering ? "Register Hardware Passkey" : "Authenticate FaceID"}
+        actionText={isRegistering ? "Enroll OpenBR Biometrics & Create Vault" : "Verify Owner Biometrics"}
         amountText="Free / Sponsored Gas"
         defaultMode="faceid"
+        enrollmentMode={isRegistering}
         onSign={async (pin) => {
           if (isRegistering) {
             await register('stylussafe-vault', pin || undefined);

@@ -14,9 +14,12 @@ export type Step =
   | 'BLINK'
   | 'COMPLETE';
 
+export type VerificationMode = 'enroll' | 'verify';
+
 export type VerificationStatus = 'idle' | 'detecting' | 'success';
 
-export const STEP_ORDER: Step[] = [
+/** Full 5-stage multi-angle liveness sequence for First-Time Wallet Sign-Up (Enrollment) */
+export const ENROLL_STEP_ORDER: Step[] = [
   'LOOK_STRAIGHT',
   'TURN_LEFT',
   'TURN_RIGHT',
@@ -25,7 +28,20 @@ export const STEP_ORDER: Step[] = [
   'COMPLETE',
 ];
 
-export const CONFIRM_MS = 500;
+/** Fast 2-stage 1:1 OpenBR Template Match + Active Blink sequence for Transaction Signing */
+export const VERIFY_STEP_ORDER: Step[] = [
+  'LOOK_STRAIGHT',
+  'BLINK',
+  'COMPLETE',
+];
+
+export const STEP_ORDER = ENROLL_STEP_ORDER;
+
+export function getStepsForMode(mode: VerificationMode): Step[] {
+  return mode === 'verify' ? VERIFY_STEP_ORDER : ENROLL_STEP_ORDER;
+}
+
+export const CONFIRM_MS = 450;
 
 /** Consecutive failed frames before dropping a pending confirmation (reduces mobile jitter). */
 const CONFIRM_MISS_FRAMES = 8;
@@ -37,6 +53,7 @@ export type BlinkPhase =
   | 'blink_done';
 
 export type VerificationState = {
+  mode: VerificationMode;
   currentStep: Step;
   completedSteps: Step[];
   status: VerificationStatus;
@@ -45,8 +62,11 @@ export type VerificationState = {
   confirmMissStreak: number;
 };
 
-export function initialVerificationState(): VerificationState {
+export function initialVerificationState(
+  mode: VerificationMode = 'enroll',
+): VerificationState {
   return {
+    mode,
     currentStep: 'LOOK_STRAIGHT',
     completedSteps: [],
     status: 'idle',
@@ -87,7 +107,10 @@ function stepConditionMet(
   step: Step,
   landmarks: NormalizedLandmark[],
   blink: { phase: BlinkPhase; sequenceDone: boolean },
+  templateMatched: boolean,
 ): boolean {
+  if (!templateMatched) return false;
+
   const head = detectHeadTurn(landmarks);
   const mouthOpen = detectMouthOpen(landmarks);
 
@@ -111,6 +134,7 @@ export function reduceVerification(
   prev: VerificationState,
   landmarks: NormalizedLandmark[] | null,
   nowMs: number,
+  templateMatched = true,
 ): VerificationState {
   if (prev.currentStep === 'COMPLETE' || prev.status === 'success') {
     return prev;
@@ -137,10 +161,15 @@ export function reduceVerification(
     blinkSeqDone = b.sequenceDone;
   }
 
-  const met = stepConditionMet(prev.currentStep, landmarks, {
-    phase: blinkPhase,
-    sequenceDone: blinkSeqDone,
-  });
+  const met = stepConditionMet(
+    prev.currentStep,
+    landmarks,
+    {
+      phase: blinkPhase,
+      sequenceDone: blinkSeqDone,
+    },
+    templateMatched,
+  );
 
   if (!met) {
     const streak = prev.confirmMissStreak + 1;
@@ -181,9 +210,10 @@ export function reduceVerification(
     };
   }
 
+  const sequence = getStepsForMode(prev.mode);
   const completed = [...prev.completedSteps, prev.currentStep];
-  const idx = STEP_ORDER.indexOf(prev.currentStep);
-  const nextStep = STEP_ORDER[idx + 1] ?? 'COMPLETE';
+  const idx = sequence.indexOf(prev.currentStep);
+  const nextStep = sequence[idx + 1] ?? 'COMPLETE';
 
   if (nextStep === 'COMPLETE') {
     return {
@@ -203,27 +233,30 @@ export function reduceVerification(
     completedSteps: completed,
     status,
     pendingSince: null,
-    blinkPhase: nextStep === 'BLINK' ? 'await_open' : 'await_open',
+    blinkPhase: 'await_open',
     confirmMissStreak: 0,
   };
 }
 
-export function stepInstruction(step: Step): string {
+export function stepInstruction(step: Step, mode: VerificationMode = 'enroll'): string {
   switch (step) {
     case 'LOOK_STRAIGHT':
-      return 'Look straight at the camera';
+      return mode === 'verify'
+        ? 'Align face with enrolled OpenBR template'
+        : 'Look straight at the camera to enroll template';
     case 'TURN_LEFT':
-      return 'Turn your head left';
+      return 'Turn your head left (3D depth calibration)';
     case 'TURN_RIGHT':
-      return 'Turn your head right';
+      return 'Turn your head right (3D depth calibration)';
     case 'OPEN_MOUTH':
-      return 'Open your mouth';
+      return 'Open your mouth (craniofacial ratio check)';
     case 'BLINK':
-      return 'Blink once';
+      return 'Blink once to confirm live presence';
     case 'COMPLETE':
-      return 'Verification complete';
+      return mode === 'verify'
+        ? '1:1 Biometric match & liveness confirmed'
+        : '5-stage biometric enrollment complete';
     default:
       return '';
   }
 }
-

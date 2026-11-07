@@ -1,18 +1,21 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { STEP_ORDER, type Step } from '@/lib/faceverify/verification';
+import {
+  getStepsForMode,
+  type Step,
+  type VerificationMode,
+} from '@/lib/faceverify/verification';
 
 type Props = {
+  mode?: VerificationMode;
   currentStep: Step;
   completedSteps: Step[];
   success: boolean;
 };
 
-const ACTIVE = STEP_ORDER.filter((s) => s !== 'COMPLETE');
-
 const STEP_LABELS: Partial<Record<Step, string>> = {
-  LOOK_STRAIGHT: 'LOOK',
+  LOOK_STRAIGHT: 'MATCH',
   TURN_LEFT: 'LEFT',
   TURN_RIGHT: 'RIGHT',
   OPEN_MOUTH: 'MOUTH',
@@ -20,18 +23,24 @@ const STEP_LABELS: Partial<Record<Step, string>> = {
 };
 
 export default function ProgressBar({
+  mode = 'enroll',
   currentStep,
   completedSteps,
   success,
 }: Props) {
-  const total = ACTIVE.length;
+  const activeSteps = getStepsForMode(mode).filter((s) => s !== 'COMPLETE');
+  const total = activeSteps.length;
   const done = completedSteps.filter((s) => s !== 'COMPLETE').length;
   const linePct = success ? 100 : (done / total) * 100;
 
   return (
     <div className='w-full rounded-xl border border-white/[0.08] bg-[#0d0d10] px-3.5 py-2.5'>
       <div className='mb-2.5 flex items-center justify-between font-mono text-[8px] uppercase tracking-[0.22em]'>
-        <span className='text-[#8e8e98]'>ACTIVE LIVENESS SEQUENCE</span>
+        <span className='text-[#8e8e98]'>
+          {mode === 'verify'
+            ? '1:1 OPENBR MATCH + LIVENESS'
+            : 'FIRST-TIME 5-STAGE ENROLLMENT'}
+        </span>
         <span className='text-white font-semibold'>
           {done}/{total}
         </span>
@@ -53,7 +62,7 @@ export default function ProgressBar({
 
         {/* Step nodes */}
         <div className='relative flex justify-between'>
-          {ACTIVE.map((step, i) => {
+          {activeSteps.map((step, i) => {
             const isDone = completedSteps.includes(step);
             const isActive = currentStep === step && !isDone && !success;
 
@@ -107,7 +116,9 @@ export default function ProgressBar({
                         : 'text-[#8e8e98]'
                   }`}
                 >
-                  {STEP_LABELS[step]}
+                  {mode === 'enroll' && step === 'LOOK_STRAIGHT'
+                    ? 'LOOK'
+                    : STEP_LABELS[step]}
                 </span>
               </div>
             );
@@ -117,4 +128,3 @@ export default function ProgressBar({
     </div>
   );
 }
-
