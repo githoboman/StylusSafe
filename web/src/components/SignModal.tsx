@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { IconCheck, IconFace, IconFingerprint, IconDialpad } from '@/components/Icons';
+import { IconCheck, IconFace, IconDialpad } from '@/components/Icons';
+import FaceVerifyScanner from '@/components/faceverify/FaceVerifyScanner';
 
 type SignModalProps = {
   isOpen: boolean;
@@ -35,26 +36,25 @@ export function SignModal({
     }
   }, [isOpen, defaultMode]);
 
-  if (!isOpen) return null;
-
-  const handleFaceIDAuth = async () => {
+  const handleFaceVerified = useCallback(async () => {
     setStatus('scanning');
     setError(null);
     try {
       if (onSign) {
-        // Calling with empty string tells useInvisibleWallet to use native WebAuthn / Face ID
         await onSign('');
       }
       setStatus('success');
       setTimeout(() => {
         onClose();
-      }, 900);
+      }, 950);
     } catch (err: any) {
-      console.error('Face ID Error:', err);
+      console.error('FaceVerify Signature Error:', err);
       setStatus('error');
-      setError(err?.message || 'Face ID authentication was cancelled or unavailable.');
+      setError(err?.message || 'Cryptographic P-256 signature failed after FaceVerify liveness.');
     }
-  };
+  }, [onSign, onClose]);
+
+  if (!isOpen) return null;
 
   const handleKeyPress = (num: number) => {
     if (pin.length < 6) {
@@ -94,7 +94,7 @@ export function SignModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-[#09090b]/80 backdrop-blur-md"
+        className="absolute inset-0 bg-[#09090b]/85 backdrop-blur-md"
         onClick={status === 'scanning' ? undefined : onClose}
       />
 
@@ -104,25 +104,45 @@ export function SignModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }}
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-sm bg-[#141418] rounded-2xl border border-white/[0.1] shadow-2xl overflow-hidden text-white"
+        className="relative w-full max-w-md bg-[#141418] rounded-2xl border border-white/[0.1] shadow-2xl overflow-hidden text-white max-h-[92vh] overflow-y-auto"
       >
-        <div className="p-6 flex flex-col items-center text-center">
+        <div className="p-5 flex flex-col items-center text-center">
+
+          {/* Header Bar */}
+          <div className="w-full flex items-center justify-between mb-3 pb-2.5 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-[#ff4500]/15 border border-[#ff4500]/40 flex items-center justify-center text-[#ff4500] font-mono text-[10px] font-bold">
+                FV
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-semibold text-white tracking-tight">
+                  FaceVerify Neural Liveness
+                </div>
+                <div className="text-[9px] font-mono uppercase tracking-widest text-[#8e8e98]">
+                  MediaPipe 468-Landmark · RIP-7212 P-256
+                </div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] font-mono text-[9px] uppercase tracking-wider text-emerald-400">
+              0x100 Enclave
+            </span>
+          </div>
 
           {/* Action & Amount Context Card */}
-          <div className="w-full bg-[#0d0d10] rounded-xl p-3.5 mb-5 border border-white/[0.06] text-left space-y-1.5 text-xs">
+          <div className="w-full bg-[#0d0d10] rounded-xl p-3 mb-3.5 border border-white/[0.06] text-left space-y-1 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-[#8e8e98] font-mono text-[11px] uppercase tracking-wider">Action</span>
-              <span className="text-white font-medium truncate max-w-[200px]">{actionText}</span>
+              <span className="text-[#8e8e98] font-mono text-[10px] uppercase tracking-wider">Intent</span>
+              <span className="text-white font-medium truncate max-w-[240px]">{actionText}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[#8e8e98] font-mono text-[11px] uppercase tracking-wider">Parameters</span>
-              <span className="text-white font-mono text-[11px] truncate max-w-[200px]">{amountText}</span>
+              <span className="text-[#8e8e98] font-mono text-[10px] uppercase tracking-wider">Execution</span>
+              <span className="text-white font-mono text-[11px] truncate max-w-[240px]">{amountText}</span>
             </div>
           </div>
 
           <AnimatePresence mode="wait">
             {mode === 'faceid' ? (
-              /* ── Face ID Biometric View ────────────────────────────────────────── */
+              /* ── FaceVerify Optical Liveness View ─────────────────────────────── */
               <motion.div
                 key="faceid-view"
                 initial={{ opacity: 0, y: 10 }}
@@ -131,93 +151,33 @@ export function SignModal({
                 transition={{ duration: 0.2 }}
                 className="w-full flex flex-col items-center"
               >
-                {/* Biometric Scanner HUD Target */}
-                <div className="relative w-28 h-28 my-2 flex items-center justify-center">
-                  
-                  {/* Corner Target Reticles */}
-                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white/40 rounded-tl-md" />
-                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white/40 rounded-tr-md" />
-                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white/40 rounded-bl-md" />
-                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white/40 rounded-br-md" />
+                <FaceVerifyScanner
+                  onVerified={handleFaceVerified}
+                  isSigning={status === 'scanning'}
+                />
 
-                  {/* Pulsing Center Biometric Glyphs */}
-                  <div className="relative w-20 h-20 rounded-2xl bg-[#1b1b21] border border-white/[0.08] flex items-center justify-center overflow-hidden">
-                    {status === 'success' ? (
-                      <motion.div
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="text-emerald-400"
-                      >
-                        <IconCheck size={36} />
-                      </motion.div>
-                    ) : (
-                      <>
-                        <div className={`transition-colors ${
-                          status === 'scanning' ? 'text-[#ff4500]' : 'text-white/80'
-                        }`}>
-                          <IconFace size={38} />
-                        </div>
-
-                        {/* Animated Laser Sweep Line */}
-                        {status === 'scanning' && (
-                          <motion.div
-                            animate={{ y: [-36, 36, -36] }}
-                            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                            className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#ff4500] to-transparent shadow-[0_0_12px_#ff4500]"
-                          />
-                        )}
-                      </>
-                    )}
+                {error && (
+                  <div className="w-full py-2 px-3 mt-2.5 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-lg">
+                    {error}
                   </div>
-                </div>
+                )}
 
-                <h3 className="text-lg font-semibold text-white tracking-tight mt-3 mb-1">
-                  {status === 'scanning' && 'Scanning Face ID...'}
-                  {status === 'success' && 'Biometrics Verified'}
-                  {status === 'error' && 'Verification Needed'}
-                  {status === 'idle' && 'Biometric Authentication'}
-                </h3>
-                <p className="text-xs text-[#8e8e98] mb-5 max-w-[240px]">
-                  {status === 'scanning' && 'Hold device steady to authorize via Secure Enclave.'}
-                  {status === 'success' && 'Signed with native RIP-7212 P-256 precompile.'}
-                  {status === 'error' && (error || 'Please scan Face ID or switch to PIN.')}
-                  {status === 'idle' && 'Authorize using Apple Face ID, Touch ID, or Windows Hello.'}
-                </p>
-
-                {/* Face ID Action Button */}
-                <button
-                  type="button"
-                  onClick={handleFaceIDAuth}
-                  disabled={status === 'scanning' || status === 'success'}
-                  className="w-full h-12 rounded-lg bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.99] text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#ff4500]/20 disabled:opacity-50"
-                >
-                  {status === 'scanning' ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Verifying Biometrics...</span>
-                    </>
-                  ) : status === 'success' ? (
-                    <>
-                      <IconCheck size={16} />
-                      <span>Authorized</span>
-                    </>
-                  ) : (
-                    <>
-                      <IconFingerprint size={16} />
-                      <span>Authenticate with Face ID</span>
-                    </>
-                  )}
-                </button>
+                {status === 'success' && (
+                  <div className="w-full py-2 px-3 mt-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded-lg flex items-center justify-center gap-2 font-mono">
+                    <IconCheck size={15} />
+                    <span>SIGNED VIA RIP-7212 P-256 PRECOMPILE</span>
+                  </div>
+                )}
 
                 {/* Fallback to PIN */}
                 <button
                   type="button"
                   onClick={() => setMode('pin')}
                   disabled={status === 'scanning'}
-                  className="mt-4 text-xs text-[#8e8e98] hover:text-white transition-colors inline-flex items-center gap-1.5 font-mono"
+                  className="mt-3.5 text-xs text-[#8e8e98] hover:text-white transition-colors inline-flex items-center gap-1.5 font-mono"
                 >
                   <IconDialpad size={14} />
-                  <span>Use 6-digit PIN instead</span>
+                  <span>Use 6-digit PIN fallback instead</span>
                 </button>
               </motion.div>
             ) : (
@@ -235,7 +195,7 @@ export function SignModal({
                 </div>
 
                 <h3 className="text-lg font-semibold text-white tracking-tight mb-0.5">Enter Security PIN</h3>
-                <p className="text-xs text-[#8e8e98] mb-4">Fallback authentication method</p>
+                <p className="text-xs text-[#8e8e98] mb-4">AES-GCM PBKDF2 encrypted P-256 fallback</p>
 
                 {/* PIN Dots */}
                 <div className="flex items-center justify-center gap-3 mb-5 h-6">
@@ -310,7 +270,7 @@ export function SignModal({
                   )}
                 </button>
 
-                {/* Switch back to Face ID */}
+                {/* Switch back to FaceVerify */}
                 <button
                   type="button"
                   onClick={() => setMode('faceid')}
@@ -318,7 +278,7 @@ export function SignModal({
                   className="mt-3 text-xs text-[#8e8e98] hover:text-white transition-colors inline-flex items-center gap-1.5 font-mono"
                 >
                   <IconFace size={15} />
-                  <span>Switch back to Face ID</span>
+                  <span>Switch back to FaceVerify Camera</span>
                 </button>
               </motion.div>
             )}
@@ -329,7 +289,7 @@ export function SignModal({
             type="button"
             onClick={onClose}
             disabled={status === 'scanning'}
-            className="mt-4 text-xs font-mono text-[#8e8e98] hover:text-white transition-colors"
+            className="mt-3 text-xs font-mono text-[#8e8e98] hover:text-white transition-colors"
           >
             Cancel
           </button>

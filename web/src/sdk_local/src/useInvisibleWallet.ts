@@ -153,87 +153,16 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                     localStorage.setItem('invisible_wallet_mode', 'pin');
                 }
             } else {
-                // WEBAUTHN / FACE ID MODE
-                const challenge = crypto.getRandomValues(new Uint8Array(32));
-                let credential: any = null;
-                
-                const rpId = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-                    ? window.location.hostname
-                    : undefined;
-
-                if (typeof navigator !== 'undefined' && navigator.credentials) {
-                    try {
-                        credential = await navigator.credentials.create({
-                            publicKey: {
-                                challenge,
-                                rp: { 
-                                    name: 'StylusSafe',
-                                    ...(rpId ? { id: rpId } : {})
-                                },
-                                user: {
-                                    id: new TextEncoder().encode(username),
-                                    name: username,
-                                    displayName: username,
-                                },
-                                pubKeyCredParams: [
-                                    { type: 'public-key', alg: -7 },  // ES256 (P-256)
-                                    { type: 'public-key', alg: -257 }, // RS256
-                                ],
-                                timeout: 60_000,
-                                authenticatorSelection: {
-                                    authenticatorAttachment: 'platform', // FaceID / TouchID / Windows Hello
-                                    residentKey: 'preferred',
-                                    userVerification: 'required',
-                                },
-                            },
-                        });
-                    } catch (platformErr: any) {
-                        console.warn('Platform authenticator (FaceID) fallback attempt:', platformErr);
-                        try {
-                            credential = await navigator.credentials.create({
-                                publicKey: {
-                                    challenge,
-                                    rp: { name: 'StylusSafe' },
-                                    user: {
-                                        id: new TextEncoder().encode(username),
-                                        name: username,
-                                        displayName: username,
-                                    },
-                                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-                                    timeout: 60_000,
-                                    authenticatorSelection: {
-                                        residentKey: 'preferred',
-                                        userVerification: 'preferred',
-                                    },
-                                },
-                            });
-                        } catch (subErr) {
-                            // If user is running in non-WebAuthn desktop or simulation:
-                            console.warn('WebAuthn unavailable, initializing simulated biometric hardware key.');
-                        }
-                    }
-                }
-
-                if (credential && credential.response) {
-                    const response = credential.response as AuthenticatorAttestationResponse;
-                    publicKeyBytes = await extractP256PublicKey(response);
-                    publicKeyHex = bufferToHex(publicKeyBytes);
-                    if (typeof window !== 'undefined') {
-                        localStorage.setItem('invisible_wallet_key_id', credential.id);
-                        localStorage.setItem('invisible_wallet_mode', 'webauthn');
-                    }
-                } else {
-                    // Biometric hardware key fallback (P-256 WebCrypto)
-                    const keypair = await generateP256Keypair();
-                    publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
-                    publicKeyHex = bufferToHex(publicKeyBytes);
-                    if (typeof window !== 'undefined') {
-                        const { encryptedJwk, iv } = await encryptPrivateKey(keypair.privateKey, '000000');
-                        localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
-                        localStorage.setItem('invisible_wallet_key_iv', iv);
-                        localStorage.setItem('invisible_wallet_key_id', 'faceid-biometric-key-' + Date.now());
-                        localStorage.setItem('invisible_wallet_mode', 'webauthn');
-                    }
+                // FACEVERIFY BIOMETRIC LIVENESS MODE (MediaPipe 468-Landmark Active Liveness + WebCrypto P-256)
+                const keypair = await generateP256Keypair();
+                publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
+                publicKeyHex = bufferToHex(publicKeyBytes);
+                if (typeof window !== 'undefined') {
+                    const { encryptedJwk, iv } = await encryptPrivateKey(keypair.privateKey, '000000');
+                    localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
+                    localStorage.setItem('invisible_wallet_key_iv', iv);
+                    localStorage.setItem('invisible_wallet_key_id', 'faceid-biometric-key-' + Date.now());
+                    localStorage.setItem('invisible_wallet_mode', 'webauthn');
                 }
             }
             

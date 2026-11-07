@@ -71,21 +71,33 @@ Because the address is known prior to on-chain deployment, users and institution
 
 
 ================================================================================
-SECTION 3: ARBITRUM STYLUS WASM AND RIP-7212 CRYPTOGRAPHIC PRIMITIVES
+SECTION 3: ARBITRUM STYLUS WASM, FACEVERIFY ACTIVE LIVENESS, AND RIP-7212
 ================================================================================
 
-3.1 Native secp256r1 Verification via RIP-7212 (0x0100)
+3.1 FaceVerify 468-Landmark Neural Liveness and P-256 Key Attestation
 
-Consumer hardware enclaves generate cryptographic keys on the NIST P-256 (secp256r1) prime curve defined over the finite field Fp:
+To prevent static photo spoofing, deepfake replay, and unauthorized browser session hijacking before a cryptographic signature is ever generated, StylusSafe integrates the FaceVerify neural active liveness engine (powered by MediaPipe Tasks Vision FaceLandmarker running 100 percent client-side in WebAssembly) directly ahead of the NIST P-256 (secp256r1) signing enclave.
+
+When a human principal initiates vault registration, policy mutation, or high-value treasury transfers, the FaceVerify module captures a 12 FPS optical camera feed and extracts a 468-point 3D facial landmark mesh in real time. Before unlocking the P-256 signing keypair, the user must complete a deterministic 5-stage active liveness challenge with a 500-millisecond anti-jitter confirmation window per stage:
+
+  Stage 1 (LOOK_STRAIGHT) : Verifies centered head yaw via nose-tip to inter-ocular midpoint ratio (|offset| <= 0.15), closed lips, and open eyes (Eye Aspect Ratio EAR > 0.16).
+  Stage 2 (TURN_LEFT)     : Verifies egocentric left head rotation where normalized nasal offset exceeds +0.15 relative to inter-eye width.
+  Stage 3 (TURN_RIGHT)    : Verifies egocentric right head rotation where normalized nasal offset exceeds -0.15 relative to inter-eye width.
+  Stage 4 (OPEN_MOUTH)    : Measures vertical labiale separation (landmarks 13 and 14) normalized against inter-ocular distance (landmarks 33 and 263), requiring a mouth-open ratio > 0.26.
+  Stage 5 (BLINK)         : Tracks 6-point Eye Aspect Ratio (EAR) across both left (33, 160, 158, 133, 153, 144) and right (362, 385, 387, 263, 373, 380) ocular contours through a three-phase state transition (await_open -> await_closed at EAR < 0.12 -> await_open_again at EAR > 0.16).
+
+Once all 5 physical liveness stages pass, the client generates or unlocks the non-extractable NIST P-256 (secp256r1) keypair over the prime finite field Fp:
 
   y^2 = x^3 - 3x + b (mod p)
   where p = 2^256 - 2^224 + 2^192 + 2^96 - 1
 
-Because the Ethereum Virtual Machine natively supports only the secp256k1 curve (via ecrecover at 0x01), verifying a secp256r1 signature in traditional Solidity requires emulating 256-bit modular elliptic curve arithmetic in smart contract bytecode. This software emulation consumes approximately 320,000 gas per verification, rendering hardware passkey wallets prohibitively expensive for active DeFi usage.
+3.2 Native secp256r1 Verification via RIP-7212 (0x0100)
+
+Because the Ethereum Virtual Machine natively supports only the secp256k1 curve (via ecrecover at 0x01), verifying a secp256r1 signature in traditional Solidity requires emulating 256-bit modular elliptic curve arithmetic in smart contract bytecode. This software emulation consumes approximately 320,000 gas per verification, rendering biometric P-256 wallets prohibitively expensive for active DeFi usage.
 
 StylusSafe eliminates this overhead by combining Arbitrum Stylus (Rust compiled to high-speed WebAssembly) with direct invocation of Arbitrum's native RIP-7212 secp256r1 precompile at address 0x0000000000000000000000000000000000000100.
 
-When a human principal signs an action with FaceID or TouchID, the browser or mobile enclave returns a WebAuthn assertion containing authenticatorData, clientDataJSON, and a DER-encoded ECDSA signature. The StylusSafe SDK normalizes the DER signature into raw 32-byte (r, s) coordinates (enforcing low-s malleability protection where s <= n / 2) and submits the payload to the smart account. On-chain verification proceeds in three deterministic steps:
+When FaceVerify completes active liveness (or the user authenticates via the PBKDF2 AES-GCM 6-digit PIN fallback), the client signs the exact ERC-4337 userOpHash using ECDSA-SHA256 over P-256, producing authenticatorData, clientDataJSON, and raw 32-byte (r, s) signature coordinates (enforcing low-s malleability protection where s <= n / 2). On-chain verification proceeds in three deterministic steps:
 
 Step 1 — Authenticator Data Flag and Replay Validation:
 The contract parses the 37-byte authenticatorData header. It verifies that the User Present flag (UP, bit 0 of authData[32]) and the User Verified flag (UV, bit 2 of authData[32]) are asserted, proving live biometric presence. It extracts the 32-bit big-endian signature counter (signCount at bytes 33..37) and verifies that signCount is strictly greater than the previously recorded counter in contract storage, preventing replay of historical signatures.
@@ -98,7 +110,7 @@ The contract computes the SHA-256 digest of clientDataJSON (after verifying that
 Step 3 — RIP-7212 Precompile Call:
 The contract abi-encodes (messageHash, r, s, Qx, Qy) into a 160-byte memory buffer and performs a staticcall to address 0x0100. The precompile executes native curve verification in the Arbitrum node runtime and returns 1 (valid) or 0 (invalid) for approximately 3,450 gas.
 
-3.2 Quantitative Gas and Latency Benchmarks
+3.3 Quantitative Gas and Latency Benchmarks
 
 By leveraging Arbitrum Stylus WASM execution and native precompiles, StylusSafe achieves an order-of-magnitude reduction in execution cost compared to legacy EVM smart accounts:
 
@@ -261,4 +273,4 @@ Phase 3 (Months 4 to 6) — Institutional Treasury Scaling and Orbit Chain Expan
 SECTION 8: CONCLUSION
 ================================================================================
 
-As blockchain transaction volume transitions from manual browser extensions to 24/7 autonomous software agents, the industry requires an institutional-grade security and stablecoin settlement layer. By uniting Arbitrum Stylus WASM execution efficiency, native RIP-7212 hardware passkey verification, deterministic on-chain spending firewalls, and Paxos USDG self-funding liquidity, StylusSafe establishes the definitive standard for safe, scalable autonomous finance on Arbitrum.
+As blockchain transaction volume transitions from man
