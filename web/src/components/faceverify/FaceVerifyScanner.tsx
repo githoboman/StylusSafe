@@ -16,6 +16,7 @@ import {
   type VerificationMode,
 } from '@/lib/faceverify/verification';
 import {
+  combineEnrollmentDescriptors,
   extractOpenBRDescriptor,
   getEnrolledBiometricTemplate,
   saveEnrolledBiometricTemplate,
@@ -24,6 +25,7 @@ import {
   type OpenBRMatchResult,
   type OpenBRTemplate,
 } from '@/lib/faceverify/openbrEngine';
+import { setLastVerifiedFaceDescriptor } from '@/lib/faceverify/biometricVaultRegistry';
 
 function TelemetryCell({
   label,
@@ -131,12 +133,12 @@ export default function FaceVerifyScanner({
         return;
       }
 
+      const desc = extractOpenBRDescriptor(frame.landmarks);
+      if (desc && capturedSamplesRef.current.length < 24) {
+        capturedSamplesRef.current.push(desc);
+      }
+
       if (activeMode === 'enroll') {
-        // Capture OpenBR 64-D craniofacial descriptors during enrollment
-        const desc = extractOpenBRDescriptor(frame.landmarks);
-        if (desc && capturedSamplesRef.current.length < 24) {
-          capturedSamplesRef.current.push(desc);
-        }
         processFrame(frame.landmarks, frame.timestampMs, true);
       } else if (enrolledTemplate) {
         // 1:1 OpenBR probe-to-gallery verification
@@ -182,6 +184,13 @@ export default function FaceVerifyScanner({
       void (async () => {
         let finalHash = enrolledTemplate?.templateHash ?? '0x0';
         let finalConfidence = liveMatch?.confidencePct ?? 99.2;
+
+        const combinedProbe = combineEnrollmentDescriptors(
+          capturedSamplesRef.current,
+        );
+        if (combinedProbe.length === 64) {
+          setLastVerifiedFaceDescriptor(combinedProbe);
+        }
 
         if (activeMode === 'enroll') {
           const saved = await saveEnrolledBiometricTemplate(

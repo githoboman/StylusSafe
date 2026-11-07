@@ -21,12 +21,16 @@ export function FundWalletModal({ isOpen, onClose, address }: { isOpen: boolean,
       const res = await fetch('/api/faucet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, amount: 1000 }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Faucet request failed');
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Faucet request failed');
       setFaucetStatus('success');
-      setFaucetMsg('Minted 1,000 USDG! Balance will update shortly.');
+      setFaucetMsg(
+        data.txHash
+          ? `Minted 1,000 USDG on-chain (Tx: ${data.txHash.slice(0, 10)}...)! Balance will update shortly.`
+          : 'Minted 1,000 USDG on-chain! Balance will update shortly.'
+      );
     } catch (err: any) {
       setFaucetStatus('error');
       setFaucetMsg(err.message || 'Failed to claim testnet USDG');
