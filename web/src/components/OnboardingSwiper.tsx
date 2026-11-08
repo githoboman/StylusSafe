@@ -579,3 +579,4 @@ export function OnboardingSwiper({ mode = 'inline', onClose }: OnboardingSwiperP
 
   return deckContent;
 }
+

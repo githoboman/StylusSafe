@@ -225,3 +225,4 @@ export function activateBiometricVaultSession(entry: BiometricVaultEntry): void 
     localStorage.setItem('invisible_wallet_openbr_template', JSON.stringify(activeTpl));
   }
 }
+

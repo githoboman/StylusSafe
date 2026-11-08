@@ -29,45 +29,57 @@ export default function TabLayout() {
     >
       <Tabs.Screen
         name="portfolio"
-        options={{ 
-          tabBarLabel: 'Portfolio', 
-          tabBarIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size || 24} color={color} /> 
-        }}
-      />
-      <Tabs.Screen
-        name="transfer"
-        options={{ 
-          tabBarLabel: 'Transfer', 
-          tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal-outline" size={size || 24} color={color} /> 
-        }}
-      />
-      <Tabs.Screen
-        name="security"
-        options={{ 
-          tabBarLabel: 'Security', 
-          tabBarIcon: ({ color, size }) => <Ionicons name="shield-checkmark-outline" size={size || 24} color={color} /> 
-        }}
-      />
-      <Tabs.Screen
-        name="activity"
-        options={{ 
-          tabBarLabel: 'Activity', 
-          tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size || 24} color={color} /> 
+        options={{
+          tabBarLabel: 'Vault',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="wallet-outline" size={size || 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="session-keys"
+        options={{
+          tabBarLabel: 'Firewall',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="shield-half-outline" size={size || 22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="intents"
+        options={{
+          tabBarLabel: 'Intents',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="layers-outline" size={size || 22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="security"
+        options={{
+          tabBarLabel: 'Security',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="finger-print-outline" size={size || 22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          tabBarLabel: 'Activity',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-outline" size={size || 22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="transfer"
         options={{ href: null }}
       />
       <Tabs.Screen
         name="dca"
         options={{ href: null }}
       />
-      <Tabs.Screen
-        name="intents"
-        options={{ href: null }}
-      />
     </Tabs>
   );
 }
-
