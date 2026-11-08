@@ -7,9 +7,10 @@ import { SignModal } from '@/components/SignModal';
 import { FundWalletModal } from '@/components/FundWalletModal';
 import { SendModal } from '@/components/SendModal';
 import { ImportTokenModal } from '@/components/ImportTokenModal';
+import { OnboardingSwiper } from '@/components/OnboardingSwiper';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
-import { IconSwap, IconShield, IconSend, IconArrowRight, IconArrowUpRight, IconFingerprint } from '@/components/Icons';
+import { IconSwap, IconShield, IconSend, IconArrowRight, IconArrowUpRight, IconFingerprint, IconStacks } from '@/components/Icons';
 
 const CHAINS = [
   { name: 'Arbitrum Sepolia', id: 421614 },
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [showOnboardingDeck, setShowOnboardingDeck] = useState(false);
   
   const [selectedChain, setSelectedChain] = useState(421614);
   const { address, register, disconnect, login } = useInvisibleWallet();
@@ -44,24 +46,24 @@ export default function Dashboard() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="p-6 md:p-10 w-full max-w-6xl mx-auto space-y-8"
+      className="p-4 sm:p-6 md:p-10 w-full max-w-6xl mx-auto space-y-6 sm:space-y-8 overflow-x-hidden"
     >
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-white">
             Treasury Vault
           </h1>
           <p className="text-sm text-[#8e8e98] mt-1">
             {address ? (
-              <span className="flex items-center gap-2 flex-wrap font-mono text-xs">
+              <span className="flex items-center gap-2 flex-wrap font-mono text-xs break-all sm:break-normal">
                 <span>Account: <strong className="text-white">{address}</strong></span>
                 <button
                   type="button"
                   onClick={disconnect}
                   title="Disconnect"
-                  className="text-red-400 hover:underline text-[11px]"
+                  className="text-red-400 hover:underline text-[11px] shrink-0"
                 >
                   [disconnect]
                 </button>
@@ -72,7 +74,16 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto text-xs">
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto text-xs">
+          <button
+            type="button"
+            onClick={() => setShowOnboardingDeck((prev) => !prev)}
+            className="h-8 px-3 bg-[#ff4500]/15 hover:bg-[#ff4500]/25 border border-[#ff4500]/30 text-[#ff4500] rounded-md font-mono text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <IconStacks size={14} />
+            <span>{showOnboardingDeck ? 'Hide Onboarding' : 'Swipe Onboarding'}</span>
+          </button>
+
           <div className="flex items-center gap-2 bg-[#141418] border border-white/[0.08] px-3 py-1.5 rounded-md font-mono">
             <span className={`w-1.5 h-1.5 rounded-full ${address ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
             <span className="text-white">
@@ -91,6 +102,18 @@ export default function Dashboard() {
           </select>
         </div>
       </div>
+
+      {/* Interactive Tinder-Swiper Onboarding Deck (Expandable on Dashboard) */}
+      {showOnboardingDeck && (
+        <motion.div
+          initial={{ opacity: 0, y: -12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+          className="bg-[#141418] border border-white/[0.08] rounded-2xl p-4 sm:p-6 shadow-xl"
+        >
+          <OnboardingSwiper mode="inline" onClose={() => setShowOnboardingDeck(false)} />
+        </motion.div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

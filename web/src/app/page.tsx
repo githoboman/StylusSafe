@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BrandLogo } from '@/components/BrandLogo';
 import { ThreeVaultScene } from '@/components/ThreeVaultScene';
 import { VideoPlayerSection } from '@/components/VideoPlayerSection';
+import { OnboardingSwiper } from '@/components/OnboardingSwiper';
 import {
   IconSwap,
   IconArrowRight,
@@ -17,10 +18,15 @@ import {
   IconKey,
   IconAlert,
   IconTrash,
+  IconStacks,
+  IconFingerprint,
+  IconWallet,
 } from '@/components/Icons';
 
 export default function LandingPage() {
-  const [activeHeroTab, setActiveHeroTab] = useState<'3d_vault' | 'intent_swap'>('3d_vault');
+  const [activeHeroTab, setActiveHeroTab] = useState<'onboarding_deck' | '3d_vault' | 'intent_swap'>('onboarding_deck');
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [swapAmount, setSwapAmount] = useState('500');
   const [sourceChain, setSourceChain] = useState('Arbitrum Sepolia');
   const [destChain, setDestChain] = useState('Base');
@@ -138,12 +144,22 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="bg-[#09090b] text-[#ffffff] min-h-screen selection:bg-[#ff4500] selection:text-white font-sans">
+    <div className="bg-[#09090b] text-[#ffffff] min-h-screen selection:bg-[#ff4500] selection:text-white font-sans overflow-x-hidden">
       
-      {/* Navigation Bar */}
-      <header className="border-b border-white/[0.08] bg-[#09090b]/90 sticky top-0 z-50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
+      {/* Full-Screen Onboarding Swiper Modal (Triggered from Header or Mobile Menu) */}
+      <AnimatePresence>
+        {isOnboardingModalOpen && (
+          <OnboardingSwiper
+            mode="modal"
+            onClose={() => setIsOnboardingModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Navigation Bar — Open Swap removed completely, Mobile Drawer added */}
+      <header className="border-b border-white/[0.08] bg-[#09090b]/90 sticky top-0 z-40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <BrandLogo size={28} />
             <span className="text-xs text-[#8e8e98] pl-2 border-l border-white/[0.1] hidden sm:inline font-mono">
               Arbitrum Sepolia
@@ -151,155 +167,274 @@ export default function LandingPage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-normal text-[#8e8e98]">
-            <Link href="/transfer" className="text-white hover:text-white transition-colors">
-              Cross-Chain Swap
+            <button
+              type="button"
+              onClick={() => setIsOnboardingModalOpen(true)}
+              className="text-white hover:text-[#ff4500] transition-colors font-medium cursor-pointer"
+            >
+              Onboarding Deck
+            </button>
+            <Link href="/dashboard" className="hover:text-white transition-colors">
+              Treasury Vault
             </Link>
             <Link href="/trading" className="hover:text-white transition-colors">
               Agent Firewall
             </Link>
-            <Link href="/dashboard" className="hover:text-white transition-colors">
-              Treasury Vault
+            <Link href="/intents" className="hover:text-white transition-colors">
+              Intent Batcher
             </Link>
             <Link href="/security" className="hover:text-white transition-colors">
-              Security
+              Enclave Security
             </Link>
           </nav>
 
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/transfer"
-              className="h-9 px-4 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center transition-all active:scale-[0.98]"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsOnboardingModalOpen(true)}
+              className="h-9 px-3 sm:px-3.5 text-xs font-mono font-medium text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
-              Open Swap
-            </Link>
+              <IconStacks size={14} className="text-[#ff4500]" />
+              <span>Swipe Tour</span>
+            </button>
+
             <Link
               href="/dashboard"
-              className="h-9 px-4 text-xs font-medium text-white bg-[#ff4500] hover:bg-[#e03d00] rounded-md inline-flex items-center transition-all shadow-sm active:scale-[0.98]"
+              className="h-9 px-3.5 sm:px-4 text-xs font-semibold text-white bg-[#ff4500] hover:bg-[#e03d00] rounded-md inline-flex items-center transition-all shadow-sm active:scale-[0.98]"
             >
               Enter Vault
             </Link>
+
+            {/* Mobile Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle Mobile Navigation"
+              className="md:hidden h-9 w-9 rounded-md bg-[#141418] border border-white/[0.08] flex flex-col items-center justify-center gap-1 text-white"
+            >
+              <span
+                className={`block w-4 h-0.5 bg-white transition-transform duration-200 ${
+                  mobileMenuOpen ? 'rotate-45 translate-y-1.5' : ''
+                }`}
+              />
+              <span
+                className={`block w-4 h-0.5 bg-white transition-opacity duration-200 ${
+                  mobileMenuOpen ? 'opacity-0' : 'opacity-100'
+                }`}
+              />
+              <span
+                className={`block w-4 h-0.5 bg-white transition-transform duration-200 ${
+                  mobileMenuOpen ? '-rotate-45 -translate-y-1.5' : ''
+                }`}
+              />
+            </button>
           </div>
         </div>
+
+        {/* Responsive Mobile Navigation Drawer */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="md:hidden overflow-hidden border-t border-white/[0.08] bg-[#0d0d10]"
+            >
+              <div className="px-4 py-4 space-y-2 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setIsOnboardingModalOpen(true);
+                  }}
+                  className="w-full p-3 rounded-lg bg-[#ff4500]/10 border border-[#ff4500]/30 text-[#ff4500] font-semibold flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <IconStacks size={15} />
+                    <span>Launch Interactive Onboarding Swiper</span>
+                  </span>
+                  <IconArrowRight size={14} />
+                </button>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] text-white flex items-center gap-2"
+                  >
+                    <IconWallet size={15} className="text-emerald-400" />
+                    <span>Treasury Vault</span>
+                  </Link>
+                  <Link
+                    href="/trading"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] text-white flex items-center gap-2"
+                  >
+                    <IconShield size={15} className="text-blue-400" />
+                    <span>Agent Firewall</span>
+                  </Link>
+                  <Link
+                    href="/intents"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] text-white flex items-center gap-2"
+                  >
+                    <IconStacks size={15} className="text-purple-400" />
+                    <span>Intent Batcher</span>
+                  </Link>
+                  <Link
+                    href="/security"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="p-3 rounded-lg bg-[#141418] border border-white/[0.06] text-white flex items-center gap-2"
+                  >
+                    <IconFingerprint size={15} className="text-[#ff4500]" />
+                    <span>Enclave Security</span>
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Hero Section */}
-      <section className="pt-14 pb-20 md:pt-20 md:pb-28 px-6 max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+      <section className="pt-8 pb-16 sm:pt-14 sm:pb-20 md:pt-20 md:pb-28 px-4 sm:px-6 max-w-7xl mx-auto">
+        <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
           
           {/* Left Column: Thesis & Statement */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-7 space-y-7"
+            className="lg:col-span-6 space-y-6 sm:space-y-7"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418] border border-white/[0.08] text-xs font-mono text-[#8e8e98]">
-              <span className="w-2 h-2 rounded-full bg-[#ff4500]" />
-              <span>ARBITRUM STYLUS WASM • PAXOS USDG LIQUIDITY</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418] border border-white/[0.08] text-[11px] sm:text-xs font-mono text-[#8e8e98]">
+              <span className="w-2 h-2 rounded-full bg-[#ff4500] shrink-0" />
+              <span className="truncate">ARBITRUM STYLUS WASM • PAXOS USDG LIQUIDITY</span>
             </div>
 
             <div className="space-y-4">
-              <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-[1.08]">
-                Universal cross-chain intents with hardware-grade agent guardrails.
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1]">
+                Biometric smart vaults with hardware-grade agent guardrails.
               </h1>
-              <p className="text-lg text-[#8e8e98] leading-relaxed max-w-2xl font-normal">
-                Swap any token across Arbitrum, Base, Optimism, and Ethereum in a single biometric touch with zero native gas tokens. Authorize autonomous AI agents to trade under mathematically enforced on-chain spending caps and instant panic revocation.
+              <p className="text-sm sm:text-lg text-[#8e8e98] leading-relaxed max-w-2xl font-normal">
+                Hold and recover your Arbitrum smart account using OpenBR 64-D facial geometry and hardware Secure Enclave biometrics. Authorize autonomous AI agents to operate under deterministic on-chain USDG spending caps and 1-block panic revocation.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3.5 pt-1">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 pt-1">
               <Link
-                href="/transfer"
-                className="h-11 px-6 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-md font-medium text-sm inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+                href="/dashboard"
+                className="h-11 px-6 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-lg font-semibold text-sm inline-flex items-center justify-center gap-2 transition-all shadow-sm w-full sm:w-auto"
               >
-                <span>Launch Cross-Chain Swap</span>
+                <IconFingerprint size={16} />
+                <span>Enroll Biometric Vault</span>
                 <IconArrowRight size={16} />
               </Link>
               <Link
                 href="/trading"
-                className="h-11 px-6 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.98] text-white border border-white/[0.08] rounded-md font-medium text-sm inline-flex items-center justify-center gap-2 transition-all"
+                className="h-11 px-5 bg-white/[0.06] hover:bg-white/[0.1] active:scale-[0.98] text-white border border-white/[0.08] rounded-lg font-medium text-sm inline-flex items-center justify-center gap-2 transition-all w-full sm:w-auto"
               >
+                <IconShield size={16} className="text-emerald-400" />
                 <span>Configure Agent Policy</span>
               </Link>
-              <a
-                href="/models/stylus_vault.glb"
-                download="stylus_vault.glb"
-                className="h-11 px-4 bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] text-[#8e8e98] hover:text-white border border-white/[0.06] rounded-md font-mono text-xs inline-flex items-center justify-center gap-2 transition-all"
-                title="Download 3D Blender GLB Model"
+              <button
+                type="button"
+                onClick={() => setIsOnboardingModalOpen(true)}
+                className="h-11 px-4 bg-white/[0.03] hover:bg-white/[0.08] active:scale-[0.98] text-[#a1a1aa] hover:text-white border border-white/[0.08] rounded-lg font-mono text-xs inline-flex items-center justify-center gap-2 transition-all w-full sm:w-auto"
               >
-                <span>Download 3D Model (.glb)</span>
-              </a>
+                <IconStacks size={15} className="text-[#ff4500]" />
+                <span>Full-Screen Onboarding Deck</span>
+              </button>
             </div>
 
             {/* Core Metrics Strip */}
-            <div className="pt-7 border-t border-white/[0.08] grid grid-cols-3 gap-6">
+            <div className="pt-6 sm:pt-7 border-t border-white/[0.08] grid grid-cols-3 gap-3 sm:gap-6">
               <div>
-                <div className="text-2xl font-bold font-mono tracking-tight text-white tabular-nums">3.2s</div>
-                <div className="text-xs text-[#8e8e98] mt-1">Average Intent Fill</div>
+                <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-white tabular-nums">3.2s</div>
+                <div className="text-[11px] sm:text-xs text-[#8e8e98] mt-1">Atomic Settlement</div>
               </div>
               <div>
-                <div className="text-2xl font-bold font-mono tracking-tight text-[#ff4500] tabular-nums">~3,450</div>
-                <div className="text-xs text-[#8e8e98] mt-1">Stylus RIP-7212 Gas</div>
+                <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#ff4500] tabular-nums">~3,450</div>
+                <div className="text-[11px] sm:text-xs text-[#8e8e98] mt-1">Stylus RIP-7212 Gas</div>
               </div>
               <div>
-                <div className="text-2xl font-bold font-mono tracking-tight text-emerald-400 tabular-nums">USDG</div>
-                <div className="text-xs text-[#8e8e98] mt-1">Self-Funding Reserve</div>
+                <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-emerald-400 tabular-nums">USDG</div>
+                <div className="text-[11px] sm:text-xs text-[#8e8e98] mt-1">Auto-Funded Vault</div>
               </div>
             </div>
           </motion.div>
 
-          {/* Right Column: Dual View (Interactive 3D Three.js Vault + Working Intent Terminal) */}
+          {/* Right Column: Interactive Tinder-Swiper Onboarding Deck + 3D Enclave + Live Simulator */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-5 w-full"
+            className="lg:col-span-6 w-full"
           >
-            <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
               
               {/* Tab Selector Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-                <div className="flex items-center gap-1 bg-[#0d0d10] p-1 rounded-lg border border-white/[0.06]">
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/[0.06] overflow-x-auto">
+                <div className="flex items-center gap-1 bg-[#0d0d10] p-1 rounded-lg border border-white/[0.06] w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveHeroTab('onboarding_deck')}
+                    className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-mono transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                      activeHeroTab === 'onboarding_deck'
+                        ? 'bg-[#1b1b21] text-white shadow-sm font-semibold border border-[#ff4500]/30'
+                        : 'text-[#8e8e98] hover:text-white'
+                    }`}
+                  >
+                    <IconStacks size={14} className="text-[#ff4500]" />
+                    <span>Swipe Onboarding</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setActiveHeroTab('3d_vault')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-mono transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
                       activeHeroTab === '3d_vault'
                         ? 'bg-[#1b1b21] text-white shadow-sm font-semibold'
                         : 'text-[#8e8e98] hover:text-white'
                     }`}
                   >
-                    <IconCpu size={14} className="text-[#ff4500]" />
-                    <span>3D Enclave Vault</span>
+                    <IconCpu size={14} className="text-emerald-400" />
+                    <span>3D Enclave</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveHeroTab('intent_swap')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-mono transition-all flex items-center gap-1.5 ${
+                    className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-mono transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
                       activeHeroTab === 'intent_swap'
                         ? 'bg-[#1b1b21] text-white shadow-sm font-semibold'
                         : 'text-[#8e8e98] hover:text-white'
                     }`}
                   >
-                    <IconSwap size={14} className="text-[#10b981]" />
-                    <span>Live Swap Terminal</span>
+                    <IconSwap size={14} className="text-blue-400" />
+                    <span>Simulator</span>
                   </button>
-                </div>
-
-                <div className="text-[11px] font-mono text-[#8e8e98] hidden sm:block">
-                  {activeHeroTab === '3d_vault' ? 'Three.js WebGL' : 'Li.Fi Solver'}
                 </div>
               </div>
 
               {/* Tab Content Panes */}
               <AnimatePresence mode="wait">
-                {activeHeroTab === '3d_vault' ? (
+                {activeHeroTab === 'onboarding_deck' ? (
+                  <motion.div
+                    key="onboarding_deck"
+                    initial={{ opacity: 0, x: 24, scale: 0.98 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -24, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+                  >
+                    <OnboardingSwiper mode="inline" />
+                  </motion.div>
+                ) : activeHeroTab === '3d_vault' ? (
                   <motion.div
                     key="3d"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, x: 24, scale: 0.98 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -24, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 26 }}
                     className="relative bg-[#0d0d10] rounded-xl border border-white/[0.04] overflow-hidden"
                   >
                     <ThreeVaultScene />
@@ -307,10 +442,10 @@ export default function LandingPage() {
                 ) : (
                   <motion.div
                     key="swap"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, x: 24, scale: 0.98 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -24, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 26 }}
                     className="space-y-4"
                   >
                     {/* Source Panel */}

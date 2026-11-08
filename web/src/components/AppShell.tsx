@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { BrandLogo } from '@/components/BrandLogo';
+import { OnboardingSwiper } from '@/components/OnboardingSwiper';
 import {
-  IconSwap,
   IconShield,
   IconWallet,
   IconAutoRenew,
@@ -14,6 +15,7 @@ import {
   IconFingerprint,
   IconActivity,
   IconLogout,
+  IconDialpad,
 } from '@/components/Icons';
 
 type NavItem = {
@@ -23,9 +25,8 @@ type NavItem = {
 };
 
 const navExecution: NavItem[] = [
-  { href: '/transfer', label: 'Cross-Chain Swap', icon: IconSwap },
-  { href: '/trading', label: 'Agent Firewall', icon: IconShield },
   { href: '/dashboard', label: 'Treasury Vault', icon: IconWallet },
+  { href: '/trading', label: 'Agent Firewall', icon: IconShield },
 ];
 
 const navAutomations: NavItem[] = [
@@ -41,15 +42,17 @@ const navSecurity: NavItem[] = [
 const allNavItems = [...navExecution, ...navAutomations, ...navSecurity];
 
 const mobileNavItems: NavItem[] = [
-  { href: '/transfer', label: 'Swap', icon: IconSwap },
-  { href: '/trading', label: 'Firewall', icon: IconShield },
   { href: '/dashboard', label: 'Vault', icon: IconWallet },
-  { href: '/activity', label: 'Activity', icon: IconActivity },
+  { href: '/trading', label: 'Firewall', icon: IconShield },
+  { href: '/intents', label: 'Intents', icon: IconStacks },
+  { href: '/security', label: 'Security', icon: IconFingerprint },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { address, disconnect } = useInvisibleWallet();
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
 
   if (pathname === '/') {
     return <>{children}</>;
@@ -59,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const renderNavGroup = (title: string, items: NavItem[]) => (
+  const renderNavGroup = (title: string, items: NavItem[], onNavigate?: () => void) => (
     <div className="space-y-1">
       <div className="text-[11px] font-mono text-[#8e8e98] uppercase tracking-wider px-3 mb-1.5 font-medium">
         {title}
@@ -71,7 +74,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+            onClick={onNavigate}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               active
                 ? 'bg-white/[0.08] text-white shadow-sm'
                 : 'text-[#8e8e98] hover:bg-white/[0.04] hover:text-white'
@@ -88,8 +92,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white font-sans">
+    <div className="min-h-screen bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white font-sans overflow-x-hidden">
       
+      {/* Full-Screen Onboarding Swiper Modal */}
+      <AnimatePresence>
+        {isOnboardingOpen && (
+          <OnboardingSwiper
+            mode="modal"
+            onClose={() => setIsOnboardingOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.08] bg-[#0d0d10] p-5 justify-between h-screen sticky top-0 z-30 shrink-0">
         <div className="space-y-6 overflow-y-auto">
@@ -104,9 +118,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
+          {/* Interactive Onboarding Deck Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsOnboardingOpen(true)}
+            className="w-full p-2.5 rounded-lg bg-[#ff4500]/10 hover:bg-[#ff4500]/15 border border-[#ff4500]/30 text-xs font-mono font-semibold text-[#ff4500] flex items-center justify-between transition-all cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <IconStacks size={15} />
+              <span>Swipe Onboarding</span>
+            </span>
+            <span className="text-[10px] bg-[#ff4500]/20 px-1.5 py-0.5 rounded">6 Slides</span>
+          </button>
+
           {/* Navigation Groups */}
           <nav className="space-y-5">
-            {renderNavGroup('Execution', navExecution)}
+            {renderNavGroup('Core Vault', navExecution)}
             {renderNavGroup('Automations', navAutomations)}
             {renderNavGroup('Security', navSecurity)}
           </nav>
@@ -143,55 +170,157 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen pb-16 md:pb-0 overflow-x-hidden">
+      <main className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0 overflow-x-hidden">
         
-        {/* Top App Header */}
-        <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-6 h-16 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="md:hidden flex items-center gap-2">
+        {/* Top App Header — Open Swap removed completely */}
+        <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-4 sm:px-6 h-16 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="md:hidden flex items-center gap-2 shrink-0">
               <Link href="/">
                 <BrandLogo size={24} />
               </Link>
             </div>
-            <div className="hidden md:flex items-center gap-2 text-xs text-[#8e8e98]">
-              <span className="font-normal">StylusSafe</span>
-              <span className="text-white/20">/</span>
-              <span className="text-white font-medium">
-                {allNavItems.find(i => i.href === pathname)?.label || 'App'}
+            <div className="flex items-center gap-2 text-xs text-[#8e8e98] truncate">
+              <span className="font-normal hidden sm:inline">StylusSafe</span>
+              <span className="text-white/20 hidden sm:inline">/</span>
+              <span className="text-white font-medium truncate">
+                {allNavItems.find(i => i.href === pathname)?.label || 'Vault'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/transfer"
-              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsOnboardingOpen(true)}
+              className="h-8 px-2.5 sm:px-3 text-xs font-mono font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
-              <IconSwap size={14} className="text-[#ff4500]" />
-              <span>Swap</span>
-            </Link>
+              <IconStacks size={14} className="text-[#ff4500]" />
+              <span>Swipe Guide</span>
+            </button>
             <Link
               href="/trading"
-              className="h-8 px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
+              className="h-8 px-2.5 sm:px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md hidden sm:inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
               <IconShield size={14} className="text-emerald-400" />
               <span>Firewall</span>
             </Link>
             <Link
               href="/"
-              className="h-8 px-3 text-xs text-[#8e8e98] hover:text-white rounded-md inline-flex items-center transition-colors"
+              className="h-8 px-2.5 text-xs text-[#8e8e98] hover:text-white rounded-md inline-flex items-center transition-colors"
             >
-              Overview
+              Home
             </Link>
           </div>
         </header>
 
-        {children}
+        {/* Swipe-Physics Animated Route Container */}
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, x: 18, scale: 0.99 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
+          className="flex-1 w-full"
+        >
+          {children}
+        </motion.div>
       </main>
 
+      {/* Mobile Slide-Up Full Navigation Drawer */}
+      <AnimatePresence>
+        {isMobileSheetOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_e, info) => {
+                if (info.offset.y > 80 || info.velocity.y > 400) {
+                  setIsMobileSheetOpen(false);
+                }
+              }}
+              className="bg-[#0d0d10] border-t border-white/[0.1] rounded-t-2xl p-5 pb-8 space-y-5 max-h-[82vh] overflow-y-auto"
+            >
+              {/* Drag Handle */}
+              <div className="w-10 h-1 bg-white/[0.2] rounded-full mx-auto" />
+
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <BrandLogo size={22} />
+                  <span className="text-xs font-mono text-white font-semibold">StylusSafe Navigation</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileSheetOpen(false)}
+                  className="text-xs font-mono text-[#8e8e98] hover:text-white px-2 py-1 rounded bg-white/[0.05]"
+                >
+                  Close [✕]
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileSheetOpen(false);
+                  setIsOnboardingOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-[#ff4500]/15 border border-[#ff4500]/30 text-xs font-mono font-semibold text-[#ff4500] flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <IconStacks size={16} />
+                  <span>Open Tinder-Style Onboarding Deck</span>
+                </span>
+                <span>6 Cards →</span>
+              </button>
+
+              <div className="space-y-4">
+                {renderNavGroup('Core Vault', navExecution, () => setIsMobileSheetOpen(false))}
+                {renderNavGroup('Automations', navAutomations, () => setIsMobileSheetOpen(false))}
+                {renderNavGroup('Security', navSecurity, () => setIsMobileSheetOpen(false))}
+              </div>
+
+              {/* Mobile Wallet Status & Disconnect */}
+              <div className="pt-3 border-t border-white/[0.06]">
+                <div className="p-3 rounded-xl bg-[#141418] border border-white/[0.06] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-[#ff4500] shrink-0">
+                      <IconFingerprint size={17} />
+                    </span>
+                    <div className="truncate">
+                      <div className="font-mono text-xs text-white truncate font-medium">
+                        {address ? formatAddress(address) : 'No Biometric Vault Connected'}
+                      </div>
+                      <div className="text-[10px] text-[#8e8e98]">
+                        {address ? 'RIP-7212 Enclave Active' : 'Enroll via Vault Dashboard'}
+                      </div>
+                    </div>
+                  </div>
+                  {address && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        disconnect();
+                        setIsMobileSheetOpen(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-mono shrink-0"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08] px-2 py-1">
-        <div className="flex justify-around items-center h-13">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08] px-2 py-1.5">
+        <div className="flex justify-around items-center h-12">
           {mobileNavItems.map((item) => {
             const active = pathname === item.href;
             const IconComponent = item.icon;
@@ -210,6 +339,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          <button
+            type="button"
+            onClick={() => setIsMobileSheetOpen((prev) => !prev)}
+            className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition-colors ${
+              isMobileSheetOpen ? 'text-white font-medium' : 'text-[#8e8e98]'
+            }`}
+          >
+            <span className={`inline-flex items-center justify-center ${isMobileSheetOpen ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
+              <IconDialpad size={18} />
+            </span>
+            <span className="text-[10px] mt-1 leading-none">Menu</span>
+          </button>
         </div>
       </nav>
     </div>
