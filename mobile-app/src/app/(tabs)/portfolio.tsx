@@ -212,15 +212,6 @@ export default function PortfolioScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity
-              style={styles.swipeGuideBtn}
-              activeOpacity={0.8}
-              onPress={() => router.push('/' as any)}
-            >
-              <Ionicons name="layers-outline" size={14} color={Colors.accentOrange} />
-              <Text style={styles.swipeGuideText}>Swipe Guide</Text>
-            </TouchableOpacity>
-
             <View
               style={[
                 styles.statusBadge,

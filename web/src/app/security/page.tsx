@@ -160,7 +160,7 @@ export default function SecurityPage() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="p-6 md:p-10 w-full max-w-4xl mx-auto space-y-8 font-sans"
+      className="p-3.5 sm:p-6 md:p-10 w-full max-w-4xl mx-auto space-y-6 sm:space-y-8 font-sans overflow-x-hidden"
     >
       
       {/* Header */}
@@ -215,9 +215,9 @@ export default function SecurityPage() {
             <span className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 inline-flex items-center justify-center">
               <IconCpu size={18} />
             </span>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-semibold text-white">Native RIP-7212 P-256 Precompile</h2>
-              <span className="text-[11px] font-mono text-[#8e8e98]">Precompile: 0x0000000000000000000000000000000000000100</span>
+              <span className="text-[11px] font-mono text-[#8e8e98] break-all">Precompile: 0x0000...0100 (Arbitrum L2)</span>
             </div>
           </div>
           <span className="text-emerald-400 font-mono text-xs px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 font-medium">

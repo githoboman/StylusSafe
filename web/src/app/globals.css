@@ -23,7 +23,16 @@
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
 body {
+  max-width: 100vw;
+  overflow-x: hidden;
   background: var(--color-background-ink);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
@@ -32,6 +41,25 @@ body {
   text-rendering: optimizeLegibility;
   letter-spacing: -0.012em;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Prevent flex/grid children and long hex addresses from pushing past mobile screen width */
+div,
+section,
+main,
+header,
+footer,
+article,
+aside,
+p,
+h1,
+h2,
+h3,
+h4,
+span,
+a {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Tabular figures for numbers to ensure precision financial alignment */

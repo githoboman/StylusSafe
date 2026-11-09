@@ -1,15 +1,21 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
-  title: 'StylusSafe — Passkey Cross-Chain Wallet & AI Agent Firewall',
-  description: 'A seedless smart contract vault secured by WebAuthn FaceID passkeys and on-chain agent guardrails on Arbitrum Stylus.',
+  title: 'StylusSafe — Biometric Smart Wallet & AI Agent Firewall',
+  description: 'Unlock your wallet with your face and fingerprint, start with $1,000 test USDG, and set safe spending limits for AI agents on Arbitrum Stylus.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -22,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased overscroll-none bg-[#09090b] text-[#ffffff]">
+      <body className="antialiased overscroll-none bg-[#09090b] text-[#ffffff] overflow-x-hidden max-w-full">
         <AppShell>
           {children}
         </AppShell>

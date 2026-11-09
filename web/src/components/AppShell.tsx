@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { BrandLogo } from '@/components/BrandLogo';
-import { OnboardingSwiper } from '@/components/OnboardingSwiper';
+import { FirstTimeOnboardingOverlay } from '@/components/OnboardingSwiper';
 import {
   IconShield,
   IconWallet,
@@ -25,37 +25,41 @@ type NavItem = {
 };
 
 const navExecution: NavItem[] = [
-  { href: '/dashboard', label: 'Treasury Vault', icon: IconWallet },
-  { href: '/trading', label: 'Agent Firewall', icon: IconShield },
+  { href: '/dashboard', label: 'My Wallet Vault', icon: IconWallet },
+  { href: '/trading', label: 'AI Spending Limits', icon: IconShield },
 ];
 
 const navAutomations: NavItem[] = [
-  { href: '/subscription', label: 'DCA & Recurring', icon: IconAutoRenew },
-  { href: '/intents', label: 'Intent Batches', icon: IconStacks },
+  { href: '/subscription', label: 'Auto-Pay & DCA', icon: IconAutoRenew },
+  { href: '/intents', label: 'Batch Actions', icon: IconStacks },
 ];
 
 const navSecurity: NavItem[] = [
-  { href: '/security', label: 'Enclave Security', icon: IconFingerprint },
-  { href: '/activity', label: 'Activity Log', icon: IconActivity },
+  { href: '/security', label: 'Face & Fingerprint Keys', icon: IconFingerprint },
+  { href: '/activity', label: 'Activity History', icon: IconActivity },
 ];
 
 const allNavItems = [...navExecution, ...navAutomations, ...navSecurity];
 
 const mobileNavItems: NavItem[] = [
   { href: '/dashboard', label: 'Vault', icon: IconWallet },
-  { href: '/trading', label: 'Firewall', icon: IconShield },
-  { href: '/intents', label: 'Intents', icon: IconStacks },
-  { href: '/security', label: 'Security', icon: IconFingerprint },
+  { href: '/trading', label: 'AI Limits', icon: IconShield },
+  { href: '/intents', label: 'Batches', icon: IconStacks },
+  { href: '/security', label: 'Keys', icon: IconFingerprint },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { address, disconnect } = useInvisibleWallet();
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
 
   if (pathname === '/') {
-    return <>{children}</>;
+    return (
+      <>
+        <FirstTimeOnboardingOverlay />
+        {children}
+      </>
+    );
   }
 
   const formatAddress = (addr: string) => {
@@ -84,7 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className={`inline-flex items-center justify-center shrink-0 ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
               <IconComponent size={18} />
             </span>
-            <span className="leading-none">{item.label}</span>
+            <span className="leading-none truncate">{item.label}</span>
           </Link>
         );
       })}
@@ -92,23 +96,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white font-sans overflow-x-hidden">
-      
-      {/* Full-Screen Onboarding Swiper Modal */}
-      <AnimatePresence>
-        {isOnboardingOpen && (
-          <OnboardingSwiper
-            mode="modal"
-            onClose={() => setIsOnboardingOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+    <div className="min-h-screen w-full max-w-full bg-[#09090b] flex flex-col md:flex-row text-[#ffffff] selection:bg-[#ff4500] selection:text-white font-sans overflow-x-hidden">
+      {/* First-Time User Onboarding Swiper (Automatically disappears once completed) */}
+      <FirstTimeOnboardingOverlay />
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-white/[0.08] bg-[#0d0d10] p-5 justify-between h-screen sticky top-0 z-30 shrink-0">
         <div className="space-y-6 overflow-y-auto">
-          
-          {/* Brand Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
             <Link href="/" className="hover:opacity-90 transition-opacity">
               <BrandLogo size={28} />
@@ -118,24 +112,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          {/* Interactive Onboarding Deck Trigger */}
-          <button
-            type="button"
-            onClick={() => setIsOnboardingOpen(true)}
-            className="w-full p-2.5 rounded-lg bg-[#ff4500]/10 hover:bg-[#ff4500]/15 border border-[#ff4500]/30 text-xs font-mono font-semibold text-[#ff4500] flex items-center justify-between transition-all cursor-pointer"
-          >
-            <span className="flex items-center gap-2">
-              <IconStacks size={15} />
-              <span>Swipe Onboarding</span>
-            </span>
-            <span className="text-[10px] bg-[#ff4500]/20 px-1.5 py-0.5 rounded">6 Slides</span>
-          </button>
-
-          {/* Navigation Groups */}
           <nav className="space-y-5">
-            {renderNavGroup('Core Vault', navExecution)}
+            {renderNavGroup('My Wallet', navExecution)}
             {renderNavGroup('Automations', navAutomations)}
-            {renderNavGroup('Security', navSecurity)}
+            {renderNavGroup('Security & History', navSecurity)}
           </nav>
         </div>
 
@@ -148,10 +128,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
               <div className="truncate">
                 <div className="font-mono text-xs text-white truncate font-medium">
-                  {address ? formatAddress(address) : 'No Wallet'}
+                  {address ? formatAddress(address) : 'Not Connected'}
                 </div>
                 <div className="text-[10px] text-[#8e8e98] leading-tight">
-                  {address ? 'Hardware Enclave' : 'Connect Vault'}
+                  {address ? 'Face & Fingerprint Locked' : 'Tap Create Vault'}
                 </div>
               </div>
             </div>
@@ -170,40 +150,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0 overflow-x-hidden">
-        
-        {/* Top App Header — Open Swap removed completely */}
-        <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-4 sm:px-6 h-16 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+      <main className="flex-1 flex flex-col min-h-screen w-full max-w-full min-w-0 pb-20 md:pb-0 overflow-x-hidden">
+        {/* Top App Header */}
+        <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 shrink-0 w-full max-w-full">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="md:hidden flex items-center gap-2 shrink-0">
               <Link href="/">
-                <BrandLogo size={24} />
+                <BrandLogo size={22} />
               </Link>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#8e8e98] truncate">
               <span className="font-normal hidden sm:inline">StylusSafe</span>
               <span className="text-white/20 hidden sm:inline">/</span>
               <span className="text-white font-medium truncate">
-                {allNavItems.find(i => i.href === pathname)?.label || 'Vault'}
+                {allNavItems.find((i) => i.href === pathname)?.label || 'My Wallet Vault'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsOnboardingOpen(true)}
-              className="h-8 px-2.5 sm:px-3 text-xs font-mono font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
-            >
-              <IconStacks size={14} className="text-[#ff4500]" />
-              <span>Swipe Guide</span>
-            </button>
             <Link
               href="/trading"
-              className="h-8 px-2.5 sm:px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md hidden sm:inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
+              className="h-8 px-2.5 sm:px-3 text-xs font-medium text-white bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-md inline-flex items-center gap-1.5 transition-all active:scale-[0.98]"
             >
               <IconShield size={14} className="text-emerald-400" />
-              <span>Firewall</span>
+              <span>AI Limits</span>
             </Link>
             <Link
               href="/"
@@ -217,10 +188,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Swipe-Physics Animated Route Container */}
         <motion.div
           key={pathname}
-          initial={{ opacity: 0, x: 18, scale: 0.99 }}
+          initial={{ opacity: 0, x: 16, scale: 0.99 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.8 }}
-          className="flex-1 w-full"
+          className="flex-1 w-full max-w-full min-w-0 overflow-x-hidden"
         >
           {children}
         </motion.div>
@@ -243,15 +214,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   setIsMobileSheetOpen(false);
                 }
               }}
-              className="bg-[#0d0d10] border-t border-white/[0.1] rounded-t-2xl p-5 pb-8 space-y-5 max-h-[82vh] overflow-y-auto"
+              className="bg-[#0d0d10] border-t border-white/[0.1] rounded-t-2xl p-4 pb-8 space-y-4 max-h-[82vh] overflow-y-auto w-full max-w-full"
             >
-              {/* Drag Handle */}
               <div className="w-10 h-1 bg-white/[0.2] rounded-full mx-auto" />
 
               <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
-                  <BrandLogo size={22} />
-                  <span className="text-xs font-mono text-white font-semibold">StylusSafe Navigation</span>
+                  <BrandLogo size={20} />
+                  <span className="text-xs font-mono text-white font-semibold">Wallet Menu</span>
                 </div>
                 <button
                   type="button"
@@ -262,28 +232,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileSheetOpen(false);
-                  setIsOnboardingOpen(true);
-                }}
-                className="w-full p-3 rounded-xl bg-[#ff4500]/15 border border-[#ff4500]/30 text-xs font-mono font-semibold text-[#ff4500] flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <IconStacks size={16} />
-                  <span>Open Tinder-Style Onboarding Deck</span>
-                </span>
-                <span>6 Cards →</span>
-              </button>
-
               <div className="space-y-4">
-                {renderNavGroup('Core Vault', navExecution, () => setIsMobileSheetOpen(false))}
+                {renderNavGroup('My Wallet', navExecution, () => setIsMobileSheetOpen(false))}
                 {renderNavGroup('Automations', navAutomations, () => setIsMobileSheetOpen(false))}
-                {renderNavGroup('Security', navSecurity, () => setIsMobileSheetOpen(false))}
+                {renderNavGroup('Security & History', navSecurity, () => setIsMobileSheetOpen(false))}
               </div>
 
-              {/* Mobile Wallet Status & Disconnect */}
               <div className="pt-3 border-t border-white/[0.06]">
                 <div className="p-3 rounded-xl bg-[#141418] border border-white/[0.06] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -292,10 +246,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </span>
                     <div className="truncate">
                       <div className="font-mono text-xs text-white truncate font-medium">
-                        {address ? formatAddress(address) : 'No Biometric Vault Connected'}
+                        {address ? formatAddress(address) : 'No Wallet Connected'}
                       </div>
                       <div className="text-[10px] text-[#8e8e98]">
-                        {address ? 'RIP-7212 Enclave Active' : 'Enroll via Vault Dashboard'}
+                        {address ? 'Face & Fingerprint Bound' : 'Create Vault on Dashboard'}
                       </div>
                     </div>
                   </div>
@@ -319,7 +273,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08] px-2 py-1.5">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d10]/95 backdrop-blur-md border-t border-white/[0.08] px-1 py-1.5 w-full max-w-full">
         <div className="flex justify-around items-center h-12">
           {mobileNavItems.map((item) => {
             const active = pathname === item.href;
@@ -328,12 +282,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition-colors ${
+                className={`flex flex-col items-center justify-center min-w-[52px] py-1 transition-colors ${
                   active ? 'text-white font-medium' : 'text-[#8e8e98]'
                 }`}
               >
                 <span className={`inline-flex items-center justify-center ${active ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
-                  <IconComponent size={19} />
+                  <IconComponent size={18} />
                 </span>
                 <span className="text-[10px] mt-1 leading-none">{item.label}</span>
               </Link>
@@ -343,14 +297,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setIsMobileSheetOpen((prev) => !prev)}
-            className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition-colors ${
+            className={`flex flex-col items-center justify-center min-w-[52px] py-1 transition-colors ${
               isMobileSheetOpen ? 'text-white font-medium' : 'text-[#8e8e98]'
             }`}
           >
             <span className={`inline-flex items-center justify-center ${isMobileSheetOpen ? 'text-[#ff4500]' : 'text-[#8e8e98]'}`}>
               <IconDialpad size={18} />
             </span>
-            <span className="text-[10px] mt-1 leading-none">Menu</span>
+            <span className="text-[10px] mt-1 leading-none">More</span>
           </button>
         </div>
       </nav>

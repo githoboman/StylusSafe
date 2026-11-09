@@ -175,7 +175,7 @@ export default function TradingPage() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="p-4 md:p-10 w-full max-w-5xl mx-auto flex flex-col gap-8"
+      className="p-3.5 sm:p-6 md:p-10 w-full max-w-5xl mx-auto flex flex-col gap-6 sm:gap-8 overflow-x-hidden"
     >
       
       {/* Header */}
