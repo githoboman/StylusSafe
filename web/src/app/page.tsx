@@ -555,7 +555,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between gap-3 pb-5 border-b border-white/[0.08]">
                 <div>
                   <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
-                    On-Chain Vault Rule Preview
+                    Example Rule (Illustration)
                   </div>
                   <h3 className="text-xl font-bold text-white mt-1">
                     {activeGuardrail.title}
@@ -603,7 +603,7 @@ export default function LandingPage() {
                   href="/trading"
                   className="w-full h-12 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] rounded-xl text-sm font-semibold text-white inline-flex items-center justify-center gap-2 transition-all"
                 >
-                  <span>Configure AI Allowance Rules</span>
+                  <span>Set &amp; Test Rules on Your Own Vault</span>
                   <IconArrowRight size={16} />
                 </Link>
               </div>

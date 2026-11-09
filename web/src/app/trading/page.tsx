@@ -1,10 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { isAddress, type Address } from 'viem';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { SignModal } from '@/components/SignModal';
-import Link from 'next/link';
 import { IconArrowLeft, IconShield, IconCheck, IconKey } from '@/components/Icons';
+import {
+  simulateAgentSpend,
+  unitsToUsdg,
+  usdgToUnits,
+  useOnChainAgentPolicy,
+  type OnChainPolicy,
+  type SimulationKind,
+  type SimulationResult,
+} from '@/lib/agentPolicy';
 
 const POPULAR_TARGETS = [
   { name: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
@@ -13,11 +24,27 @@ const POPULAR_TARGETS = [
   { name: 'CoW Swap Settlement', address: '0x9008D19f58AAbD9eD0D60971565AA8510560ab41' },
 ];
 
+function describeExpiry(expiry: number): string {
+  const secs = expiry - Math.floor(Date.now() / 1000);
+  if (secs <= 0) return 'Expired';
+  const hours = Math.floor(secs / 3600);
+  if (hours >= 48) return `${Math.floor(hours / 24)} days left`;
+  if (hours >= 1) return `${hours}h ${Math.floor((secs % 3600) / 60)}m left`;
+  return `${Math.max(1, Math.floor(secs / 60))} min left`;
+}
+
+function shortAddr(a: string) {
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+}
+
 export default function TradingPage() {
-  const { setAgentPolicy, revokeSessionKey } = useInvisibleWallet();
+  const { setAgentPolicy, revokeSessionKey, address } = useInvisibleWallet();
+  const { policy, loading, error: readError, checkedAt, refresh } = useOnChainAgentPolicy(address);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState<'set_policy' | 'revoke'>('set_policy');
-  const [status, setStatus] = useState<'idle' | 'authorizing' | 'success'>('idle');
+  const [status, setStatus] = useState<'idle' | 'authorizing'>('idle');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [agentAddress, setAgentAddress] = useState<string>('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
   const [targetAddress, setTargetAddress] = useState<string>(POPULAR_TARGETS[0].address);
@@ -25,67 +52,65 @@ export default function TradingPage() {
   const [maxPerTx, setMaxPerTx] = useState<string>('100');
   const [durationHours, setDurationHours] = useState<number>(24);
 
-  const [activePolicy, setActivePolicy] = useState<{
-    key: string;
-    target: string;
-    dailyLimit: string;
-    maxPerTx: string;
-    expiry: number;
-    spentToday: string;
-  } | null>(null);
+  const [simRunning, setSimRunning] = useState<SimulationKind | null>(null);
+  const [sim, setSim] = useState<{ kind: SimulationKind; amount: number; result: SimulationResult } | null>(null);
+  const [previewSpentUnits, setPreviewSpentUnits] = useState<bigint>(0n);
 
-  const [testNote, setTestNote] = useState<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedKey = localStorage.getItem('invisible_wallet_session_key');
-      const savedExpiry = localStorage.getItem('invisible_wallet_session_expiry');
-      const savedDaily = localStorage.getItem('invisible_wallet_session_daily_limit');
-      const savedMax = localStorage.getItem('invisible_wallet_session_max_per_tx');
-      const savedTarget = localStorage.getItem('invisible_wallet_session_target');
-
-      if (savedKey && savedExpiry) {
-        setActivePolicy({
-          key: savedKey,
-          target: savedTarget || POPULAR_TARGETS[0].address,
-          dailyLimit: savedDaily ? (BigInt(savedDaily) / 1000000n).toString() : '500',
-          maxPerTx: savedMax ? (BigInt(savedMax) / 1000000n).toString() : '100',
-          expiry: Number(savedExpiry),
-          spentToday: '0',
-        });
+    if (typeof window === 'undefined') return;
+    const savedPk = localStorage.getItem('stylussafe_agent_helper_pk');
+    if (savedPk) {
+      try {
+        setAgentAddress(privateKeyToAccount(savedPk as `0x${string}`).address);
+      } catch {
+        // ignore malformed value
       }
     }
-  }, [status]);
+  }, []);
+
+  const handleGenerateHelperKey = () => {
+    const pk = generatePrivateKey();
+    const account = privateKeyToAccount(pk);
+    localStorage.setItem('stylussafe_agent_helper_pk', pk);
+    localStorage.setItem('invisible_wallet_session_pk', pk);
+    setAgentAddress(account.address);
+    setFormError(null);
+  };
 
   const handleAuthorize = async (pin: string) => {
+    setFormError(null);
     setStatus('authorizing');
     try {
       if (modalAction === 'set_policy') {
-        const dailyLimitUnits = BigInt(Math.floor(Number(dailyLimit) * 1_000_000));
-        const maxPerTxUnits = BigInt(Math.floor(Number(maxPerTx) * 1_000_000));
+        const dailyUnits = BigInt(Math.floor(Number(dailyLimit) * 1_000_000));
+        const perTxUnits = BigInt(Math.floor(Number(maxPerTx) * 1_000_000));
         const res = await setAgentPolicy(
           {
             sessionKey: agentAddress as `0x${string}`,
             durationHours,
-            maxPerTx: maxPerTxUnits,
-            dailyLimit: dailyLimitUnits,
+            maxPerTx: perTxUnits,
+            dailyLimit: dailyUnits,
             allowedTarget: targetAddress as `0x${string}`,
           },
           pin
         );
+        if (!res) throw new Error('The allowance could not be submitted.');
 
-        if (!res) throw new Error('Policy submission failed');
-
-        setActivePolicy({
-          key: agentAddress,
-          target: targetAddress,
-          dailyLimit,
-          maxPerTx,
-          expiry: Math.floor(Date.now() / 1000) + durationHours * 3600,
-          spentToday: '0',
-        });
-
-        setTestNote(`Saved: AI helper can spend up to $${dailyLimit} USDG per day.`);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('invisible_wallet_session_spent_today', '0');
+          localStorage.setItem(
+            'invisible_wallet_session_last_reset',
+            Math.floor(Date.now() / 1000).toString()
+          );
+        }
 
         try {
           const stored = localStorage.getItem('invisible_wallet_activity');
@@ -102,65 +127,89 @@ export default function TradingPage() {
             amountPositive: false,
             status: 'executed',
             timestamp: new Date().toISOString(),
-            txHash:
-              (res as any)?.userOpHash ||
-              '0x7b1c3d5e7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d3e5f7a9b1c',
+            txHash: (res as any)?.userOpHash || '',
           });
           localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
         } catch {}
 
-        setStatus('success');
+        setPreviewSpentUnits(0n);
+        setSim(null);
+        await refresh();
       } else {
         const res = await revokeSessionKey(pin);
-        if (!res) throw new Error('Revocation failed');
-        setActivePolicy(null);
-        setTestNote('AI helper key turned off on Arbitrum.');
-
-        try {
-          const stored = localStorage.getItem('invisible_wallet_activity');
-          const existing = stored ? JSON.parse(stored) : [];
-          existing.unshift({
-            id: `revoke-${Date.now()}`,
-            type: 'signer',
-            title: 'AI Helper Key Turned Off',
-            subtitle: 'Session key zeroed on Arbitrum Stylus',
-            status: 'executed',
-            timestamp: new Date().toISOString(),
-            txHash:
-              (res as any)?.userOpHash ||
-              '0x2a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3f5a7b9c1d3e5f7a9b1c3d5e7f9a1b',
-          });
-          localStorage.setItem('invisible_wallet_activity', JSON.stringify(existing.slice(0, 50)));
-        } catch {}
-
-        setStatus('idle');
+        if (!res) throw new Error('The AI helper key could not be turned off.');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('invisible_wallet_session_spent_today');
+          localStorage.removeItem('invisible_wallet_session_last_reset');
+        }
+        setPreviewSpentUnits(0n);
+        setSim(null);
+        await refresh();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setStatus('idle');
+      setFormError(String(e?.message || 'Something went wrong. Please try again.').slice(0, 200));
     } finally {
+      if (mounted.current) setStatus('idle');
       setIsModalOpen(false);
     }
   };
 
-  const simulateCompliantTrade = () => {
-    const tradeAmount = 50;
-    const currentSpent = Number(activePolicy?.spentToday || 0);
-    const newSpent = currentSpent + tradeAmount;
+  const canSave =
+    !!address &&
+    isAddress(agentAddress) &&
+    Number(dailyLimit) > 0 &&
+    Number(maxPerTx) > 0 &&
+    Number(maxPerTx) <= Number(dailyLimit);
 
-    if (activePolicy) {
-      setActivePolicy({ ...activePolicy, spentToday: String(newSpent) });
+  // Build effective policy for real Arbitrum Sepolia eth_call simulation (uses saved policy if present, else form rules)
+  const effectivePolicy: OnChainPolicy = policy ?? {
+    sessionKey: (isAddress(agentAddress)
+      ? agentAddress
+      : '0x70997970C51812dc3A010C7d01b50e0d17dc79C8') as Address,
+    expiry: Math.floor(Date.now() / 1000) + durationHours * 3600,
+    maxPerTx: usdgToUnits(maxPerTx || '100'),
+    dailyLimit: usdgToUnits(dailyLimit || '500'),
+    spentToday: previewSpentUnits,
+    lastReset: Math.floor(Date.now() / 1000) - 60,
+    windowSeconds: 86400,
+    allowedTarget: targetAddress as Address,
+    isActive: true,
+    effectiveSpentToday: previewSpentUnits,
+  };
+
+  const maxPerTxUsdg = Number(unitsToUsdg(effectivePolicy.maxPerTx));
+  const withinAmount = Math.max(1, Math.min(50, maxPerTxUsdg || 50));
+  const overAmount = Math.max(5000, maxPerTxUsdg * 2);
+
+  const runSim = async (kind: SimulationKind) => {
+    const amount = kind === 'over_limit' ? overAmount : kind === 'within_limit' ? withinAmount : 10;
+    setSimRunning(kind);
+    const currentPolicy = (await refresh()) ?? effectivePolicy;
+    const result = await simulateAgentSpend(
+      address ? (address as Address) : null,
+      currentPolicy,
+      kind,
+      amount
+    );
+    if (mounted.current) {
+      if (result.newSpentToday !== undefined) {
+        setPreviewSpentUnits(result.newSpentToday);
+        await refresh();
+      }
+      setSim({ kind, amount, result });
+      setSimRunning(null);
     }
-    setTestNote(
-      `Approved: $50 USDG trade succeeded. Spent today: $${newSpent} of $${activePolicy?.dailyLimit || dailyLimit} USDG.`
-    );
   };
 
-  const simulateRogueSpend = () => {
-    setTestNote(
-      `Blocked by Vault: $5,000 USDG request exceeds your $${activePolicy?.dailyLimit || dailyLimit} daily limit ($0.00 lost).`
-    );
-  };
+  const displayedSpent = policy ? policy.effectiveSpentToday : previewSpentUnits;
+  const displayedDaily = policy ? policy.dailyLimit : effectivePolicy.dailyLimit;
+  const spentPct = Math.min(
+    100,
+    Number((displayedSpent * 10000n) / (displayedDaily || 1n)) / 100
+  );
+
+  const busy = status !== 'idle';
 
   return (
     <div className="p-5 sm:p-8 md:p-12 w-full max-w-5xl mx-auto space-y-8 sm:space-y-10">
@@ -184,19 +233,26 @@ export default function TradingPage() {
           </div>
         </div>
 
-        {activePolicy && (
+        {policy && (
           <button
             type="button"
             onClick={() => {
               setModalAction('revoke');
               setIsModalOpen(true);
             }}
-            className="h-11 px-5 bg-[#141418] hover:bg-white/[0.08] text-white border border-white/[0.12] rounded-xl text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-all self-start md:self-auto shrink-0"
+            disabled={busy}
+            className="h-11 px-5 bg-[#141418] hover:bg-white/[0.08] disabled:opacity-50 text-white border border-white/[0.12] rounded-xl text-xs sm:text-sm font-medium inline-flex items-center gap-2 transition-all self-start md:self-auto shrink-0"
           >
             <span>Turn Off AI Key</span>
           </button>
         )}
       </div>
+
+      {formError && (
+        <div className="p-4 rounded-2xl bg-[#141418] border border-white/[0.12] text-sm text-zinc-200">
+          {formError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Allowance Settings Form */}
@@ -210,15 +266,13 @@ export default function TradingPage() {
           </div>
 
           <div className="space-y-5">
-            {/* Limits Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs sm:text-sm font-medium text-zinc-300">
-                  Daily Spending Limit
-                </label>
+                <label className="text-xs sm:text-sm font-medium text-zinc-300">Daily Spending Limit</label>
                 <div className="flex items-center bg-[#0d0d10] border border-white/[0.08] rounded-xl px-4 focus-within:border-[#ff4500] transition-colors">
                   <input
                     type="number"
+                    min="0"
                     value={dailyLimit}
                     onChange={(e) => setDailyLimit(e.target.value)}
                     className="w-full h-12 bg-transparent outline-none text-base text-white font-mono"
@@ -228,12 +282,11 @@ export default function TradingPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs sm:text-sm font-medium text-zinc-300">
-                  Max Per Single Trade
-                </label>
+                <label className="text-xs sm:text-sm font-medium text-zinc-300">Max Per Single Trade</label>
                 <div className="flex items-center bg-[#0d0d10] border border-white/[0.08] rounded-xl px-4 focus-within:border-[#ff4500] transition-colors">
                   <input
                     type="number"
+                    min="0"
                     value={maxPerTx}
                     onChange={(e) => setMaxPerTx(e.target.value)}
                     className="w-full h-12 bg-transparent outline-none text-base text-white font-mono"
@@ -242,12 +295,14 @@ export default function TradingPage() {
                 </div>
               </div>
             </div>
+            {Number(maxPerTx) > Number(dailyLimit) && (
+              <p className="text-xs sm:text-sm text-zinc-400">
+                A single trade limit higher than the daily limit has no effect. Lower it to continue.
+              </p>
+            )}
 
-            {/* Approved App */}
             <div className="space-y-2">
-              <label className="text-xs sm:text-sm font-medium text-zinc-300">
-                Approved App (Allowlist)
-              </label>
+              <label className="text-xs sm:text-sm font-medium text-zinc-300">Approved App (Allowlist)</label>
               <select
                 value={targetAddress}
                 onChange={(e) => setTargetAddress(e.target.value)}
@@ -261,7 +316,6 @@ export default function TradingPage() {
               </select>
             </div>
 
-            {/* Time Limit */}
             <div className="space-y-2">
               <label className="text-xs sm:text-sm font-medium text-zinc-300">
                 How Long Should This Allowance Last?
@@ -278,18 +332,27 @@ export default function TradingPage() {
               </select>
             </div>
 
-            {/* Delegate Key */}
             <div className="space-y-2">
-              <label className="text-xs sm:text-sm font-medium text-zinc-300">
-                AI Helper Key Address
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-xs sm:text-sm font-medium text-zinc-300">AI Helper Key Address</label>
+                <button
+                  type="button"
+                  onClick={handleGenerateHelperKey}
+                  className="text-xs sm:text-sm text-white underline underline-offset-4 hover:text-[#ff4500] transition-colors"
+                >
+                  Generate a new helper key
+                </button>
+              </div>
               <input
                 type="text"
                 value={agentAddress}
-                onChange={(e) => setAgentAddress(e.target.value)}
-                placeholder="0x..."
+                onChange={(e) => setAgentAddress(e.target.value.trim())}
+                placeholder="0x... or tap Generate"
                 className="w-full h-12 bg-[#0d0d10] border border-white/[0.08] rounded-xl px-4 text-sm text-white font-mono outline-none focus:border-[#ff4500] transition-colors"
               />
+              {agentAddress && !isAddress(agentAddress) && (
+                <p className="text-xs sm:text-sm text-zinc-400">That is not a valid wallet address.</p>
+              )}
             </div>
           </div>
 
@@ -299,11 +362,13 @@ export default function TradingPage() {
               setModalAction('set_policy');
               setIsModalOpen(true);
             }}
-            disabled={status === 'authorizing'}
-            className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 font-semibold text-sm sm:text-base text-white shadow-sm disabled:opacity-50"
+            disabled={busy || !canSave}
+            className="w-full h-12 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center gap-2 font-semibold text-sm sm:text-base text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === 'authorizing' ? (
-              <span>Saving Allowance on Arbitrum...</span>
+              <span>Saving Allowance...</span>
+            ) : !address ? (
+              <span>Unlock Wallet on Dashboard to Save</span>
             ) : (
               <>
                 <IconShield size={17} />
@@ -313,94 +378,141 @@ export default function TradingPage() {
           </button>
         </div>
 
-        {/* Right: Active Allowance Status & Simple Test */}
+        {/* Right: Live allowance + real checks */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-[#141418] rounded-3xl p-6 sm:p-8 border border-white/[0.08] space-y-6">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4 gap-3">
               <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <IconCheck size={17} className="text-[#ff4500]" />
                 <span>Current Allowance</span>
               </h3>
-              <span className="px-3 py-1 rounded-full text-xs font-mono bg-white/[0.05] text-zinc-300 border border-white/[0.08]">
-                {activePolicy ? 'Active' : 'Not Set'}
+              <span className="px-3 py-1 rounded-full text-xs font-mono bg-white/[0.05] text-zinc-300 border border-white/[0.08] shrink-0">
+                {policy ? (policy.isActive ? 'Active' : 'Expired') : 'Previewing Form Rules'}
               </span>
             </div>
 
-            {activePolicy ? (
-              <div className="space-y-4 text-sm">
-                <div className="flex justify-between py-2 border-b border-white/[0.06]">
-                  <span className="text-zinc-400">Daily Limit</span>
-                  <span className="text-white font-mono font-semibold">
-                    ${activePolicy.dailyLimit} USDG
-                  </span>
+            <div className="space-y-4 text-sm">
+              <div className="flex justify-between gap-3 py-2 border-b border-white/[0.06]">
+                <span className="text-zinc-400">Helper Key</span>
+                <span className="text-white font-mono">{shortAddr(effectivePolicy.sessionKey)}</span>
+              </div>
+              <div className="flex justify-between gap-3 py-2 border-b border-white/[0.06]">
+                <span className="text-zinc-400">Approved App</span>
+                <span className="text-white font-mono">{shortAddr(effectivePolicy.allowedTarget)}</span>
+              </div>
+              <div className="flex justify-between gap-3 py-2 border-b border-white/[0.06]">
+                <span className="text-zinc-400">Daily Limit</span>
+                <span className="text-white font-mono font-semibold">
+                  ${unitsToUsdg(effectivePolicy.dailyLimit)} USDG
+                </span>
+              </div>
+              <div className="flex justify-between gap-3 py-2 border-b border-white/[0.06]">
+                <span className="text-zinc-400">Max Per Trade</span>
+                <span className="text-white font-mono font-semibold">
+                  ${unitsToUsdg(effectivePolicy.maxPerTx)} USDG
+                </span>
+              </div>
+              {policy && (
+                <div className="flex justify-between gap-3 py-2 border-b border-white/[0.06]">
+                  <span className="text-zinc-400">Time Left</span>
+                  <span className="text-white font-mono">{describeExpiry(policy.expiry)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-white/[0.06]">
-                  <span className="text-zinc-400">Max Per Trade</span>
-                  <span className="text-white font-mono font-semibold">
-                    ${activePolicy.maxPerTx} USDG
-                  </span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-white/[0.06]">
+              )}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between gap-3">
                   <span className="text-zinc-400">Spent Today</span>
                   <span className="text-white font-mono font-semibold">
-                    ${activePolicy.spentToday} / ${activePolicy.dailyLimit} USDG
+                    ${unitsToUsdg(displayedSpent)} / ${unitsToUsdg(displayedDaily)} USDG
                   </span>
                 </div>
-
                 <div className="w-full h-2.5 bg-[#0d0d10] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#ff4500] transition-all duration-300"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (Number(activePolicy.spentToday) /
-                          Math.max(1, Number(activePolicy.dailyLimit))) *
-                          100
-                      )}%`,
-                    }}
+                    style={{ width: `${spentPct}%` }}
                   />
                 </div>
               </div>
-            ) : (
-              <p className="py-4 text-sm text-zinc-400 leading-relaxed">
-                No AI helper allowance is active yet. Choose a daily limit on the left and tap Save &amp; Approve.
-              </p>
-            )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/[0.06] text-xs text-zinc-400">
+              <span>
+                {readError
+                  ? `RPC status: ${readError}`
+                  : checkedAt
+                    ? `Synced with Arbitrum Sepolia at ${new Date(checkedAt).toLocaleTimeString()}`
+                    : 'Arbitrum Sepolia Live'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewSpentUnits(0n);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('invisible_wallet_session_spent_today', '0');
+                  }
+                  refresh();
+                }}
+                disabled={loading}
+                className="text-white underline underline-offset-4 disabled:opacity-40 shrink-0"
+              >
+                {loading ? 'Checking...' : 'Reset / Refresh'}
+              </button>
+            </div>
           </div>
 
-          {/* Simple Allowance Tester */}
+          {/* Real checks against the deployed Arbitrum Sepolia contract */}
           <div className="bg-[#141418] rounded-3xl p-6 sm:p-8 border border-white/[0.08] space-y-5">
             <div className="space-y-1">
               <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <IconKey size={17} className="text-zinc-300" />
-                <span>Test Your Allowance Rules</span>
+                <span>Test Your Allowance Rules (Live On-Chain Check)</span>
               </h3>
               <p className="text-sm text-zinc-400 leading-relaxed">
-                Try a small $50 trade vs. an oversized $5,000 request to see how your vault responds.
+                Each button sends a real <code className="text-zinc-200 font-mono">eth_call</code> to the deployed{' '}
+                <code className="text-zinc-200 font-mono">StylusSafeAccount</code> contract on Arbitrum Sepolia (
+                <code className="text-zinc-200 font-mono">0x0D66...32fA</code>).
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={simulateCompliantTrade}
-                className="h-11 px-3 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-xl text-xs sm:text-sm font-medium text-white transition-all"
-              >
-                Test $50 Trade
-              </button>
-
-              <button
-                type="button"
-                onClick={simulateRogueSpend}
-                className="h-11 px-3 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-xl text-xs sm:text-sm font-medium text-white transition-all"
-              >
-                Test $5,000 Attempt
-              </button>
+            <div className="space-y-3">
+              {(
+                [
+                  { kind: 'within_limit', label: `Try a $${withinAmount} trade`, hint: 'Inside your limits' },
+                  { kind: 'over_limit', label: `Try a $${overAmount.toLocaleString()} trade`, hint: 'Above your limits' },
+                  { kind: 'unapproved_app', label: 'Try an unapproved app', hint: 'Not on allowlist' },
+                ] as { kind: SimulationKind; label: string; hint: string }[]
+              ).map((t) => (
+                <button
+                  key={t.kind}
+                  type="button"
+                  onClick={() => runSim(t.kind)}
+                  disabled={simRunning !== null}
+                  className="w-full h-14 px-4 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 disabled:cursor-not-allowed border border-white/[0.08] rounded-xl text-left transition-all flex items-center justify-between gap-3 cursor-pointer"
+                >
+                  <span className="text-sm font-medium text-white">
+                    {simRunning === t.kind ? 'Calling Arbitrum Sepolia...' : t.label}
+                  </span>
+                  <span className="text-xs text-zinc-400 shrink-0">{t.hint}</span>
+                </button>
+              ))}
             </div>
 
-            {testNote && (
-              <div className="p-4 rounded-xl bg-[#0d0d10] border border-white/[0.06] text-xs sm:text-sm text-zinc-200 leading-relaxed">
-                {testNote}
+            {sim && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#0d0d10] border border-white/[0.1] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm sm:text-base font-semibold text-white">{sim.result.title}</span>
+                  <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-white/[0.06] text-zinc-200 border border-white/[0.1] shrink-0">
+                    {sim.result.verdict === 'approved'
+                      ? 'Allowed'
+                      : sim.result.verdict === 'blocked'
+                        ? 'Blocked'
+                        : 'Error'}
+                  </span>
+                </div>
+                <p className="text-sm text-zinc-300 leading-relaxed">{sim.result.explanation}</p>
+                <p className="text-xs font-mono text-zinc-500 pt-2 border-t border-white/[0.06]">
+                  Verified via live Arbitrum Sepolia eth_call (0x0D66...32fA)
+                  {sim.result.revertName ? ` · revert: ${sim.result.revertName}` : ''}
+                </p>
               </div>
             )}
           </div>
@@ -410,15 +522,9 @@ export default function TradingPage() {
       <SignModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        actionText={
-          modalAction === 'set_policy'
-            ? 'Approve AI Allowance Rules'
-            : 'Turn Off AI Helper Key'
-        }
+        actionText={modalAction === 'set_policy' ? 'Approve AI Allowance Rules' : 'Turn Off AI Helper Key'}
         amountText={
-          modalAction === 'set_policy'
-            ? `Daily Limit: $${dailyLimit} USDG`
-            : 'Remove AI spending permissions'
+          modalAction === 'set_policy' ? `Daily Limit: $${dailyLimit} USDG` : 'Remove AI spending permissions'
         }
         onSign={handleAuthorize}
       />

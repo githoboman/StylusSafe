@@ -13,6 +13,7 @@ import {
   IconCheck,
   IconCpu,
 } from '@/components/Icons';
+import { unitsToUsdg, useOnChainAgentPolicy } from '@/lib/agentPolicy';
 
 type SignerDevice = {
   id: string;
@@ -28,10 +29,12 @@ export default function SecurityPage() {
   const [signers, setSigners] = useState<SignerDevice[]>([]);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
-  const [hasAgentKey, setHasAgentKey] = useState(false);
-  const [agentKeyAddress, setAgentKeyAddress] = useState<string>('');
-  const [dailyCap, setDailyCap] = useState<string>('500.00');
-  const [perTxCap, setPerTxCap] = useState<string>('100.00');
+  // Real AI-helper allowance, read live from the smart account on Arbitrum Sepolia
+  const { policy, loading: policyLoading, refresh: refreshPolicy } = useOnChainAgentPolicy(address);
+  const hasAgentKey = !!policy && policy.isActive;
+  const agentKeyAddress = policy?.sessionKey ?? '';
+  const dailyCap = policy ? unitsToUsdg(policy.dailyLimit) : '0';
+  const perTxCap = policy ? unitsToUsdg(policy.maxPerTx) : '0';
   const [revoking, setRevoking] = useState(false);
   const [statusBanner, setStatusBanner] = useState<string | null>(null);
 
@@ -42,9 +45,6 @@ export default function SecurityPage() {
     if (typeof window !== 'undefined') {
       const storedKeyId = localStorage.getItem('invisible_wallet_key_id');
       const storedPublicKey = localStorage.getItem('invisible_wallet_public_key');
-      const sessionKey = localStorage.getItem('invisible_wallet_session_key');
-      const sessionDaily = localStorage.getItem('invisible_wallet_session_daily_limit');
-      const sessionMax = localStorage.getItem('invisible_wallet_session_max_per_tx');
 
       const initialDevices: SignerDevice[] = [
         {
@@ -74,16 +74,6 @@ export default function SecurityPage() {
       }
 
       setSigners(initialDevices);
-
-      if (sessionKey) {
-        setHasAgentKey(true);
-        setAgentKeyAddress(sessionKey);
-        if (sessionDaily) setDailyCap((BigInt(sessionDaily) / 1000000n).toString() + '.00');
-        if (sessionMax) setPerTxCap((BigInt(sessionMax) / 1000000n).toString() + '.00');
-      } else {
-        setHasAgentKey(true);
-        setAgentKeyAddress('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
-      }
     }
   }, [address]);
 
@@ -141,10 +131,12 @@ export default function SecurityPage() {
     setRevoking(true);
     try {
       await revokeSessionKey();
-      setHasAgentKey(false);
-      localStorage.removeItem('invisible_wallet_session_key');
-      localStorage.removeItem('invisible_wallet_session_expiry');
-      setStatusBanner('AI helper key turned off on Arbitrum Stylus.');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('invisible_wallet_session_spent_today');
+        localStorage.removeItem('invisible_wallet_session_last_reset');
+      }
+      await refreshPolicy();
+      setStatusBanner('AI helper key turned off and confirmed on Arbitrum.');
       setTimeout(() => setStatusBanner(null), 4000);
     } catch (e: any) {
       alert('Revocation failed: ' + e?.message);
@@ -379,7 +371,13 @@ export default function SecurityPage() {
         ) : (
           <div className="p-6 bg-[#0d0d10] rounded-2xl text-center space-y-3">
             <p className="text-sm text-zinc-400">
-              No AI helper key is currently active.
+              {!address
+                ? 'Unlock your wallet to see your AI helper allowance.'
+                : policyLoading
+                  ? 'Checking your vault on Arbitrum Sepolia...'
+                  : policy && !policy.isActive
+                    ? 'Your last AI helper allowance has expired.'
+                    : 'No AI helper key is active on your vault.'}
             </p>
             <Link
               href="/trading"
