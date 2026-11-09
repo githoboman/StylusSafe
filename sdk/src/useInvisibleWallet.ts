@@ -86,10 +86,18 @@ export type InvisibleWallet = {
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
-// ── Canonical Deployed Addresses on Arbitrum Sepolia ─────────────────────────
-const CANONICAL_FACTORY = '0xAB283BA59EA6E9448c5C105d7afB12d73727c864' as `0x${string}`;
+// ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
+const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 export function useInvisibleWallet(config: Partial<WalletConfig> = {}): InvisibleWallet {
     const defaultFactory = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS || process.env.EXPO_PUBLIC_FACTORY_ADDRESS || CANONICAL_FACTORY) as `0x${string}`;
@@ -312,28 +320,30 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 if (!encryptedJwk || !iv) throw new Error('Wallet keys corrupted.');
 
                 const privateKey = await decryptPrivateKey(encryptedJwk, iv, pin);
+                const currentRpId = typeof window !== 'undefined' ? window.location.hostname : 'stylussafe.xyz';
                 const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
                 
                 const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
                     type: 'webauthn.get',
-                    challenge: bufferToHex(signaturePayload),
+                    challenge: bytesToBase64Url(signaturePayload),
                     origin: currentOrigin,
                     crossOrigin: false
                 }));
                 
                 const mockAuthData = new Uint8Array(37);
+                const rpIdHash = await sha256(new TextEncoder().encode(currentRpId));
+                mockAuthData.set(rpIdHash, 0);
                 mockAuthData[32] = 0x05; // UP + UV
                 
                 const clientDataHash = await sha256(mockClientDataJSON);
                 const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
                 messageToSign.set(mockAuthData, 0);
                 messageToSign.set(clientDataHash, mockAuthData.length);
-                const finalHash = await sha256(messageToSign);
 
                 const rawSignatureBuf = await crypto.subtle.sign(
                     { name: 'ECDSA', hash: 'SHA-256' },
                     privateKey,
-                    finalHash as any
+                    messageToSign as any
                 );
                 
                 return {

@@ -70,8 +70,8 @@ export function SendModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
           
           {txHash && (
             <div className="bg-[#0d0d10] rounded-lg p-3 w-full mb-6 border border-white/[0.06] flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-mono tracking-widest text-[#8e8e98]">UserOp Hash</span>
-              <a href={`https://jiffyscan.su/userOpHash/${txHash}?network=arbitrum-sepolia`} target="_blank" rel="noreferrer" className="text-xs font-mono text-[#ff4500] truncate hover:underline">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-[#8e8e98]">Arbitrum Sepolia Tx Hash</span>
+              <a href={`https://sepolia.arbiscan.io/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-xs font-mono text-[#ff4500] truncate hover:underline">
                 {txHash}
               </a>
             </div>

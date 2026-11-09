@@ -8,48 +8,54 @@ import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 const SUPPORTED_TOKENS = [
-  { symbol: 'USDG', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', decimals: 6, name: 'USDG Treasury (6 Decimals)', color: '#10B981' },
+  { symbol: 'USDG', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', decimals: 6, name: 'USDG Treasury (6 Decimals)', color: '#ff4500' },
   { symbol: 'USDC', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', decimals: 6, name: 'USD Coin', color: Colors.secondary },
   { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Ether', color: Colors.primary },
   { symbol: 'WBTC', address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 8, name: 'Wrapped Bitcoin', color: '#F7931A' },
 ];
 
 const SUPPORTED_CHAINS = [
-  { name: 'Arbitrum One', id: 42161, color: Colors.accentAzure },
+  { name: 'Arbitrum Sepolia', id: 421614, color: Colors.accentAzure },
   { name: 'Optimism', id: 10, color: '#FF0420' },
   { name: 'Base', id: 8453, color: '#0052FF' },
   { name: 'Polygon', id: 137, color: '#8247E5' },
 ];
 
 export default function TransferScreen() {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('50');
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
-  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[1]);
+  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[0]);
   const [customToToken, setCustomToToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { executeCrossChainSwap, isPending } = useInvisibleWallet();
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const { address, executeCrossChainSwap } = useInvisibleWallet();
 
   const handleTransfer = async () => {
-    if (!amount || !recipient) return;
+    const parsed = parseFloat(amount);
+    if (!parsed || parsed <= 0) return;
     setIsSubmitting(true);
+    setLastTxHash(null);
     try {
-      const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** selectedToken.decimals));
+      const targetRecipient = (recipient.trim() || address || '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc') as `0x${string}`;
+      const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const toToken = customToToken || selectedToken.address;
-      await executeCrossChainSwap(
+      const res = await executeCrossChainSwap(
         selectedChain.id,
         selectedToken.address as `0x${string}`,
         toToken as `0x${string}`,
         amountRaw,
-        recipient as `0x${string}`,
+        targetRecipient,
       );
+      if (res?.userOpHash) {
+        setLastTxHash(res.userOpHash);
+      }
       setAmount('');
       setRecipient('');
       setCustomToToken('');
-      alert('Swap successfully executed!');
     } catch (e) {
       console.error(e);
-      alert('Swap failed. ' + String(e));
+      alert('Swap failed: ' + String(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -59,8 +65,15 @@ export default function TransferScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        <Text style={styles.pageTitle}>New Transfer</Text>
-        <Text style={styles.pageSubtitle}>Bridge and swap assets cross-chain. Gas is sponsored.</Text>
+        <Text style={styles.pageTitle}>Cross-Chain Swap</Text>
+        <Text style={styles.pageSubtitle}>Bridge and swap assets with sponsored gas on Arbitrum Sepolia.</Text>
+
+        {lastTxHash && (
+          <View style={styles.successBanner}>
+            <Text style={styles.successTitle}>Swap Executed On-Chain</Text>
+            <Text style={styles.successHash} numberOfLines={1}>{lastTxHash}</Text>
+          </View>
+        )}
 
         {/* Token selector */}
         <View style={styles.card}>
@@ -86,7 +99,7 @@ export default function TransferScreen() {
           <View style={[styles.inputRow, { marginTop: Spacing.sm }]}>
             <TextInput
               style={[styles.amountInput, { fontSize: 14 }]}
-              placeholder="Custom Destination Token (Optional)"
+              placeholder="Destination Token Symbol or Address (Optional)"
               placeholderTextColor={Colors.textMuted + '60'}
               value={customToToken}
               onChangeText={setCustomToToken}
@@ -107,22 +120,19 @@ export default function TransferScreen() {
           </View>
         </View>
 
-        {/* Recipient */}
+        {/* Recipient (optional) */}
         <View style={styles.card}>
-          <Text style={styles.fieldLabel}>Destination Address</Text>
+          <Text style={styles.fieldLabel}>Recipient Address (Optional)</Text>
           <View style={styles.inputRow}>
             <TextInput
               style={[styles.amountInput, { fontSize: 14 }]}
-              placeholder="0x... or ENS name"
+              placeholder={address ? `Defaults to your wallet (${address.slice(0, 6)}...${address.slice(-4)})` : '0x...'}
               placeholderTextColor={Colors.textMuted + '60'}
               autoCapitalize="none"
               autoCorrect={false}
               value={recipient}
               onChangeText={setRecipient}
             />
-            <TouchableOpacity hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}>
-              <Text style={{ color: Colors.accentAzure, fontSize: 13, fontWeight: '600' }}>Paste</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -133,12 +143,12 @@ export default function TransferScreen() {
             {SUPPORTED_CHAINS.map((chain) => (
               <TouchableOpacity
                 key={chain.id}
-                style={[styles.chainChip, selectedChain.id === chain.id && { borderColor: chain.color, backgroundColor: chain.color + '15' }]}
+                style={[styles.chainChip, selectedChain.id === chain.id && { borderColor: '#ff4500', backgroundColor: 'rgba(255,69,0,0.12)' }]}
                 onPress={() => setSelectedChain(chain)}
                 activeOpacity={0.75}
               >
                 <View style={[styles.chainDot, { backgroundColor: chain.color }]} />
-                <Text style={[styles.chainText, selectedChain.id === chain.id && { color: chain.color, fontWeight: '600' }]}>
+                <Text style={[styles.chainText, selectedChain.id === chain.id && { color: '#ffffff', fontWeight: '600' }]}>
                   {chain.name}
                 </Text>
               </TouchableOpacity>
@@ -151,9 +161,9 @@ export default function TransferScreen() {
           <Text style={styles.summaryTitle}>Transaction Summary</Text>
           <View style={{ gap: Spacing.md, marginTop: Spacing.xs }}>
             {[
-              { label: 'Network Fee', value: 'Sponsored', valueColor: Colors.primary },
-              { label: 'Routing Protocol', value: 'Li.Fi / DEX Aggregator' },
-              { label: 'Est. Time', value: '~45 seconds' },
+              { label: 'Network Fee', value: 'Sponsored ($0.00)', valueColor: '#ffffff' },
+              { label: 'Routing Protocol', value: 'StylusSafe Solver' },
+              { label: 'Est. Time', value: '~3 seconds' },
             ].map(row => (
               <View key={row.label} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{row.label}</Text>
@@ -169,14 +179,14 @@ export default function TransferScreen() {
 
         {/* Submit */}
         <TouchableOpacity
-          style={[styles.submitButton, (!amount || !recipient) && { opacity: 0.4 }]}
+          style={[styles.submitButton, (!amount || parseFloat(amount) <= 0) && { opacity: 0.4 }]}
           onPress={handleTransfer}
-          disabled={!amount || !recipient || isSubmitting}
+          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
           activeOpacity={0.8}
         >
           {isSubmitting
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitButtonText}>Review Transfer</Text>
+            : <Text style={styles.submitButtonText}>Execute Swap ({amount || '0'} {selectedToken.symbol})</Text>
           }
         </TouchableOpacity>
 
@@ -188,13 +198,16 @@ export default function TransferScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.backgroundInk },
   scroll: { padding: Spacing.lg, gap: Spacing.md },
-  pageTitle: { fontSize: 32, fontWeight: '600', color: Colors.textPrimary, letterSpacing: -0.5 },
+  pageTitle: { fontSize: 28, fontWeight: '700', color: Colors.textPrimary, letterSpacing: -0.5 },
   pageSubtitle: { fontSize: 14, color: Colors.textMuted },
+  successBanner: { backgroundColor: '#141418', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,69,0,0.4)', gap: 4 },
+  successTitle: { fontSize: 13, fontWeight: '700', color: '#ffffff' },
+  successHash: { fontSize: 11, color: '#ff4500', fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
   card: { backgroundColor: Colors.surfaceZinc, borderRadius: Radius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border, gap: Spacing.sm },
   fieldLabel: { fontSize: 11, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
   tokenRow: { flexDirection: 'row', gap: Spacing.sm },
   tokenChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.sm, backgroundColor: Colors.surfaceContainer, borderWidth: 1, borderColor: Colors.border },
-  tokenChipActive: { borderColor: Colors.primary + '60', backgroundColor: Colors.primary + '12' },
+  tokenChipActive: { borderColor: '#ff4500', backgroundColor: 'rgba(255,69,0,0.12)' },
   tokenDot: { width: 8, height: 8, borderRadius: 2 },
   tokenChipText: { fontSize: 13, color: Colors.textMuted, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace' },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surfaceContainer, borderRadius: Radius.sm, paddingHorizontal: Spacing.md, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
@@ -209,6 +222,6 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summaryLabel: { fontSize: 12, color: Colors.textMuted, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace', flexShrink: 1, paddingRight: 8 },
   summaryValue: { fontSize: 12, color: Colors.textPrimary, fontFamily: Platform.OS === 'ios' ? 'ui-monospace' : 'monospace', flexShrink: 1, textAlign: 'right' },
-  submitButton: { backgroundColor: Colors.accentAzure, borderRadius: Radius.sm, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
-  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  submitButton: { backgroundColor: '#ff4500', borderRadius: Radius.md, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.sm },
+  submitButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

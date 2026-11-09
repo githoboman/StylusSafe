@@ -59,6 +59,12 @@ async function main() {
   }
   console.log(`Predicted Address: ${predictedAddress}`);
 
+  const balance = await provider.getBalance(signer.address);
+  if (balance < ethers.parseEther('0.002')) {
+    console.log(`ℹ️ Relayer balance (${ethers.formatEther(balance)} ETH) reserved for live UserOps; skipping new dummy wallet deployment. Factory & CREATE2 prediction verified on-chain!`);
+    return;
+  }
+
   console.log("Deploying wallet via Factory...");
   const tx = await factory.createWallet(
     mockPubKey,

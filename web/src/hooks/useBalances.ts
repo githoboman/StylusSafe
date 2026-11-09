@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 
 export const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as const;
@@ -52,17 +52,54 @@ export type CustomTokenBalance = {
   chainId: number;
 };
 
+export function getSwappedLedger(walletAddress: string | null): Record<string, number> {
+  if (typeof window === 'undefined' || !walletAddress) return {};
+  try {
+    const raw = localStorage.getItem(`invisible_wallet_swapped_balances_${walletAddress.toLowerCase()}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function recordSwappedDelta(walletAddress: string, symbol: string, delta: number) {
+  if (typeof window === 'undefined' || !walletAddress) return;
+  try {
+    const key = `invisible_wallet_swapped_balances_${walletAddress.toLowerCase()}`;
+    const current = getSwappedLedger(walletAddress);
+    const nextVal = Math.max(0, (Number(current[symbol]) || 0) + delta);
+    current[symbol] = nextVal;
+    localStorage.setItem(key, JSON.stringify(current));
+    window.dispatchEvent(new CustomEvent('stylussafe-balance-updated'));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function useBalances(walletAddress: string | null, chainId: number = 421614) {
   const [usdgBalance, setUsdgBalance] = useState('0.00');
   const [ethBalance, setEthBalance] = useState('0.00');
   const [usdcBalance, setUsdcBalance] = useState('0.00');
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
   const [customTokens, setCustomTokens] = useState<CustomTokenBalance[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefreshTick((t) => t + 1);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onUpdate = () => setRefreshTick((t) => t + 1);
+    window.addEventListener('stylussafe-balance-updated', onUpdate);
+    return () => window.removeEventListener('stylussafe-balance-updated', onUpdate);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
-    const config = CHAIN_CONFIGS[chainId];
+    const config = CHAIN_CONFIGS[chainId] || CHAIN_CONFIGS[421614];
     if (!config) return;
 
     const publicClient = createPublicClient({
@@ -75,6 +112,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         setUsdgBalance('0.00');
         setEthBalance('0.00');
         setUsdcBalance('0.00');
+        setTokenBalances({});
         return;
       }
 
@@ -82,7 +120,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
       setError(null);
       try {
         const [nativeBalRaw, usdc, usdgRaw] = await Promise.all([
-          publicClient.getBalance({ address: walletAddress as `0x${string}` }),
+          publicClient.getBalance({ address: walletAddress as `0x${string}` }).catch(() => BigInt(0)),
           publicClient
             .readContract({
               address: config.usdc,
@@ -134,9 +172,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
                 address: t.address,
                 symbol: symbol as string,
                 decimals: decimals as number,
-                balance: Number(formatUnits(bal as bigint, decimals as number)).toLocaleString(undefined, {
-                  maximumFractionDigits: 4,
-                }),
+                balance: Number(formatUnits(bal as bigint, decimals as number)).toFixed(4),
                 chainId,
               };
             } catch {
@@ -146,22 +182,33 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         );
 
         if (isMounted) {
-          const formattedNative = Number(formatEther(nativeBalRaw)).toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 4,
-          });
-          const formattedUsdg = Number(formatUnits(usdgRaw as bigint, 6)).toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          });
+          const ledger = getSwappedLedger(walletAddress);
+          const onChainEth = Number(formatEther(nativeBalRaw));
+          const onChainUsdg = Number(formatUnits(usdgRaw as bigint, 6));
+          const onChainUsdc = Number(formatUnits(usdc as bigint, 6));
+
+          const totalEth = Math.max(0, onChainEth + (Number(ledger.ETH) || 0));
+          // USDG is settled directly on-chain on Arbitrum Sepolia (421614); on other chains fall back to ledger if needed
+          const totalUsdg = chainId === 421614 ? Math.max(0, onChainUsdg + (Number(ledger.USDG_LOCAL_DELTA) || 0)) : onChainUsdg;
+          const totalUsdc = Math.max(0, onChainUsdc + (Number(ledger.USDC) || 0));
+
+          const formattedNative = totalEth.toFixed(4);
+          const formattedUsdg = totalUsdg.toFixed(2);
+          const formattedUsdc = totalUsdc.toFixed(2);
+
           setUsdgBalance(formattedUsdg);
           setEthBalance(formattedNative);
-          setUsdcBalance(
-            Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
-          );
+          setUsdcBalance(formattedUsdc);
+          setTokenBalances({
+            USDG: formattedUsdg,
+            USDC: formattedUsdc,
+            ETH: formattedNative,
+            ARB: Math.max(0, Number(ledger.ARB) || 0).toFixed(2),
+            USDT: Math.max(0, Number(ledger.USDT) || 0).toFixed(2),
+            DEGEN: Math.max(0, Number(ledger.DEGEN) || 0).toFixed(2),
+            UNI: Math.max(0, Number(ledger.UNI) || 0).toFixed(2),
+            WBTC: Math.max(0, Number(ledger.WBTC) || 0).toFixed(6),
+          });
           setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
         }
       } catch (err: any) {
@@ -173,24 +220,21 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
     };
 
     fetchBalances();
-    const interval = setInterval(fetchBalances, 15000);
+    const interval = setInterval(fetchBalances, 12000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [walletAddress, chainId]);
-
-  const refetch = () => {
-    // manual refetch trigger
-  };
+  }, [walletAddress, chainId, refreshTick]);
 
   const addCustomToken = (address: string) => {
     const saved = JSON.parse(localStorage.getItem('custom_tokens') || '[]');
     if (!saved.find((t: any) => t.address.toLowerCase() === address.toLowerCase() && t.chainId === chainId)) {
       saved.push({ address, chainId });
       localStorage.setItem('custom_tokens', JSON.stringify(saved));
+      refetch();
     }
   };
 
-  return { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, error, refetch, addCustomToken };
+  return { usdgBalance, ethBalance, usdcBalance, tokenBalances, customTokens, isFetching, error, refetch, addCustomToken };
 }

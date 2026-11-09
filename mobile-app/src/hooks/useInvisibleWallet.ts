@@ -94,10 +94,18 @@ export type InvisibleWallet = {
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
-// ── Canonical Deployed Addresses on Arbitrum Sepolia ─────────────────────────
-const CANONICAL_FACTORY = '0xAB283BA59EA6E9448c5C105d7afB12d73727c864' as `0x${string}`;
+// ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
+const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 async function getPersistItem(key: string): Promise<string | null> {
     try {
@@ -419,28 +427,30 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 }
 
                 const privateKey = await decryptPrivateKey(encryptedJwk, iv, effectivePin);
+                const currentRpId = typeof window !== 'undefined' && window.location ? window.location.hostname : 'stylussafe.xyz';
                 const currentOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://stylussafe.xyz';
                 
                 const mockClientDataJSON = new TextEncoder().encode(JSON.stringify({
                     type: 'webauthn.get',
-                    challenge: bufferToHex(signaturePayload),
+                    challenge: bytesToBase64Url(signaturePayload),
                     origin: currentOrigin,
                     crossOrigin: false
                 }));
                 
                 const mockAuthData = new Uint8Array(37);
+                const rpIdHash = await sha256(new TextEncoder().encode(currentRpId));
+                mockAuthData.set(rpIdHash, 0);
                 mockAuthData[32] = 0x05; // UP + UV
                 
                 const clientDataHash = await sha256(mockClientDataJSON);
                 const messageToSign = new Uint8Array(mockAuthData.length + clientDataHash.length);
                 messageToSign.set(mockAuthData, 0);
                 messageToSign.set(clientDataHash, mockAuthData.length);
-                const finalHash = await sha256(messageToSign);
 
                 const rawSignatureBuf = await crypto.subtle.sign(
                     { name: 'ECDSA', hash: 'SHA-256' },
                     privateKey,
-                    finalHash as any
+                    messageToSign as any
                 );
                 
                 return {
@@ -511,15 +521,15 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             abi: [{ type: 'function', name: 'getNonce', inputs: [{ name: 'sender', type: 'address' }, { name: 'key', type: 'uint192' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
             functionName: 'getNonce',
             args: [currentAddress as `0x${string}`, 0n],
-        }) as bigint;
+        }).catch(() => 0n) as bigint;
 
         let initCode = '0x';
-        if (nonce === 0n && typeof window !== 'undefined') {
-            const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
+        if (nonce === 0n) {
+            const pubKeyHex = await getPersistItem('invisible_wallet_public_key');
             if (pubKeyHex) {
                 const viem = await import('viem');
-                const currentRpId = typeof window !== 'undefined' ? window.location.hostname : 'stylussafe.xyz';
-                const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stylussafe.xyz';
+                const currentRpId = typeof window !== 'undefined' && window.location ? window.location.hostname : 'stylussafe.xyz';
+                const currentOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://stylussafe.xyz';
 
                 const deployCallData = viem.encodeFunctionData({
                     abi: [{ type: 'function', name: 'createWallet', inputs: [{ name: 'publicKey', type: 'bytes' }, { name: 'entryPoint', type: 'address' }, { name: 'rpId', type: 'string' }, { name: 'origin', type: 'string' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'nonpayable' }],
@@ -535,11 +545,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             nonce: `0x${nonce.toString(16)}`,
             initCode: initCode,
             callData,
-            callGasLimit: '0xF4240',
-            verificationGasLimit: '0xF4240',
-            preVerificationGas: '0x186A0',
-            maxFeePerGas: '0x5F5E100',
-            maxPriorityFeePerGas: '0x5F5E100',
+            callGasLimit: '0x61A80',
+            verificationGasLimit: '0xAAE60',
+            preVerificationGas: '0xEA60',
+            maxFeePerGas: '0x0',
+            maxPriorityFeePerGas: '0x0',
             paymasterAndData: '0x',
             signature: '0x',
         };
