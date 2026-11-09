@@ -174,17 +174,8 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         maximumFractionDigits: 4,
       });
 
-      let numericUsdg = Number(formatUnits(usdgRaw as bigint, 6));
-      if (numericUsdg === 0 && chainId === 421614) {
-        const grantKey = `usdg_faucet_grant_${walletAddress.toLowerCase()}`;
-        const existingGrant = await getStorageValue(grantKey);
-        if (existingGrant) {
-          numericUsdg = parseFloat(existingGrant) || 1000;
-        } else {
-          await setStorageValue(grantKey, '1000.00');
-          numericUsdg = 1000;
-        }
-      }
+      // Real on-chain USDG balance only; no fabricated faucet grant.
+      const numericUsdg = Number(formatUnits(usdgRaw as bigint, 6));
 
       const formattedUsdg = numericUsdg.toLocaleString(undefined, {
         minimumFractionDigits: 2,

@@ -1,31 +1,66 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { encodeFunctionData, isAddress, parseUnits } from 'viem';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
+const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as const;
+
+type Step = { id: string; title: string; desc: string; dest: `0x${string}`; value: bigint; func: `0x${string}` };
+
 export default function IntentsScreen() {
   const router = useRouter();
   const { executeIntentBatch } = useInvisibleWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const handleAddStep = () => {
+    const amt = parseFloat(amount);
+    if (!isAddress(recipient)) {
+      Alert.alert('Check the address', 'Enter a valid wallet address (starts with 0x, 42 characters).');
+      return;
+    }
+    if (!amt || amt <= 0) {
+      Alert.alert('Check the amount', 'Enter an amount greater than zero.');
+      return;
+    }
+    const data = encodeFunctionData({
+      abi: [{ type: 'function', name: 'transfer', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
+      functionName: 'transfer',
+      args: [recipient as `0x${string}`, parseUnits(amount, 6)],
+    });
+    setSteps((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}`,
+        title: 'Send USDG',
+        desc: `${amt} USDG to ${recipient.slice(0, 6)}...${recipient.slice(-4)}`,
+        dest: USDG_ADDRESS,
+        value: 0n,
+        func: data,
+      },
+    ]);
+    setRecipient('');
+    setAmount('');
+    setAdding(false);
+  };
 
   const handleSignBatch = async () => {
+    if (steps.length === 0) return;
     setIsSubmitting(true);
     try {
-      // Execute multi-intent atomic batch UserOp
-      const sampleIntents = [
-        {
-          dest: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', // USDG Token
-          value: 0n,
-          func: '0x095ea7b3000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // approve Uniswap
-        }
-      ];
-
-      const res = await executeIntentBatch(sampleIntents, '0000');
+      const res = await executeIntentBatch(
+        steps.map((s) => ({ dest: s.dest, value: s.value, func: s.func })),
+        '0000'
+      );
       if (res?.userOpHash) {
-        Alert.alert('Batch Executed', `All actions successfully submitted atomically to Arbitrum Sepolia. Hash: ${res.userOpHash.slice(0, 10)}...`, [
+        Alert.alert('Batch Executed', `All ${steps.length} actions were submitted together to Arbitrum Sepolia. Hash: ${res.userOpHash.slice(0, 10)}...`, [
           { text: 'OK', onPress: () => router.back() }
         ]);
       } else {
@@ -47,68 +82,88 @@ export default function IntentsScreen() {
         <Text style={styles.headerTitle}>Intent Batches</Text>
         <View style={{ width: 24 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.pageSubtitle}>
-          Compose multiple actions across contracts and chains into a single atomic transaction.
+          Line up several actions and send them as one all-or-nothing transaction.
         </Text>
 
-        <Text style={styles.sectionTitle}>Draft Intent</Text>
-        
-        {/* Step 1 */}
-        <View style={styles.stepCard}>
-          <View style={styles.stepBadge}><Text style={styles.stepNum}>1</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>Bridge Assets</Text>
-            <Text style={styles.stepDesc}>Arbitrum Sepolia → Optimism</Text>
+        <Text style={styles.sectionTitle}>Your Actions</Text>
+
+        {steps.length === 0 && !adding && (
+          <Text style={styles.pageSubtitle}>No actions yet. Tap Add Action to start your batch.</Text>
+        )}
+
+        {steps.map((step, i) => (
+          <View key={step.id}>
+            {i > 0 && <View style={styles.line} />}
+            <View style={styles.stepCard}>
+              <View style={styles.stepBadge}><Text style={styles.stepNum}>{i + 1}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.stepTitle}>{step.title}</Text>
+                <Text style={styles.stepDesc}>{step.desc}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSteps((prev) => prev.filter((s) => s.id !== step.id))}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle-outline" size={22} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
           </View>
-          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        </View>
+        ))}
 
-        <View style={styles.line} />
-
-        {/* Step 2 */}
-        <View style={styles.stepCard}>
-          <View style={styles.stepBadge}><Text style={styles.stepNum}>2</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>Swap Asset</Text>
-            <Text style={styles.stepDesc}>USDG → ETH on Uniswap V3</Text>
+        {adding ? (
+          <View style={[styles.stepCard, { flexDirection: 'column', alignItems: 'stretch', marginTop: Spacing.lg }]}>
+            <Text style={styles.stepTitle}>Send USDG</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Recipient address (0x...)"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={recipient}
+              onChangeText={setRecipient}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Amount in USDG"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+            />
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <TouchableOpacity style={[styles.addButton, { flex: 1, marginTop: 0 }]} onPress={() => setAdding(false)}>
+                <Text style={styles.addText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.addButton, { flex: 1, marginTop: 0, backgroundColor: Colors.accentAzure }]} onPress={handleAddStep}>
+                <Text style={[styles.addText, { color: '#fff' }]}>Add</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        </View>
-
-        <View style={styles.line} />
-
-        {/* Step 3 */}
-        <View style={styles.stepCard}>
-          <View style={styles.stepBadge}><Text style={styles.stepNum}>3</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.stepTitle}>Deposit to Protocol</Text>
-            <Text style={styles.stepDesc}>Supply USDG to Aave V3</Text>
-          </View>
-          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-        </View>
-
-        <TouchableOpacity style={styles.addButton} onPress={() => {}}>
-          <Ionicons name="add" size={18} color={Colors.textPrimary} />
-          <Text style={styles.addText}>Add Action</Text>
-        </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.addButton} onPress={() => setAdding(true)}>
+            <Ionicons name="add" size={18} color={Colors.textPrimary} />
+            <Text style={styles.addText}>Add Action</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.summaryBox}>
           <Ionicons name="shield-checkmark" size={24} color={Colors.secondary} />
           <Text style={styles.summaryText}>
-            If any step fails, the entire transaction reverts and no assets are moved.
+            If any step fails, the whole batch is cancelled and nothing is moved.
           </Text>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.saveButton, isSubmitting && { opacity: 0.5 }]} 
-          disabled={isSubmitting}
+        <TouchableOpacity
+          style={[styles.saveButton, (isSubmitting || steps.length === 0) && { opacity: 0.5 }]}
+          disabled={isSubmitting || steps.length === 0}
           onPress={handleSignBatch}
         >
           {isSubmitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Sign Batch</Text>
+            <Text style={styles.saveButtonText}>{steps.length ? `Sign ${steps.length} Action${steps.length > 1 ? 's' : ''}` : 'Sign Batch'}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -135,5 +190,6 @@ const styles = StyleSheet.create({
   summaryBox: { flexDirection: 'row', backgroundColor: Colors.secondary + '10', padding: Spacing.md, borderRadius: Radius.sm, marginTop: Spacing.xl, alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderColor: Colors.secondary + '40' },
   summaryText: { flex: 1, fontSize: 13, color: Colors.textPrimary, lineHeight: 18 },
   saveButton: { backgroundColor: Colors.accentAzure, borderRadius: Radius.sm, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.lg },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' }
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  input: { backgroundColor: Colors.surfaceContainer, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, color: Colors.textPrimary, paddingHorizontal: Spacing.md, height: 46, marginVertical: Spacing.sm },
 });

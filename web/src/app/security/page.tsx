@@ -55,7 +55,7 @@ export default function SecurityPage() {
           type: 'passkey',
           publicKeyPrefix: storedPublicKey
             ? `${storedPublicKey.slice(0, 10)}...${storedPublicKey.slice(-6)}`
-            : '0x04e8b3...7f21a',
+            : 'Not enrolled yet',
           date: 'Registered on Arbitrum',
           isCurrentDevice: true,
         },
@@ -87,7 +87,7 @@ export default function SecurityPage() {
         type: 'hardware',
         publicKeyPrefix: result?.walletAddress
           ? `${result.walletAddress.slice(0, 8)}...`
-          : '0x048291...3c12',
+          : 'Pending confirmation',
         date: `Added ${new Date().toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',

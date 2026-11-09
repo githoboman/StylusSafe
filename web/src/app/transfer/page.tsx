@@ -19,6 +19,16 @@ const TOKENS = [
   { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, priceUsd: 65000.0, isNative: false },
 ];
 
+const LLAMA_IDS: Record<string, string> = {
+  ETH: 'coingecko:ethereum',
+  ARB: 'coingecko:arbitrum',
+  UNI: 'coingecko:uniswap',
+  WBTC: 'coingecko:wrapped-bitcoin',
+  DEGEN: 'coingecko:degen-base',
+  USDC: 'coingecko:usd-coin',
+  USDT: 'coingecko:tether',
+};
+
 const CHAINS = [
   { name: 'Arbitrum Sepolia', id: 421614 },
   { name: 'Base', id: 8453 },
@@ -68,12 +78,49 @@ export default function TransferPage() {
     return '0.00';
   };
 
+  // Live USD prices from DeFiLlama; the static table above is only an offline fallback.
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const [pricesLive, setPricesLive] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const keys = Object.values(LLAMA_IDS).join(',');
+        const res = await fetch(`https://coins.llama.fi/prices/current/${keys}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const next: Record<string, number> = {};
+        for (const [symbol, id] of Object.entries(LLAMA_IDS)) {
+          const p = json?.coins?.[id]?.price;
+          if (typeof p === 'number' && p > 0) next[symbol] = p;
+        }
+        if (!cancelled && Object.keys(next).length > 0) {
+          setLivePrices(next);
+          setPricesLive(true);
+        }
+      } catch {
+        if (!cancelled) setPricesLive(false);
+      }
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  const priceOf = (token: { symbol: string; priceUsd: number }) =>
+    livePrices[token.symbol] ?? token.priceUsd;
+
   const computeEstimatedOutput = () => {
     const parsed = parseFloat(amount || '0');
     if (!parsed || parsed <= 0) return '0.00';
-    const usdIn = parsed * selectedToken.priceUsd;
-    const outTokens = (usdIn / selectedDestToken.priceUsd) * 0.998;
-    const decimalsToShow = selectedDestToken.priceUsd >= 1000 ? 5 : selectedDestToken.priceUsd < 0.1 ? 0 : 2;
+    const usdIn = parsed * priceOf(selectedToken);
+    const destPrice = priceOf(selectedDestToken);
+    const outTokens = (usdIn / destPrice) * 0.998;
+    const decimalsToShow = destPrice >= 1000 ? 5 : destPrice < 0.1 ? 0 : 2;
     return outTokens.toFixed(decimalsToShow);
   };
 
@@ -531,7 +578,7 @@ export default function TransferPage() {
                   <div className="flex justify-between">
                     <span>Exchange Rate</span>
                     <span className="text-white font-mono">
-                      1 {selectedToken.symbol} ≈ {(selectedToken.priceUsd / selectedDestToken.priceUsd).toFixed(selectedDestToken.priceUsd > 100 ? 4 : 2)} {selectedDestToken.symbol}
+                      1 {selectedToken.symbol} ≈ {(priceOf(selectedToken) / priceOf(selectedDestToken)).toFixed(priceOf(selectedDestToken) > 100 ? 4 : 2)} {selectedDestToken.symbol} <span className="ml-1 text-[10px] text-zinc-500">{pricesLive ? 'live' : 'offline estimate'}</span>
                     </span>
                   </div>
                   <div className="flex justify-between">

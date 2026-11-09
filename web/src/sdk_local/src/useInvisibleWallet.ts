@@ -115,6 +115,7 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+// Offline fallback only. Overwritten with live DeFiLlama prices by refreshTokenPrices().
 const TOKEN_USD_PRICES: Record<string, number> = {
     USDG: 1.0,
     USDC: 1.0,
@@ -125,6 +126,33 @@ const TOKEN_USD_PRICES: Record<string, number> = {
     UNI: 7.5,
     WBTC: 65000.0,
 };
+
+const LLAMA_PRICE_IDS: Record<string, string> = {
+    ETH: 'coingecko:ethereum',
+    ARB: 'coingecko:arbitrum',
+    UNI: 'coingecko:uniswap',
+    WBTC: 'coingecko:wrapped-bitcoin',
+    DEGEN: 'coingecko:degen-base',
+    USDC: 'coingecko:usd-coin',
+    USDT: 'coingecko:tether',
+};
+
+/** Fetches live USD prices and updates the shared table; silently keeps fallback on failure. */
+export async function refreshTokenPrices(): Promise<Record<string, number>> {
+    try {
+        const res = await fetch(`https://coins.llama.fi/prices/current/${Object.values(LLAMA_PRICE_IDS).join(',')}`);
+        if (res.ok) {
+            const json = await res.json();
+            for (const [symbol, id] of Object.entries(LLAMA_PRICE_IDS)) {
+                const p = json?.coins?.[id]?.price;
+                if (typeof p === 'number' && p > 0) TOKEN_USD_PRICES[symbol] = p;
+            }
+        }
+    } catch {
+        // offline: keep fallback prices
+    }
+    return TOKEN_USD_PRICES;
+}
 
 const TOKEN_DECIMALS: Record<string, number> = {
     USDG: 6,
@@ -863,6 +891,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
+            await refreshTokenPrices();
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized. Call login() or register().');
             

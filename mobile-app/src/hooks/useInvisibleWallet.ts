@@ -96,6 +96,8 @@ export type InvisibleWallet = {
 
 // ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
 const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
+const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string}`;
+const SOLVER_LIQUIDITY_VAULT = '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
 
@@ -753,15 +755,27 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 pin = arg6 as string | undefined;
             }
 
-            const dests: `0x${string}`[] = [recipient];
-            const values: bigint[] = [amount];
-            const funcs: `0x${string}`[] = ['0x'];
+            // Paying with USDG encodes a real ERC-20 transfer to the solver vault (or the given
+            // recipient). Other tokens have no on-chain leg on testnet, so we send a zero-value
+            // call to the solver instead of passing the token amount as native ETH value.
+            const isPayingUsdg = fromToken === 'USDG' || fromToken.toLowerCase() === USDG_ADDRESS.toLowerCase();
+            const execAbi = [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }] as const;
+            let walletCallData: `0x${string}`;
 
-            const walletCallData = encodeFunctionData({
-                abi: [{ type: 'function', name: 'executeBatch', inputs: [{ name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [], stateMutability: 'nonpayable' }],
-                functionName: 'executeBatch',
-                args: [dests, values, funcs]
-            });
+            if (isPayingUsdg) {
+                const settlementRecipient =
+                    !recipient || recipient.toLowerCase() === currentAddress.toLowerCase()
+                        ? SOLVER_LIQUIDITY_VAULT
+                        : recipient;
+                const erc20TransferData = encodeFunctionData({
+                    abi: [{ type: 'function', name: 'transfer', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
+                    functionName: 'transfer',
+                    args: [settlementRecipient, amount],
+                });
+                walletCallData = encodeFunctionData({ abi: execAbi, functionName: 'execute', args: [USDG_ADDRESS, 0n, erc20TransferData] });
+            } else {
+                walletCallData = encodeFunctionData({ abi: execAbi, functionName: 'execute', args: [SOLVER_LIQUIDITY_VAULT, 0n, '0x'] });
+            }
 
             const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
             return { userOpHash };
@@ -931,7 +945,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            const payee = currentAddress as `0x${string}`;
+            // StylusSafeAccount.setupSubscription reverts (InvalidPolicy) if payee is the account itself or zero.
+            const payee =
+                tokenIn && tokenIn.toLowerCase() !== currentAddress.toLowerCase() && tokenIn !== '0x0000000000000000000000000000000000000000'
+                    ? tokenIn
+                    : SOLVER_LIQUIDITY_VAULT;
             const callData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'setupSubscription', inputs: [{ name: 'payee', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'frequencyDays', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
                 functionName: 'setupSubscription',

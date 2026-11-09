@@ -1,56 +1,137 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Platform,
+  Platform, Linking, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { createPublicClient, http, parseAbiItem, formatUnits } from 'viem';
 import { Colors, Spacing, Radius } from '@/constants/theme';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
+import { USDG_ADDRESS } from '@/hooks/useBalances';
 
-const MOCK_TRANSACTIONS = [
-  { id: '1', type: 'Bridge', desc: '0.5 ETH → Optimism', time: '2 min ago', status: 'Confirmed', amount: '0.5 ETH', positive: false },
-  { id: '2', type: 'Receive', desc: 'From 0x1a2b...3c4d', time: '1h ago', status: 'Confirmed', amount: '+100 USDC', positive: true },
-  { id: '3', type: 'Intent Batch', desc: '3 operations', time: '3h ago', status: 'Confirmed', amount: '—', positive: false },
-  { id: '4', type: 'DCA', desc: 'Auto-swap ETH → USDC', time: '1d ago', status: 'Confirmed', amount: '0.1 ETH', positive: false },
-  { id: '5', type: 'Session Key', desc: 'Created 8h session', time: '1d ago', status: 'Expired', amount: '—', positive: false },
-  { id: '6', type: 'Receive', desc: 'From Faucet', time: '2d ago', status: 'Confirmed', amount: '+0.01 ETH', positive: true },
-];
+const RPC_URL = 'https://sepolia-rollup.arbitrum.io/rpc';
+const ZERO = '0x0000000000000000000000000000000000000000';
+
+type Tx = {
+  id: string;
+  type: 'Receive' | 'Send' | 'Mint';
+  desc: string;
+  block: bigint;
+  status: 'Confirmed';
+  amount: string;
+  positive: boolean;
+  hash: string;
+};
+
+
+const transferEvent = parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)');
 
 const TYPE_COLORS: Record<string, string> = {
-  Bridge: Colors.accentAzure,
   Receive: Colors.primary,
-  'Intent Batch': Colors.secondary,
-  DCA: Colors.tertiary,
-  'Session Key': Colors.textMuted,
+  Mint: Colors.tertiary,
+  Send: Colors.accentAzure,
 };
 
 const STATUS_COLORS: Record<string, string> = {
   Confirmed: Colors.primary,
-  Pending: Colors.tertiary,
-  Failed: Colors.error,
-  Expired: Colors.textMuted,
 };
 
+const short = (a?: string) => (a ? `${a.slice(0, 6)}...${a.slice(-4)}` : '');
+
 export default function ActivityScreen() {
+  const { address } = useInvisibleWallet();
+  const [txs, setTxs] = useState<Tx[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!address) {
+      setTxs([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const client = createPublicClient({ transport: http(RPC_URL) });
+      const latest = await client.getBlockNumber();
+      const fromBlock = latest > 200_000n ? latest - 200_000n : 0n;
+      const me = address as `0x${string}`;
+
+      const [incoming, outgoing] = await Promise.all([
+        client.getLogs({ address: USDG_ADDRESS, event: transferEvent, args: { to: me }, fromBlock, toBlock: latest }),
+        client.getLogs({ address: USDG_ADDRESS, event: transferEvent, args: { from: me }, fromBlock, toBlock: latest }),
+      ]);
+
+      const list: Tx[] = [];
+      for (const log of incoming) {
+        const isMint = log.args.from?.toLowerCase() === ZERO;
+        list.push({
+          id: `in-${log.transactionHash}-${log.logIndex}`,
+          type: isMint ? 'Mint' : 'Receive',
+          desc: isMint ? 'Testnet USDG minted' : `From ${short(log.args.from)}`,
+          block: log.blockNumber ?? 0n,
+          status: 'Confirmed',
+          amount: `+${Number(formatUnits(log.args.value ?? 0n, 6)).toFixed(2)} USDG`,
+          positive: true,
+          hash: log.transactionHash ?? '',
+        });
+      }
+      for (const log of outgoing) {
+        list.push({
+          id: `out-${log.transactionHash}-${log.logIndex}`,
+          type: 'Send',
+          desc: `To ${short(log.args.to)}`,
+          block: log.blockNumber ?? 0n,
+          status: 'Confirmed',
+          amount: `-${Number(formatUnits(log.args.value ?? 0n, 6)).toFixed(2)} USDG`,
+          positive: false,
+          hash: log.transactionHash ?? '',
+        });
+      }
+      list.sort((a, b) => (a.block < b.block ? 1 : a.block > b.block ? -1 : 0));
+      setTxs(list);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not load on-chain activity');
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const stats = useMemo(() => {
+    const received = txs.filter((t) => t.positive).length;
+    const sent = txs.length - received;
+    return [
+      { label: 'Total', value: String(txs.length) },
+      { label: 'Received', value: String(received) },
+      { label: 'Sent', value: String(sent) },
+    ];
+  }, [txs]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={Colors.primary} />}
+      >
 
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Activity</Text>
-          <TouchableOpacity style={styles.filterButton} onPress={() => {}} activeOpacity={0.7}>
-            <Text style={styles.filterText}>Filter</Text>
+          <TouchableOpacity style={styles.filterButton} onPress={load} activeOpacity={0.7}>
+            {loading ? <ActivityIndicator size="small" color={Colors.textMuted} /> : <Text style={styles.filterText}>Refresh</Text>}
           </TouchableOpacity>
         </View>
-        <Text style={styles.pageSubtitle}>All wallet transactions and events.</Text>
+        <Text style={styles.pageSubtitle}>Live USDG transfers for your wallet on Arbitrum Sepolia.</Text>
 
-        {/* Stats Row */}
+        {/* Stats Row (derived from the real transfers below) */}
         <View style={styles.statsUnifiedCard}>
-          {[
-            { label: 'Total Txns', value: '24' },
-            { label: 'Bridges', value: '6' },
-            { label: 'Gas Saved', value: '$12.40' },
-          ].map((stat, idx) => (
+          {stats.map((stat, idx) => (
             <View key={stat.label} style={{ flexDirection: 'row', flex: 1 }}>
               <View style={styles.statColumn}>
                 <Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{stat.value}</Text>
@@ -63,29 +144,38 @@ export default function ActivityScreen() {
 
         {/* Transaction feed */}
         <Text style={styles.sectionLabel}>Recent Transactions</Text>
-        {MOCK_TRANSACTIONS.map((tx) => (
-          <TouchableOpacity key={tx.id} style={styles.txCard} activeOpacity={0.7} onPress={() => {}}>
-            {/* Type indicator */}
+
+        {!address && <Text style={styles.pageSubtitle}>Create or unlock your wallet to see activity.</Text>}
+        {error && <Text style={[styles.pageSubtitle, { color: Colors.error }]}>{error}</Text>}
+        {address && !loading && !error && txs.length === 0 && (
+          <Text style={styles.pageSubtitle}>No transfers yet. Mint some USDG or make a swap and it will show up here.</Text>
+        )}
+
+        {txs.map((tx) => (
+          <TouchableOpacity
+            key={tx.id}
+            style={styles.txCard}
+            activeOpacity={0.7}
+            onPress={() => tx.hash && Linking.openURL(`https://sepolia.arbiscan.io/tx/${tx.hash}`)}
+          >
             <View style={[styles.txIconBox, { backgroundColor: (TYPE_COLORS[tx.type] || Colors.textMuted) + '18' }]}>
-              <Ionicons 
-                name={tx.type === 'Bridge' ? 'arrow-up' : tx.type === 'Receive' ? 'arrow-down' : tx.type === 'DCA' ? 'repeat' : tx.type === 'Session Key' ? 'flash' : 'list'} 
-                size={20} 
-                color={TYPE_COLORS[tx.type] || Colors.textPrimary} 
+              <Ionicons
+                name={tx.type === 'Send' ? 'arrow-up' : 'arrow-down'}
+                size={20}
+                color={TYPE_COLORS[tx.type] || Colors.textPrimary}
               />
             </View>
 
-            {/* Details */}
             <View style={{ flex: 1 }}>
               <Text style={styles.txType}>{tx.type}</Text>
               <Text style={styles.txDesc}>{tx.desc}</Text>
             </View>
 
-            {/* Right column */}
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={[styles.txAmount, tx.positive && { color: Colors.primary }]}>{tx.amount}</Text>
               <View style={styles.txTimestamp}>
                 <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[tx.status] || Colors.textMuted }]} />
-                <Text style={styles.txTime}>{tx.time}</Text>
+                <Text style={styles.txTime}>Block {tx.block.toString()}</Text>
               </View>
             </View>
           </TouchableOpacity>

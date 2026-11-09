@@ -8,6 +8,7 @@ import { SendModal } from '@/components/SendModal';
 import { ImportTokenModal } from '@/components/ImportTokenModal';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
+import { unitsToUsdg, useOnChainAgentPolicy } from '@/lib/agentPolicy';
 import {
   IconSwap,
   IconShield,
@@ -40,6 +41,8 @@ export default function Dashboard() {
     isFetching,
     addCustomToken,
   } = useBalances(address, selectedChain);
+
+  const { policy } = useOnChainAgentPolicy(address);
 
   const handleImportToken = (addr: string) => {
     addCustomToken(addr);
@@ -247,7 +250,7 @@ export default function Dashboard() {
                 AI Helper Allowance
               </h3>
               <span className="text-xs font-mono text-zinc-400 px-2.5 py-1 rounded-md bg-white/[0.04] border border-white/[0.06]">
-                $500 / day
+                {policy && policy.isActive ? `$${unitsToUsdg(policy.dailyLimit)} / day` : 'Not set'}
               </span>
             </div>
             <p className="text-sm text-zinc-300 leading-relaxed">

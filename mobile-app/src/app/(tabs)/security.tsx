@@ -1,12 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
   Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { createPublicClient, http, parseAbi, formatUnits } from 'viem';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { getMobileBiometricStatus } from '@/hooks/biometricAuthenticator';
+import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
+
+const POLICY_ABI = parseAbi([
+  'function sessionKey() view returns (address)',
+  'function sessionDailyLimit() view returns (uint256)',
+  'function sessionMaxPerTx() view returns (uint256)',
+]);
 
 const SIGNERS = [
   { name: 'Primary Mobile Enclave (FaceID / BiometricPrompt)', badge: 'secp256r1', date: 'OpenBR 64-D Enrolled · Active', active: true },
@@ -16,6 +24,39 @@ const SIGNERS = [
 
 export default function SecurityScreen() {
   const bioStatus = getMobileBiometricStatus();
+  const { address } = useInvisibleWallet();
+  const [caps, setCaps] = useState<{ daily: string; perTx: string } | null>(null);
+  const [capsState, setCapsState] = useState<'idle' | 'loading' | 'none' | 'error'>('idle');
+
+  // Read the live allowance from the smart account on Arbitrum Sepolia.
+  useEffect(() => {
+    if (!address) { setCaps(null); setCapsState('idle'); return; }
+    let cancelled = false;
+    (async () => {
+      setCapsState('loading');
+      try {
+        const client = createPublicClient({ transport: http('https://sepolia-rollup.arbitrum.io/rpc') });
+        const wallet = address as `0x${string}`;
+        const code = await client.getBytecode({ address: wallet });
+        if (!code || code === '0x') { if (!cancelled) { setCaps(null); setCapsState('none'); } return; }
+        const [key, daily, perTx] = await Promise.all([
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionKey' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionDailyLimit' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionMaxPerTx' }),
+        ]);
+        if (cancelled) return;
+        if (key === '0x0000000000000000000000000000000000000000') { setCaps(null); setCapsState('none'); return; }
+        setCaps({ daily: formatUnits(daily, 6), perTx: formatUnits(perTx, 6) });
+        setCapsState('idle');
+      } catch {
+        if (!cancelled) setCapsState('error');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [address]);
+
+  const capText = (v?: string) =>
+    v !== undefined ? `$${v} USDG` : capsState === 'loading' ? 'Loading...' : capsState === 'error' ? 'Unavailable' : 'Not set';
   const [lastVerifiedAt, setLastVerifiedAt] = useState<string>('Verified at Wallet Sign-Up');
 
   const handleTestBiometricPrompt = () => {
@@ -126,8 +167,8 @@ export default function SecurityScreen() {
         {/* Spending Limits */}
         <Text style={styles.sectionLabel}>On-Chain Spending Caps</Text>
         {[
-          { label: 'Daily Rolling Limit (24h)', value: '$500.00 USDG' },
-          { label: 'Per-Transaction Cap', value: '$100.00 USDG' },
+          { label: 'Daily Rolling Limit (24h)', value: capText(caps?.daily) },
+          { label: 'Per-Transaction Cap', value: capText(caps?.perTx) },
         ].map(item => (
           <View key={item.label} style={[styles.card, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
             <Text style={styles.cardSubtitle}>{item.label}</Text>
