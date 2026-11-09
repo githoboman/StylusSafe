@@ -33,6 +33,7 @@ export const ThreeVaultScene: React.FC<{ className?: string }> = ({ className = 
     renderer.toneMappingExposure = 1.2;
     renderer.domElement.style.maxWidth = '100%';
     renderer.domElement.style.display = 'block';
+    renderer.domElement.style.touchAction = 'pan-y';
     container.appendChild(renderer.domElement);
 
     // Root Group
@@ -249,17 +250,17 @@ export const ThreeVaultScene: React.FC<{ className?: string }> = ({ className = 
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={triggerSecurityPulse}
-      className={`relative w-full max-w-full h-[320px] sm:h-[380px] md:h-[440px] flex items-center justify-center cursor-pointer select-none overflow-hidden rounded-2xl ${className}`}
+      style={{ touchAction: 'pan-y' }}
+      className={`relative w-full max-w-full h-[300px] sm:h-[360px] md:h-[400px] flex items-center justify-center cursor-pointer select-none overflow-hidden rounded-2xl touch-pan-y ${className}`}
       title="Click to trigger Hardware Security Pulse"
     >
       {/* 3D Telemetry HUD Pill */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#141418]/85 border border-white/[0.08] backdrop-blur-md text-[10px] sm:text-[11px] font-mono text-[#8e8e98] pointer-events-none">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#ff4500] animate-pulse shrink-0" />
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418]/90 border border-white/[0.08] backdrop-blur-md text-xs font-mono text-zinc-300 pointer-events-none">
+        <span className="w-2 h-2 rounded-full bg-[#ff4500] shrink-0" />
         <span className="truncate">RIP-7212 • WASM</span>
       </div>
 
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#141418]/85 border border-white/[0.08] backdrop-blur-md text-[10px] sm:text-[11px] font-mono text-emerald-400 pointer-events-none">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418]/90 border border-white/[0.08] backdrop-blur-md text-xs font-mono text-zinc-300 pointer-events-none">
         <span className="truncate">PAXOS USDG</span>
       </div>
 
@@ -269,8 +270,8 @@ export const ThreeVaultScene: React.FC<{ className?: string }> = ({ className = 
       )}
 
       {/* Interactive Hint */}
-      <div className="absolute bottom-3 inset-x-3 z-10 text-center text-[10px] sm:text-[11px] font-mono text-[#8e8e98] bg-[#09090b]/85 px-2.5 py-1 rounded-md border border-white/[0.06] backdrop-blur-sm pointer-events-none transition-opacity duration-300 truncate">
-        {isHovered ? 'Interactive 3D Vault • Rotate with Cursor' : '3D Biometric Vault • Tap to Pulse'}
+      <div className="absolute bottom-4 inset-x-4 z-10 text-center text-xs font-mono text-zinc-400 bg-[#09090b]/85 px-3 py-1.5 rounded-lg border border-white/[0.06] backdrop-blur-sm pointer-events-none transition-opacity duration-300 truncate">
+        {isHovered ? 'Interactive 3D Vault' : 'Biometric Vault • Tap to Pulse'}
       </div>
     </div>
   );

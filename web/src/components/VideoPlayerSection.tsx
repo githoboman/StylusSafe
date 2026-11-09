@@ -156,7 +156,7 @@ export const VideoPlayerSection: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-[#10b981]">● USDG ATOMIC INTENTS</span>
+              <span className="text-zinc-400">Arbitrum Stylus · Paxos USDG</span>
             </div>
           </div>
         </div>

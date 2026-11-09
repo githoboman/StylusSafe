@@ -216,22 +216,22 @@ export default function PortfolioScreen() {
               style={[
                 styles.statusBadge,
                 {
-                  backgroundColor: walletAddress
-                    ? Colors.primary + '18'
-                    : Colors.error + '18',
+                  backgroundColor: Colors.surfaceZinc,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
                 },
               ]}
             >
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: walletAddress ? '#10B981' : Colors.error },
+                  { backgroundColor: walletAddress ? Colors.accentOrange : Colors.textMuted },
                 ]}
               />
               <Text
                 style={[
                   styles.statusText,
-                  { color: walletAddress ? '#10B981' : Colors.error },
+                  { color: Colors.textPrimary },
                 ]}
               >
                 {walletAddress ? 'RIP-7212' : 'Locked'}
@@ -427,8 +427,9 @@ const styles = StyleSheet.create({
     fontFamily: monoFont,
   },
   disconnectLink: {
-    fontSize: 11,
-    color: Colors.error,
+    fontSize: 12,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
     fontFamily: monoFont,
   },
   swipeGuideBtn: {

@@ -16,105 +16,83 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
-const SWIPE_THRESHOLD = width * 0.24;
+const SWIPE_THRESHOLD = width * 0.22;
 const MOBILE_ONBOARDING_KEY = 'stylussafe_mobile_onboarding_done_v2';
 
 export interface MobileOnboardingSlide {
   id: string;
   step: string;
-  badge: string;
-  accentColor: string;
   title: string;
   simpleExplanation: string;
   howToSteps: string[];
-  techProofSpec: string;
+  techLine: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
 export const MOBILE_ONBOARDING_SLIDES: MobileOnboardingSlide[] = [
   {
     id: 'biometric-key',
-    step: '1 of 5',
-    badge: 'STEP 1 • NO SECRET WORDS TO LOSE',
-    accentColor: '#FF4500',
-    title: 'Your Face & Fingerprint Are Your Wallet Key',
+    step: 'Step 1 of 5',
+    title: 'Your Face & Fingerprint Are Your Key',
     simpleExplanation:
-      'Old crypto wallets force you to write down 12 secret words on paper. Lose that paper, and your money is gone forever. Here, your face and fingerprint unlock your wallet — just like unlocking your phone.',
+      'Forget writing down 12 secret words on paper. Unlock and recover your wallet anytime using your camera and fingerprint sensor — just like unlocking your phone.',
     howToSteps: [
-      'Look at your camera for a quick 3-second live face check',
-      'Touch your fingerprint or FaceID sensor to lock in your account',
-      'Come back anytime — your face & fingerprint bring your wallet right back',
+      'Quick 3-second live camera & fingerprint check',
+      'Your device hardware locks your vault on Arbitrum',
     ],
-    techProofSpec:
-      'OpenBR 64-D Face Vector + 468-Pt Liveness + Hardware secp256r1 Passkey',
+    techLine: 'OpenBR 64-D Vector · Hardware secp256r1',
     icon: 'finger-print-outline',
   },
   {
     id: 'free-usdg',
-    step: '2 of 5',
-    badge: 'STEP 2 • FREE $1,000 TEST DOLLARS',
-    accentColor: '#10B981',
+    step: 'Step 2 of 5',
     title: 'Start with $1,000 in Digital Dollars',
     simpleExplanation:
-      'As soon as you unlock your wallet, we automatically load it with $1,000.00 in USDG test dollars so you can try sending, saving, and testing right away.',
+      'As soon as you unlock your wallet, we automatically fund it with $1,000.00 in test USDG so you can try sending and saving right away.',
     howToSteps: [
       'Tap "Create New Wallet" inside your Vault screen',
-      'Watch $1,000.00 USDG appear in your balance automatically',
-      'Backed by Paxos Global Dollar Network on Arbitrum Sepolia',
+      '$1,000.00 USDG arrives automatically on Arbitrum Sepolia',
     ],
-    techProofSpec:
-      'Real ERC-20 Paxos USDG (0xDa4D...BD36) · 6 Decimals · Auto-Faucet Mint',
+    techLine: 'Paxos USDG (0xDa4D...BD36) · Auto-Faucet Mint',
     icon: 'wallet-outline',
   },
   {
     id: 'ai-allowance',
-    step: '3 of 5',
-    badge: 'STEP 3 • SAFE AI ALLOWANCE RULES',
-    accentColor: '#12AAFF',
-    title: 'Give AI Helpers a Safe Daily Allowance',
+    step: 'Step 3 of 5',
+    title: 'Safe Daily Allowances for AI Helpers',
     simpleExplanation:
-      'Want an AI robot to trade or pay bills for you? Never give it your master key! Give the AI a strict daily allowance (like $500/day). If the AI gets tricked into spending $501, the vault blocks it automatically.',
+      'Never give an AI helper your master key. Set a strict daily spending limit (like $500/day). Anything above your limit is automatically blocked.',
     howToSteps: [
-      'Set a daily spending cap (e.g., $500/day) in the AI Firewall tab',
-      'Pick which safe apps the AI is allowed to use (like Uniswap)',
-      'Tap the red "Panic Revoke" button anytime to turn off the AI in 1 second',
+      'Choose a daily spending limit and approved apps',
+      'Turn off the AI helper key anytime in one tap',
     ],
-    techProofSpec:
-      'Arbitrum Stylus Rust WASM On-Chain Firewall + Scoped Ephemeral Session Keys',
+    techLine: 'Arbitrum Stylus Rust WASM · Scoped Session Keys',
     icon: 'shield-checkmark-outline',
   },
   {
     id: 'zero-gas',
-    step: '4 of 5',
-    badge: 'STEP 4 • FAST & FREE TO SEND',
-    accentColor: '#F59E0B',
-    title: 'Send Money in 1 Tap with $0 Gas Fees',
+    step: 'Step 4 of 5',
+    title: 'Send Money in One Tap with $0 Fees',
     simpleExplanation:
-      'Normally, blockchains make you buy special "gas tokens" just to pay for every click. StylusSafe pays the network fee for you, using super-fast Arbitrum math that cuts costs by 99%.',
+      'You never need to buy extra gas tokens just to send money. StylusSafe covers the network fee for you and settles in seconds.',
     howToSteps: [
-      'Enter how much USDG you want to send or swap',
-      'Approve with 1 fingerprint or face scan',
-      'Settles in ~3 seconds with $0.00 gas fee charged to you',
+      'Enter the amount of USDG you want to send',
+      'Approve with one fingerprint or face scan ($0 fee)',
     ],
-    techProofSpec:
-      'Native RIP-7212 Precompile (0x0100) ~3,450 Gas + ERC-4337 Sponsored Paymaster',
+    techLine: 'Native RIP-7212 (0x0100) ~3,450 Gas · Paymaster',
     icon: 'hardware-chip-outline',
   },
   {
     id: 'ready-to-start',
-    step: '5 of 5',
-    badge: 'FINAL STEP • YOU ARE READY',
-    accentColor: '#10B981',
-    title: 'Swipe This Card to Open Your Wallet!',
+    step: 'Step 5 of 5',
+    title: 'You Are Ready to Open Your Vault',
     simpleExplanation:
-      'You now know how StylusSafe works! Swipe this final card away or tap "Start Using Wallet" below — this guide will disappear and open your wallet.',
+      'Swipe this final card away or tap "Start Using Wallet" below. This guide will disappear so you can go straight to your wallet.',
     howToSteps: [
-      '1. Tap "Create Wallet" to scan your face & fingerprint',
-      '2. Receive your automatic $1,000.00 USDG test balance',
-      '3. Try sending funds or testing the AI Allowance Shield',
+      'Create or unlock your wallet with your face & fingerprint',
+      'Send test USDG or set your AI spending limits',
     ],
-    techProofSpec:
-      'CREATE2 Smart Account (0xd364...33f7) · 15/15 Invariant Tests Passing on Arbitrum Sepolia',
+    techLine: 'CREATE2 Smart Account · Arbitrum Sepolia Live',
     icon: 'key-outline',
   },
 ];
@@ -207,19 +185,7 @@ export default function OnboardingScreen() {
 
   const rotate = pan.x.interpolate({
     inputRange: [-width, 0, width],
-    outputRange: ['-14deg', '0deg', '14deg'],
-    extrapolate: 'clamp',
-  });
-
-  const rightStampOpacity = pan.x.interpolate({
-    inputRange: [20, SWIPE_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  const leftStampOpacity = pan.x.interpolate({
-    inputRange: [-SWIPE_THRESHOLD, -20],
-    outputRange: [1, 0],
+    outputRange: ['-12deg', '0deg', '12deg'],
     extrapolate: 'clamp',
   });
 
@@ -242,34 +208,27 @@ export default function OnboardingScreen() {
       {/* Top Bar */}
       <View style={styles.topHeader}>
         <View style={styles.topRow}>
-          <View style={styles.deckBadge}>
-            <Text style={styles.deckBadgeText}>QUICK WALLET GUIDE</Text>
-          </View>
+          <Text style={styles.welcomeLabel}>WELCOME GUIDE</Text>
           <TouchableOpacity
             onPress={finishOnboarding}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.skipText}>Skip Guide [✕]</Text>
+            <Text style={styles.skipText}>Skip Guide ✕</Text>
           </TouchableOpacity>
         </View>
 
         {/* 5-Segment Progress Bar */}
         <View style={styles.progressGrid}>
           {MOBILE_ONBOARDING_SLIDES.map((s, idx) => {
-            const isCurrent = idx === activeIndex;
-            const isCompleted = idx < activeIndex;
+            const isActiveOrDone = idx <= activeIndex;
             return (
               <View key={s.id} style={styles.progressTrack}>
                 <View
                   style={[
                     styles.progressFill,
                     {
-                      width: isCurrent || isCompleted ? '100%' : '0%',
-                      backgroundColor: isCurrent
-                        ? Colors.accentOrange
-                        : isCompleted
-                          ? '#10B981'
-                          : 'transparent',
+                      width: isActiveOrDone ? '100%' : '0%',
+                      backgroundColor: isActiveOrDone ? Colors.accentOrange : 'transparent',
                     },
                   ]}
                 />
@@ -305,12 +264,12 @@ export default function OnboardingScreen() {
                       { scale: nextCardScale },
                       { translateY: nextCardTranslateY },
                     ],
-                    opacity: 0.72,
+                    opacity: 0.65,
                     zIndex: 20,
                   }
                 : {
-                    transform: [{ scale: 0.89 }, { translateY: 26 }],
-                    opacity: 0.35,
+                    transform: [{ scale: 0.9 }, { translateY: 26 }],
+                    opacity: 0.3,
                     zIndex: 10,
                   };
 
@@ -321,95 +280,48 @@ export default function OnboardingScreen() {
                 style={[
                   styles.swipeCard,
                   {
-                    borderColor: isTop ? slide.accentColor + '66' : Colors.border,
+                    borderColor: isTop ? 'rgba(255,255,255,0.14)' : Colors.border,
                   },
                   animatedCardStyle,
                 ]}
               >
-                {isTop && (
-                  <>
-                    <Animated.View
-                      style={[
-                        styles.stampBadge,
-                        styles.rightStamp,
-                        { opacity: rightStampOpacity },
-                      ]}
-                    >
-                      <Text style={styles.rightStampText}>GOT IT →</Text>
-                    </Animated.View>
-                    <Animated.View
-                      style={[
-                        styles.stampBadge,
-                        styles.leftStamp,
-                        { opacity: leftStampOpacity },
-                      ]}
-                    >
-                      <Text style={styles.leftStampText}>← NEXT</Text>
-                    </Animated.View>
-                  </>
-                )}
-
-                {/* Card Header */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.badgeRow}>
-                    <View
-                      style={[
-                        styles.slideBadgePill,
-                        { borderColor: slide.accentColor + '50' },
-                      ]}
-                    >
-                      <Text style={[styles.slideBadgeText, { color: slide.accentColor }]}>
-                        {slide.badge}
-                      </Text>
-                    </View>
-                    <Text style={styles.slideStepMono}>{slide.step}</Text>
+                {/* Top Icon & Step */}
+                <View style={styles.cardTopRow}>
+                  <View style={styles.iconBox}>
+                    <Ionicons name={slide.icon} size={26} color={Colors.accentOrange} />
                   </View>
-
-                  <View style={styles.titleRow}>
-                    <View
-                      style={[
-                        styles.iconBox,
-                        { borderColor: slide.accentColor + '40' },
-                      ]}
-                    >
-                      <Ionicons name={slide.icon} size={24} color={slide.accentColor} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{slide.title}</Text>
-                      <Text style={styles.cardSubtitle}>{slide.simpleExplanation}</Text>
-                    </View>
+                  <View style={styles.stepPill}>
+                    <Text style={styles.stepPillText}>{slide.step}</Text>
                   </View>
                 </View>
 
-                {/* Card Body */}
-                <View style={styles.cardBody}>
-                  <View style={styles.highlightsList}>
-                    {slide.howToSteps.map((item) => (
-                      <View key={item} style={styles.highlightRow}>
-                        <Ionicons
-                          name="checkmark-circle-outline"
-                          size={16}
-                          color={slide.accentColor}
-                          style={{ marginTop: 1 }}
-                        />
-                        <Text style={styles.highlightText}>{item}</Text>
-                      </View>
-                    ))}
-                  </View>
+                {/* Main Title & Explanation */}
+                <View style={styles.mainCopyBlock}>
+                  <Text style={styles.cardTitle}>{slide.title}</Text>
+                  <Text style={styles.cardSubtitle}>{slide.simpleExplanation}</Text>
+                </View>
 
-                  <View style={styles.techProofBox}>
-                    <Text style={styles.techProofLabel}>
-                      UNDER THE HOOD (TECHNICAL PROOF)
-                    </Text>
-                    <Text style={styles.techProofValue}>{slide.techProofSpec}</Text>
-                  </View>
+                {/* Simple Bullet Steps */}
+                <View style={styles.highlightsList}>
+                  {slide.howToSteps.map((item) => (
+                    <View key={item} style={styles.highlightRow}>
+                      <Ionicons
+                        name="checkmark-outline"
+                        size={17}
+                        color={Colors.accentOrange}
+                        style={{ marginTop: 2 }}
+                      />
+                      <Text style={styles.highlightText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
 
-                  <View style={styles.cardFooterHint}>
-                    <View style={styles.pulseDot} />
-                    <Text style={styles.swipeHintText}>
-                      Swipe card left or right to continue
-                    </Text>
-                  </View>
+                {/* Clean Footer */}
+                <View style={styles.cardFooterRow}>
+                  <Text style={styles.techFooterText} numberOfLines={1}>
+                    {slide.techLine}
+                  </Text>
+                  <Text style={styles.swipeHintText}>Swipe →</Text>
                 </View>
               </Animated.View>
             );
@@ -434,7 +346,7 @@ export default function OnboardingScreen() {
           onPress={() => advanceSlide('right')}
         >
           <Text style={styles.primaryVaultText}>
-            {activeIndex === totalSlides - 1 ? 'Start Using Wallet' : 'Swipe Next Card'}
+            {activeIndex === totalSlides - 1 ? 'Start Using Wallet' : 'Next Card'}
           </Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </TouchableOpacity>
@@ -452,7 +364,7 @@ const styles = StyleSheet.create({
   },
   topHeader: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.md,
     gap: Spacing.sm,
   },
   topRow: {
@@ -460,36 +372,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  deckBadge: {
-    backgroundColor: Colors.accentOrange + '20',
-    borderColor: Colors.accentOrange + '50',
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.sm,
-  },
-  deckBadgeText: {
-    color: Colors.accentOrange,
-    fontSize: 10,
-    fontWeight: '700',
+  welcomeLabel: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
     fontFamily: monoFont,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   skipText: {
     color: Colors.textMuted,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     fontFamily: monoFont,
   },
   progressGrid: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
+    gap: 8,
+    marginTop: 6,
   },
   progressTrack: {
     flex: 1,
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 99,
     overflow: 'hidden',
   },
@@ -501,169 +405,102 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     position: 'relative',
   },
   swipeCard: {
     position: 'absolute',
-    width: width - Spacing.md * 2,
-    maxWidth: 500,
-    backgroundColor: '#121216',
+    width: width - Spacing.lg * 2,
+    maxWidth: 480,
+    backgroundColor: '#141418',
     borderRadius: Radius.xl,
     borderWidth: 1,
-    overflow: 'hidden',
+    padding: 26,
+    gap: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.65,
     shadowRadius: 28,
     elevation: 14,
   },
-  stampBadge: {
-    position: 'absolute',
-    top: 14,
-    zIndex: 40,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: Radius.sm,
-    borderWidth: 2,
-  },
-  rightStamp: {
-    right: 14,
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(6, 78, 59, 0.92)',
-    transform: [{ rotate: '-6deg' }],
-  },
-  rightStampText: {
-    color: '#6EE7B7',
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: monoFont,
-    letterSpacing: 1,
-  },
-  leftStamp: {
-    left: 14,
-    borderColor: '#FF4500',
-    backgroundColor: 'rgba(67, 20, 7, 0.92)',
-    transform: [{ rotate: '6deg' }],
-  },
-  leftStampText: {
-    color: '#FF4500',
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: monoFont,
-    letterSpacing: 1,
-  },
-  cardHeader: {
-    padding: Spacing.lg,
-    backgroundColor: '#16161C',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: Spacing.md,
-  },
-  badgeRow: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  slideBadgePill: {
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.sm,
-  },
-  slideBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: monoFont,
-    letterSpacing: 0.6,
-  },
-  slideStepMono: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    fontFamily: monoFont,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
-  },
   iconBox: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: Radius.md,
-    backgroundColor: '#09090B',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stepPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  stepPillText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontFamily: monoFont,
+  },
+  mainCopyBlock: {
+    gap: 10,
+  },
   cardTitle: {
     color: Colors.textPrimary,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
-    lineHeight: 23,
+    lineHeight: 28,
   },
   cardSubtitle: {
     color: '#D4D4D8',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 6,
-  },
-  cardBody: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
+    fontSize: 15,
+    lineHeight: 23,
   },
   highlightsList: {
-    gap: 8,
+    gap: 12,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
   highlightRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: 10,
   },
   highlightText: {
     color: '#E4E4E7',
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 20,
     flex: 1,
   },
-  techProofBox: {
-    backgroundColor: '#09090B',
-    borderRadius: Radius.md,
-    padding: Spacing.sm + 2,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 3,
-  },
-  techProofLabel: {
-    color: Colors.accentOrange,
-    fontSize: 9,
-    fontWeight: '700',
-    fontFamily: monoFont,
-    letterSpacing: 0.7,
-  },
-  techProofValue: {
-    color: '#A1A1AA',
-    fontSize: 11,
-    fontFamily: monoFont,
-    lineHeight: 16,
-  },
-  cardFooterHint: {
+  cardFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingTop: Spacing.xs,
+    justifyContent: 'space-between',
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 8,
   },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 99,
-    backgroundColor: Colors.accentOrange,
-  },
-  swipeHintText: {
+  techFooterText: {
     color: Colors.textMuted,
     fontSize: 11,
+    fontFamily: monoFont,
+    flex: 1,
+  },
+  swipeHintText: {
+    color: '#D4D4D8',
+    fontSize: 12,
     fontFamily: monoFont,
   },
   bottomDock: {
@@ -676,8 +513,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   secondaryActionBtn: {
-    height: 46,
-    paddingHorizontal: 14,
+    height: 48,
+    paddingHorizontal: 18,
     borderRadius: Radius.md,
     backgroundColor: Colors.surfaceContainer,
     borderWidth: 1,
@@ -688,13 +525,13 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     color: Colors.textPrimary,
-    fontSize: 13,
-    fontFamily: monoFont,
+    fontSize: 14,
+    fontWeight: '500',
   },
   primaryVaultBtn: {
     flex: 1,
-    height: 46,
-    paddingHorizontal: 16,
+    height: 48,
+    paddingHorizontal: 18,
     borderRadius: Radius.md,
     backgroundColor: Colors.accentOrange,
     flexDirection: 'row',
@@ -704,7 +541,7 @@ const styles = StyleSheet.create({
   },
   primaryVaultText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
 });

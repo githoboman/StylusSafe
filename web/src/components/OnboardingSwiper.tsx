@@ -22,117 +22,77 @@ import {
 export interface OnboardingSlide {
   id: string;
   step: string;
-  simpleTag: string;
-  accentColor: string;
-  borderAccent: string;
-  bgGlow: string;
   title: string;
   simpleExplanation: string;
   howToSteps: string[];
-  techProofTitle: string;
-  techProofSpec: string;
+  techLine: string;
   icon: 'biometric' | 'usdg' | 'firewall' | 'gasless' | 'ready';
 }
 
 export const ONBOARDING_SLIDES: OnboardingSlide[] = [
   {
     id: 'biometric-key',
-    step: '1 of 5',
-    simpleTag: 'STEP 1 • NO SECRET WORDS TO LOSE',
-    accentColor: 'text-[#ff4500]',
-    borderAccent: 'border-[#ff4500]/40',
-    bgGlow: 'from-[#ff4500]/20 via-[#ff4500]/5 to-transparent',
-    title: 'Your Face & Fingerprint Are Your Wallet Key',
+    step: 'Step 1 of 5',
+    title: 'Your Face & Fingerprint Are Your Key',
     simpleExplanation:
-      'Old crypto wallets make you write down 12 secret words on paper. Lose the paper, and your money is gone forever. Here, your face and fingerprint unlock your wallet — just like unlocking your phone.',
+      'Forget writing down 12 secret words on paper. Unlock and recover your wallet anytime using your camera and fingerprint sensor — just like unlocking your phone.',
     howToSteps: [
-      'Look at your camera for a quick 3-second live face check',
-      'Touch your fingerprint or FaceID sensor to lock in your vault',
-      'Come back anytime — your face and fingerprint recover your wallet instantly',
+      'Quick 3-second live camera & fingerprint check',
+      'Your device hardware locks your vault on Arbitrum',
     ],
-    techProofTitle: 'Under the Hood (Technical Proof)',
-    techProofSpec:
-      'OpenBR 64-D Craniofacial Vector + MediaPipe 468-Pt Liveness + Hardware secp256r1 Passkey',
+    techLine: 'OpenBR 64-D Vector · Hardware secp256r1 Passkey',
     icon: 'biometric',
   },
   {
     id: 'free-usdg',
-    step: '2 of 5',
-    simpleTag: 'STEP 2 • FREE $1,000 TEST DOLLARS',
-    accentColor: 'text-emerald-400',
-    borderAccent: 'border-emerald-500/40',
-    bgGlow: 'from-emerald-500/20 via-emerald-500/5 to-transparent',
+    step: 'Step 2 of 5',
     title: 'Start with $1,000 in Digital Dollars',
     simpleExplanation:
-      'As soon as you create your wallet, we automatically load it with $1,000.00 in USDG test dollars so you can try sending, saving, and testing right away.',
+      'As soon as you create your wallet, we automatically fund it with $1,000.00 in test USDG so you can try sending and saving right away.',
     howToSteps: [
-      'Tap "Create Wallet" inside your Vault dashboard',
-      'Watch $1,000.00 USDG arrive in your balance automatically',
-      'Powered by Paxos Global Dollar Network on Arbitrum Sepolia',
+      'Tap "Create New Wallet" on your dashboard',
+      '$1,000.00 USDG arrives automatically on Arbitrum Sepolia',
     ],
-    techProofTitle: 'Under the Hood (Technical Proof)',
-    techProofSpec:
-      'Real ERC-20 Paxos USDG (0xDa4D...BD36) · 1:1 Reserve Architecture · Auto-Faucet Mint',
+    techLine: 'Paxos USDG (0xDa4D...BD36) · Auto-Faucet Mint',
     icon: 'usdg',
   },
   {
     id: 'ai-allowance',
-    step: '3 of 5',
-    simpleTag: 'STEP 3 • SAFE AI ALLOWANCE RULES',
-    accentColor: 'text-blue-400',
-    borderAccent: 'border-blue-500/40',
-    bgGlow: 'from-blue-500/20 via-blue-500/5 to-transparent',
-    title: 'Give AI Helpers a Safe Daily Allowance',
+    step: 'Step 3 of 5',
+    title: 'Safe Daily Allowances for AI Helpers',
     simpleExplanation:
-      'Want an AI robot to trade or pay bills for you? Never give it your master key! Instead, give the AI a strict daily allowance (like $500/day). If the AI gets tricked and tries to spend $501, the vault blocks it automatically.',
+      'Never give an AI helper your master key. Instead, set a strict daily spending limit (like $500/day). Anything above your limit is automatically blocked.',
     howToSteps: [
-      'Set a daily spending cap (e.g., $500/day) in the Agent Firewall',
-      'Choose which safe apps the AI is allowed to use (like Uniswap)',
-      'Tap the red "Panic Revoke" button anytime to turn off the AI in 1 second',
+      'Choose a daily spending limit and approved apps',
+      'Turn off the AI helper key anytime in one tap',
     ],
-    techProofTitle: 'Under the Hood (Technical Proof)',
-    techProofSpec:
-      'Arbitrum Stylus Rust WASM On-Chain Firewall + Scoped Ephemeral Session Keys',
+    techLine: 'Arbitrum Stylus Rust WASM · Scoped Session Keys',
     icon: 'firewall',
   },
   {
     id: 'zero-gas',
-    step: '4 of 5',
-    simpleTag: 'STEP 4 • FAST & FREE TO SEND',
-    accentColor: 'text-amber-400',
-    borderAccent: 'border-amber-500/40',
-    bgGlow: 'from-amber-500/20 via-amber-500/5 to-transparent',
-    title: 'Send Money in 1 Tap with $0 Gas Fees',
+    step: 'Step 4 of 5',
+    title: 'Send Money in One Tap with $0 Fees',
     simpleExplanation:
-      'Normally, blockchains make you buy special "gas tokens" just to pay for every click. StylusSafe pays the network fee for you, using super-fast Arbitrum math that cuts costs by 99%.',
+      'You never need to buy extra gas tokens just to send money. StylusSafe covers the network fee for you and settles in seconds.',
     howToSteps: [
-      'Enter how much USDG you want to send or swap',
-      'Approve with 1 fingerprint or face scan',
-      'Settles in ~3 seconds with $0.00 gas fee charged to you',
+      'Enter the amount of USDG you want to send',
+      'Approve with one fingerprint or face scan ($0 fee)',
     ],
-    techProofTitle: 'Under the Hood (Technical Proof)',
-    techProofSpec:
-      'Native RIP-7212 Precompile (0x0100) ~3,450 Gas + ERC-4337 Sponsored Paymaster',
+    techLine: 'Native RIP-7212 (0x0100) ~3,450 Gas · ERC-4337 Paymaster',
     icon: 'gasless',
   },
   {
     id: 'ready-to-start',
-    step: '5 of 5',
-    simpleTag: 'FINAL STEP • YOU ARE READY',
-    accentColor: 'text-emerald-400',
-    borderAccent: 'border-emerald-500/40',
-    bgGlow: 'from-emerald-500/25 via-[#ff4500]/10 to-transparent',
-    title: 'Swipe This Card to Open Your Wallet!',
+    step: 'Step 5 of 5',
+    title: 'You Are Ready to Open Your Vault',
     simpleExplanation:
-      'You now know how StylusSafe works! Swipe this final card away or tap "Start Using Wallet" below — this guide will disappear so you can use your vault.',
+      'Swipe this final card away or tap "Start Using Wallet" below. This guide will disappear so you can go straight to your wallet.',
     howToSteps: [
-      '1. Tap "Create Vault" to scan your face & fingerprint',
-      '2. Receive your automatic $1,000.00 USDG test balance',
-      '3. Try sending funds or testing the AI Spending Firewall',
+      'Create or unlock your wallet with your face & fingerprint',
+      'Send test USDG or set your AI spending limits',
     ],
-    techProofTitle: 'Under the Hood (Technical Proof)',
-    techProofSpec:
-      'CREATE2 Smart Account (0xd364...33f7) · 15/15 Invariant Tests Passing on Arbitrum Sepolia',
+    techLine: 'CREATE2 Smart Account · Arbitrum Sepolia Live',
     icon: 'ready',
   },
 ];
@@ -142,15 +102,15 @@ const ONBOARDING_STORAGE_KEY = 'stylussafe_onboarding_done_v2';
 function SlideGraphicIcon({ type }: { type: OnboardingSlide['icon'] }) {
   switch (type) {
     case 'biometric':
-      return <IconFingerprint size={24} />;
+      return <IconFingerprint size={26} />;
     case 'usdg':
-      return <IconWallet size={24} />;
+      return <IconWallet size={26} />;
     case 'firewall':
-      return <IconShield size={24} />;
+      return <IconShield size={26} />;
     case 'gasless':
-      return <IconCpu size={24} />;
+      return <IconCpu size={26} />;
     case 'ready':
-      return <IconKey size={24} />;
+      return <IconKey size={26} />;
   }
 }
 
@@ -163,18 +123,15 @@ interface SwipeCardProps {
 
 function SwipeCard({ slide, isTop, stackOffset, onSwipedAway }: SwipeCardProps) {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-240, 0, 240], [-14, 0, 14]);
+  const rotate = useTransform(x, [-240, 0, 240], [-12, 0, 12]);
   const cardOpacity = useTransform(x, [-300, -160, 0, 160, 300], [0.3, 0.95, 1, 0.95, 0.3]);
-
-  const rightStampOpacity = useTransform(x, [25, 100], [0, 1]);
-  const leftStampOpacity = useTransform(x, [-100, -25], [1, 0]);
 
   const handleDragEnd = (
     _event: MouseEvent | TouchEvent | PointerEvent,
     info: PanInfo
   ) => {
-    const offsetThreshold = 75;
-    const velocityThreshold = 380;
+    const offsetThreshold = 70;
+    const velocityThreshold = 360;
 
     if (info.offset.x > offsetThreshold || info.velocity.x > velocityThreshold) {
       onSwipedAway('right');
@@ -186,9 +143,9 @@ function SwipeCard({ slide, isTop, stackOffset, onSwipedAway }: SwipeCardProps) 
     }
   };
 
-  const targetScale = 1 - stackOffset * 0.045;
+  const targetScale = 1 - stackOffset * 0.04;
   const targetY = stackOffset * 12;
-  const targetOpacity = stackOffset === 0 ? 1 : stackOffset === 1 ? 0.65 : 0.3;
+  const targetOpacity = stackOffset === 0 ? 1 : stackOffset === 1 ? 0.6 : 0.25;
 
   return (
     <motion.div
@@ -204,7 +161,7 @@ function SwipeCard({ slide, isTop, stackOffset, onSwipedAway }: SwipeCardProps) 
               zIndex: 30 - stackOffset,
             }
       }
-      initial={{ scale: 0.92, y: 20, opacity: 0 }}
+      initial={{ scale: 0.94, y: 16, opacity: 0 }}
       animate={{
         scale: targetScale,
         y: targetY,
@@ -212,9 +169,9 @@ function SwipeCard({ slide, isTop, stackOffset, onSwipedAway }: SwipeCardProps) 
       }}
       exit={{
         x: 320,
-        rotate: 16,
+        rotate: 14,
         opacity: 0,
-        scale: 0.9,
+        scale: 0.92,
         transition: { type: 'spring', stiffness: 280, damping: 24 },
       }}
       transition={{
@@ -228,91 +185,51 @@ function SwipeCard({ slide, isTop, stackOffset, onSwipedAway }: SwipeCardProps) 
       dragElastic={0.85}
       onDragEnd={isTop ? handleDragEnd : undefined}
       whileTap={isTop ? { scale: 0.985, cursor: 'grabbing' } : undefined}
-      className={`w-full max-w-full select-none rounded-2xl bg-[#121216] border ${
-        isTop ? slide.borderAccent : 'border-white/[0.07]'
-      } shadow-[0_24px_60px_rgba(0,0,0,0.8)] overflow-hidden ${
+      className={`w-full max-w-full select-none rounded-2xl bg-[#141418] border ${
+        isTop ? 'border-white/[0.14]' : 'border-white/[0.06]'
+      } shadow-[0_24px_60px_rgba(0,0,0,0.85)] overflow-hidden p-6 sm:p-8 space-y-6 ${
         isTop ? 'cursor-grab active:cursor-grabbing touch-pan-y' : 'pointer-events-none'
       }`}
     >
-      {/* Top Header */}
-      <div className={`relative p-4 sm:p-5 bg-gradient-to-br ${slide.bgGlow} border-b border-white/[0.06]`}>
-        {isTop && (
-          <>
-            <motion.div
-              style={{ opacity: rightStampOpacity }}
-              className="pointer-events-none absolute top-3 right-3 z-20 px-2.5 py-1 rounded border-2 border-emerald-400 bg-emerald-950/95 text-emerald-300 font-mono text-[10px] font-bold tracking-widest uppercase -rotate-6 shadow-lg"
-            >
-              GOT IT →
-            </motion.div>
-            <motion.div
-              style={{ opacity: leftStampOpacity }}
-              className="pointer-events-none absolute top-3 left-3 z-20 px-2.5 py-1 rounded border-2 border-[#ff4500] bg-[#2a0f05]/95 text-[#ff4500] font-mono text-[10px] font-bold tracking-widest uppercase rotate-6 shadow-lg"
-            >
-              ← NEXT
-            </motion.div>
-          </>
-        )}
-
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className={`text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/40 border border-white/[0.08] truncate ${slide.accentColor}`}>
-            {slide.simpleTag}
-          </span>
-          <span className="text-[11px] font-mono text-[#8e8e98] shrink-0">
-            {slide.step}
-          </span>
+      {/* Top Row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="w-12 h-12 rounded-xl bg-white/[0.05] border border-white/[0.1] flex items-center justify-center text-[#ff4500] shrink-0">
+          <SlideGraphicIcon type={slide.icon} />
         </div>
-
-        <div className="flex items-start gap-3">
-          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#09090b]/90 border border-white/[0.1] flex items-center justify-center shrink-0 ${slide.accentColor}`}>
-            <SlideGraphicIcon type={slide.icon} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug break-words">
-              {slide.title}
-            </h3>
-            <p className="text-xs sm:text-sm text-[#d4d4d8] mt-1.5 leading-relaxed break-words">
-              {slide.simpleExplanation}
-            </p>
-          </div>
-        </div>
+        <span className="text-xs font-mono text-zinc-400 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08]">
+          {slide.step}
+        </span>
       </div>
 
-      {/* Card Body: How to Use + Technical Proof */}
-      <div className="p-4 sm:p-5 space-y-3.5 bg-[#121216]">
-        <div className="space-y-2">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[#8e8e98]">
-            How It Works (Simple Steps):
-          </div>
-          {slide.howToSteps.map((item) => (
-            <div
-              key={item}
-              className="flex items-start gap-2 text-xs text-white/90 leading-relaxed"
-            >
-              <span className={`mt-0.5 shrink-0 ${slide.accentColor}`}>
-                <IconCheck size={14} />
-              </span>
-              <span className="break-words">{item}</span>
-            </div>
-          ))}
-        </div>
+      {/* Main Copy */}
+      <div className="space-y-3">
+        <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">
+          {slide.title}
+        </h3>
+        <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
+          {slide.simpleExplanation}
+        </p>
+      </div>
 
-        {/* Technical Proof Box */}
-        <div className="p-3 rounded-xl bg-[#09090b] border border-white/[0.06] space-y-1">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[#ff4500] font-semibold">
-            {slide.techProofTitle}
+      {/* Simple Bullet Points */}
+      <div className="space-y-2.5 pt-2 border-t border-white/[0.08]">
+        {slide.howToSteps.map((item) => (
+          <div
+            key={item}
+            className="flex items-start gap-2.5 text-sm text-zinc-200 leading-relaxed"
+          >
+            <span className="mt-1 shrink-0 text-[#ff4500]">
+              <IconCheck size={15} />
+            </span>
+            <span>{item}</span>
           </div>
-          <div className="text-[11px] font-mono text-[#a1a1aa] leading-relaxed break-words">
-            {slide.techProofSpec}
-          </div>
-        </div>
+        ))}
+      </div>
 
-        <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-[#8e8e98]">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#ff4500] animate-pulse" />
-            <span>Swipe card left or right</span>
-          </span>
-          <span>{slide.step}</span>
-        </div>
+      {/* Subtle Technical Footer */}
+      <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2 text-xs font-mono text-zinc-400">
+        <span className="truncate">{slide.techLine}</span>
+        <span className="text-zinc-300 shrink-0">Swipe →</span>
       </div>
     </motion.div>
   );
@@ -360,29 +277,28 @@ export function FirstTimeOnboardingOverlay() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
       >
-        <div className="w-full max-w-md mx-auto bg-[#09090b] border border-white/[0.1] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 my-auto">
+        <div className="w-full max-w-lg mx-auto bg-[#09090b] border border-white/[0.1] rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6 my-auto">
           {/* Top Progress & Skip */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between gap-2 text-xs font-mono">
-              <span className="px-2 py-0.5 rounded bg-[#ff4500]/15 text-[#ff4500] border border-[#ff4500]/30 font-semibold text-[10px]">
-                QUICK WALLET GUIDE
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
+                Welcome Guide
               </span>
               <button
                 type="button"
                 onClick={completeAndDismiss}
-                className="text-xs font-mono text-[#8e8e98] hover:text-white transition-colors cursor-pointer"
+                className="text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer px-2.5 py-1 rounded-md bg-white/[0.04]"
               >
-                Skip Guide [✕]
+                Skip Guide ✕
               </button>
             </div>
 
             {/* 5-Segment Progress Bar */}
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-5 gap-2">
               {ONBOARDING_SLIDES.map((s, idx) => {
-                const isCurrent = idx === currentIndex;
-                const isDone = idx < currentIndex;
+                const isActiveOrDone = idx <= currentIndex;
                 return (
                   <div
                     key={s.id}
@@ -390,11 +306,7 @@ export function FirstTimeOnboardingOverlay() {
                   >
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
-                        isCurrent
-                          ? 'w-full bg-[#ff4500]'
-                          : isDone
-                            ? 'w-full bg-emerald-400'
-                            : 'w-0'
+                        isActiveOrDone ? 'w-full bg-[#ff4500]' : 'w-0'
                       }`}
                     />
                   </div>
@@ -404,7 +316,7 @@ export function FirstTimeOnboardingOverlay() {
           </div>
 
           {/* Stacked Tinder-Swiper Stage */}
-          <div className="relative w-full min-h-[410px] sm:min-h-[400px] pb-4 flex items-start justify-center">
+          <div className="relative w-full min-h-[340px] sm:min-h-[350px] pb-3 flex items-start justify-center">
             <AnimatePresence initial={false} mode="popLayout">
               {remainingSlides
                 .slice()
@@ -434,28 +346,28 @@ export function FirstTimeOnboardingOverlay() {
           </div>
 
           {/* Bottom Controls */}
-          <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between gap-2">
+          <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className="h-10 px-3.5 rounded-xl bg-[#141418] hover:bg-white/[0.08] disabled:opacity-30 border border-white/[0.08] text-xs font-mono text-white inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              className="h-11 px-4 rounded-xl bg-[#141418] hover:bg-white/[0.08] disabled:opacity-30 border border-white/[0.08] text-sm font-medium text-white inline-flex items-center gap-2 transition-all cursor-pointer"
             >
-              <IconArrowLeft size={14} />
+              <IconArrowLeft size={15} />
               <span>Back</span>
             </button>
 
             <button
               type="button"
               onClick={handleCardSwiped}
-              className="flex-1 h-10 px-4 rounded-xl bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-xs font-semibold text-white inline-flex items-center justify-center gap-1.5 shadow-lg shadow-[#ff4500]/20 transition-all cursor-pointer"
+              className="flex-1 h-11 px-5 rounded-xl bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-sm font-semibold text-white inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <span>
                 {currentIndex === ONBOARDING_SLIDES.length - 1
                   ? 'Start Using Wallet'
-                  : 'Swipe Next Card'}
+                  : 'Next Card'}
               </span>
-              <IconArrowRight size={14} />
+              <IconArrowRight size={15} />
             </button>
           </div>
         </div>
