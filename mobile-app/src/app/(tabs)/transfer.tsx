@@ -108,7 +108,7 @@ export default function TransferScreen() {
         return;
       }
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
-      const toToken = customToToken || selectedDestToken.address;
+      const toToken = customToToken.trim() || selectedDestToken.symbol;
       const res = await executeCrossChainSwap(
         selectedChain.id,
         selectedToken.symbol,

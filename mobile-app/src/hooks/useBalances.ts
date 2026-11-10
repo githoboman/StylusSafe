@@ -3,6 +3,18 @@ import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as const;
+export const SWAP_POOL_ADDRESS = '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' as const;
+
+export const SEPOLIA_SWAP_TOKENS = {
+  USDG: { address: USDG_ADDRESS, decimals: 6, displayDecimals: 2 },
+  USDC: { address: '0x120A29db0F1Dd3F479D99B8DaaCf6BD1070CA56e' as `0x${string}`, decimals: 6, displayDecimals: 2 },
+  USDT: { address: '0xe5313FB74788cea60941dd0a171519cdCa14cCc6' as `0x${string}`, decimals: 6, displayDecimals: 2 },
+  ETH: { address: '0x2e05ED11a050106E15ceF55b7938dEB6249B14cF' as `0x${string}`, decimals: 18, displayDecimals: 4 },
+  ARB: { address: '0xa1AF657CEaF9566D21D7e596aeF923f368F5ead1' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+  UNI: { address: '0xEC09D28A2f790630Bb97DE8313DB904aaF6FB6b7' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+  WBTC: { address: '0x1aCa4D7bC53793c688d71e9061c19347EbAa8bC3' as `0x${string}`, decimals: 8, displayDecimals: 6 },
+  DEGEN: { address: '0xd6d2f4258A23636d650Ee6dD22bFA1978C3827A0' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+} as const;
 
 const CHAIN_CONFIGS: Record<number, { rpc: string; usdc: `0x${string}`; usdg?: `0x${string}` }> = {
   // Arbitrum Sepolia
@@ -16,9 +28,9 @@ const CHAIN_CONFIGS: Record<number, { rpc: string; usdc: `0x${string}`; usdg?: `
   // Optimism
   10: { rpc: 'https://mainnet.optimism.io', usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
   // Polygon
-  137: { rpc: 'https://polygon.llamarpc.com', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+  137: { rpc: 'https://polygon-rpc.com', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
   // Ethereum
-  1: { rpc: 'https://cloudflare-eth.com', usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+  1: { rpc: 'https://ethereum-rpc.publicnode.com', usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
 };
 
 const ERC20_ABI = [
@@ -81,6 +93,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
   const [usdgBalance, setUsdgBalance] = useState('0.00');
   const [ethBalance, setEthBalance] = useState('0.00');
   const [usdcBalance, setUsdcBalance] = useState('0.00');
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({});
   const [customTokens, setCustomTokens] = useState<CustomTokenBalance[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +103,7 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
       setUsdgBalance('0.00');
       setEthBalance('0.00');
       setUsdcBalance('0.00');
+      setTokenBalances({});
       return;
     }
 
@@ -104,7 +118,12 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         transport: http(config.rpc),
       });
 
-      const [nativeBalRaw, usdc, usdgRaw] = await Promise.all([
+      const poolEntries = Object.entries(SEPOLIA_SWAP_TOKENS) as Array<[
+        keyof typeof SEPOLIA_SWAP_TOKENS,
+        (typeof SEPOLIA_SWAP_TOKENS)[keyof typeof SEPOLIA_SWAP_TOKENS]
+      ]>;
+
+      const [nativeBalRaw, usdc, poolRaws] = await Promise.all([
         publicClient.getBalance({ address: walletAddress as `0x${string}` }).catch(() => BigInt(0)),
         publicClient
           .readContract({
@@ -114,17 +133,26 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
             args: [walletAddress as `0x${string}`],
           })
           .catch(() => BigInt(0)),
-        config.usdg
-          ? publicClient
-              .readContract({
-                address: config.usdg,
-                abi: ERC20_ABI,
-                functionName: 'balanceOf',
-                args: [walletAddress as `0x${string}`],
-              })
-              .catch(() => BigInt(0))
-          : Promise.resolve(BigInt(0)),
+        chainId === 421614
+          ? Promise.all(
+              poolEntries.map(([, info]) =>
+                publicClient
+                  .readContract({
+                    address: info.address,
+                    abi: ERC20_ABI,
+                    functionName: 'balanceOf',
+                    args: [walletAddress as `0x${string}`],
+                  })
+                  .catch(() => BigInt(0))
+              )
+            )
+          : Promise.resolve(poolEntries.map(() => BigInt(0))),
       ]);
+
+      const poolMap: Record<string, bigint> = {};
+      poolEntries.forEach(([sym], idx) => {
+        poolMap[sym] = (poolRaws[idx] as bigint) ?? BigInt(0);
+      });
 
       const rawSavedTokens = await getStorageValue('custom_tokens');
       const savedTokens = JSON.parse(rawSavedTokens || '[]') as {
@@ -169,27 +197,40 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         })
       );
 
-      const formattedNative = Number(formatEther(nativeBalRaw)).toLocaleString(undefined, {
+      const totalEthNum = Number(formatEther(nativeBalRaw + (chainId === 421614 ? (poolMap.ETH ?? BigInt(0)) : BigInt(0))));
+      const totalUsdgNum = Number(formatUnits(chainId === 421614 ? (poolMap.USDG ?? BigInt(0)) : BigInt(0), 6));
+      const totalUsdcNum = Number(formatUnits((usdc as bigint) + (chainId === 421614 ? (poolMap.USDC ?? BigInt(0)) : BigInt(0)), 6));
+
+      const formattedNative = totalEthNum.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 4,
       });
 
-      // Real on-chain USDG balance only; no fabricated faucet grant.
-      const numericUsdg = Number(formatUnits(usdgRaw as bigint, 6));
-
-      const formattedUsdg = numericUsdg.toLocaleString(undefined, {
+      const formattedUsdg = totalUsdgNum.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
 
+      const formattedUsdc = totalUsdcNum.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      const nextTokenBalances: Record<string, string> = {
+        USDG: totalUsdgNum.toFixed(2),
+        USDC: totalUsdcNum.toFixed(2),
+        ETH: totalEthNum.toFixed(4),
+      };
+      for (const [sym, info] of poolEntries) {
+        if (sym === 'USDG' || sym === 'USDC' || sym === 'ETH') continue;
+        const rawBal = chainId === 421614 ? (poolMap[sym] ?? BigInt(0)) : BigInt(0);
+        nextTokenBalances[sym] = Number(formatUnits(rawBal, info.decimals)).toFixed(info.displayDecimals);
+      }
+
       setUsdgBalance(formattedUsdg);
       setEthBalance(formattedNative);
-      setUsdcBalance(
-        Number(formatUnits(usdc as bigint, 6)).toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      );
+      setUsdcBalance(formattedUsdc);
+      setTokenBalances(nextTokenBalances);
       setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
     } catch (err: any) {
       console.error('Failed to fetch balances:', err);
@@ -219,5 +260,5 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
     }
   };
 
-  return { usdgBalance, ethBalance, usdcBalance, customTokens, isFetching, error, refetch, addCustomToken };
+  return { usdgBalance, ethBalance, usdcBalance, tokenBalances, customTokens, isFetching, error, refetch, addCustomToken };
 }

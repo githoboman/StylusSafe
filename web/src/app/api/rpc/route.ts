@@ -3,6 +3,14 @@ import { arbitrumSepoliaRpc, PUBLIC_ARB_SEPOLIA_RPC } from '@/lib/serverEnv';
 
 export const dynamic = 'force-dynamic';
 
+const CHAIN_RPCS: Record<number, string> = {
+    42161: 'https://arb1.arbitrum.io/rpc',
+    8453: 'https://mainnet.base.org',
+    10: 'https://mainnet.optimism.io',
+    137: 'https://polygon-rpc.com',
+    1: 'https://cloudflare-eth.com',
+};
+
 const ALLOWED_RPC_METHODS = new Set([
     'eth_chainId',
     'eth_blockNumber',
@@ -72,7 +80,10 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    const upstreamRpc = arbitrumSepoliaRpc();
+    const reqChainId = Number(req.nextUrl.searchParams.get('chainId') || 421614);
+    const upstreamRpc = reqChainId === 421614
+        ? arbitrumSepoliaRpc()
+        : (CHAIN_RPCS[reqChainId] || arbitrumSepoliaRpc());
 
     try {
         const upstreamResp = await fetch(upstreamRpc, {
@@ -83,21 +94,23 @@ export async function POST(req: NextRequest) {
         const data = await upstreamResp.json();
         return NextResponse.json(data, { status: upstreamResp.status });
     } catch (err: any) {
-        // Fallback to public Arbitrum Sepolia RPC if upstream fails
-        try {
-            const fallbackResp = await fetch(PUBLIC_ARB_SEPOLIA_RPC, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            const data = await fallbackResp.json();
-            return NextResponse.json(data, { status: fallbackResp.status });
-        } catch {
-            return NextResponse.json(
-                { jsonrpc: '2.0', id: body?.id ?? null, error: { code: -32603, message: err?.message || 'Upstream RPC failed' } },
-                { status: 502 }
-            );
+        if (reqChainId === 421614) {
+            try {
+                const fallbackResp = await fetch(PUBLIC_ARB_SEPOLIA_RPC, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await fallbackResp.json();
+                return NextResponse.json(data, { status: fallbackResp.status });
+            } catch {
+                // fall through to 502 error
+            }
         }
+        return NextResponse.json(
+            { jsonrpc: '2.0', id: body?.id ?? null, error: { code: -32603, message: err?.message || 'Upstream RPC failed' } },
+            { status: 502 }
+        );
     }
 }
 

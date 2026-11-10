@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { encodeFunctionData } from 'viem';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
-import { useBalances, USDG_ADDRESS, recordSwappedDelta } from '@/hooks/useBalances';
+import { useBalances, USDG_ADDRESS, SWAP_POOL_ADDRESS, SEPOLIA_SWAP_TOKENS } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 import Link from 'next/link';
 import { IconArrowLeft, IconCheck, IconPlus, IconCpu, IconArrowUpRight } from '@/components/Icons';
@@ -53,15 +53,15 @@ export default function IntentsPage() {
     {
       id: 'step-1',
       kind: 'approve_usdg',
-      label: 'Approve Uniswap V3 Router',
-      targetAddress: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+      label: 'Approve StylusSafeSwapPool',
+      targetAddress: SWAP_POOL_ADDRESS,
       amountUsdg: '100',
     },
     {
       id: 'step-2',
       kind: 'swap_usdg_to_usdc',
-      label: 'Settle USDG → USDC via Solver Pool',
-      targetAddress: '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc',
+      label: 'Swap USDG → USDC on StylusSafeSwapPool',
+      targetAddress: SWAP_POOL_ADDRESS,
       amountUsdg: '25',
     },
   ]);
@@ -73,7 +73,7 @@ export default function IntentsPage() {
         id: `step-${Date.now()}`,
         kind: 'transfer_usdg',
         label: `USDG Transfer #${prev.length + 1}`,
-        targetAddress: '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc',
+        targetAddress: SWAP_POOL_ADDRESS,
         amountUsdg: '10',
       },
     ]);
@@ -92,34 +92,52 @@ export default function IntentsPage() {
     setStatus('authorizing');
     setErrorMsg(null);
     try {
-      const encodedIntents = steps.map((step) => {
+      if (!address) throw new Error('Wallet not initialized.');
+      const encodedIntents = steps.flatMap((step) => {
         const amtUnits = BigInt(Math.max(1, Math.round(parseFloat(step.amountUsdg || '0') * 1e6)));
+        if (step.kind === 'swap_usdg_to_usdc') {
+          const approveData = encodeFunctionData({
+            abi: ERC20_CALL_ABI,
+            functionName: 'approve',
+            args: [SWAP_POOL_ADDRESS, amtUnits],
+          });
+          const swapData = encodeFunctionData({
+            abi: [{
+              type: 'function',
+              name: 'swap',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'tokenIn', type: 'address' },
+                { name: 'tokenOut', type: 'address' },
+                { name: 'amountIn', type: 'uint256' },
+                { name: 'minAmountOut', type: 'uint256' },
+                { name: 'recipient', type: 'address' },
+              ],
+              outputs: [{ name: 'amountOut', type: 'uint256' }],
+            }],
+            functionName: 'swap',
+            args: [USDG_ADDRESS, SEPOLIA_SWAP_TOKENS.USDC.address, amtUnits, 0n, address as `0x${string}`],
+          });
+          return [
+            { dest: USDG_ADDRESS, value: 0n, func: approveData },
+            { dest: SWAP_POOL_ADDRESS, value: 0n, func: swapData },
+          ];
+        }
         const fnName = step.kind === 'approve_usdg' ? 'approve' : 'transfer';
         const data = encodeFunctionData({
           abi: ERC20_CALL_ABI,
           functionName: fnName,
           args: [step.targetAddress as `0x${string}`, amtUnits],
         });
-        return {
+        return [{
           dest: USDG_ADDRESS,
           value: 0n,
           func: data,
-        };
+        }];
       });
 
       const result = await executeIntentBatch(encodedIntents, pin);
       if (!result) throw new Error('Batch execution failed on Arbitrum Sepolia.');
-
-      // Credit any swap_usdg_to_usdc step in the user's USDC balance
-      if (address) {
-        for (const step of steps) {
-          if (step.kind === 'swap_usdg_to_usdc') {
-            const amt = parseFloat(step.amountUsdg || '0');
-            // USDG and USDC are both $1 stables, so the swap credits 1:1 (no invented fee).
-            if (amt > 0) recordSwappedDelta(address, 'USDC', amt);
-          }
-        }
-      }
 
       setTxHash(result.userOpHash);
       setStatus('success');

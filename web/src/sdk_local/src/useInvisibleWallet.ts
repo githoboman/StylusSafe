@@ -25,7 +25,7 @@ import {
     getLastVerifiedFaceDescriptor,
     loadVaultRegistry,
 } from '@/lib/faceverify/biometricVaultRegistry';
-import { recordSwappedDelta, USDG_ADDRESS } from '@/hooks/useBalances';
+import { SEPOLIA_SWAP_TOKENS, SWAP_POOL_ADDRESS, USDG_ADDRESS } from '@/hooks/useBalances';
 import { fetchLifiQuote, fetchLiveTokenPrices, FALLBACK_TOKEN_USD_PRICES } from '@/lib/lifi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -106,8 +106,233 @@ export type InvisibleWallet = {
 // ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
 const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
-const SOLVER_LIQUIDITY_VAULT = '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
+
+const MAINNET_PUBLIC_RPCS: Record<number, string> = {
+    1: 'https://ethereum-rpc.publicnode.com',
+    10: 'https://mainnet.optimism.io',
+    137: 'https://polygon-rpc.com',
+    8453: 'https://mainnet.base.org',
+    42161: 'https://arb1.arbitrum.io/rpc',
+};
+
+function resolveChainEndpoint(baseUrl: string, targetChainId: number): string {
+    if (typeof window !== 'undefined' && baseUrl.startsWith('/')) {
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        return targetChainId && targetChainId !== 421614
+            ? `${window.location.origin}${baseUrl}${sep}chainId=${targetChainId}`
+            : `${window.location.origin}${baseUrl}`;
+    }
+    if (targetChainId && targetChainId !== 421614 && (!baseUrl || baseUrl === FALLBACK_PUBLIC_RPC || baseUrl.includes('sepolia'))) {
+        return MAINNET_PUBLIC_RPCS[targetChainId] || baseUrl || FALLBACK_PUBLIC_RPC;
+    }
+    return baseUrl || FALLBACK_PUBLIC_RPC;
+}
+
+const SWAP_POOL_ABI = [
+    {
+        type: 'function',
+        name: 'getAmountOut',
+        stateMutability: 'view',
+        inputs: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+        ],
+        outputs: [{ name: 'amountOut', type: 'uint256' }],
+    },
+    {
+        type: 'function',
+        name: 'swap',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'minAmountOut', type: 'uint256' },
+            { name: 'recipient', type: 'address' },
+        ],
+        outputs: [{ name: 'amountOut', type: 'uint256' }],
+    },
+] as const;
+
+const ERC20_SWAP_ABI = [
+    {
+        type: 'function',
+        name: 'approve',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+        ],
+        outputs: [{ name: '', type: 'bool' }],
+    },
+    {
+        type: 'function',
+        name: 'transfer',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'to', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+        ],
+        outputs: [{ name: '', type: 'bool' }],
+    },
+    {
+        type: 'function',
+        name: 'allowance',
+        stateMutability: 'view',
+        inputs: [
+            { name: 'owner', type: 'address' },
+            { name: 'spender', type: 'address' },
+        ],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+] as const;
+
+const ACCOUNT_EXEC_ABI = [
+    {
+        type: 'function',
+        name: 'execute',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'dest', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'func', type: 'bytes' },
+        ],
+        outputs: [],
+    },
+    {
+        type: 'function',
+        name: 'executeBatch',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'dest', type: 'address[]' },
+            { name: 'value', type: 'uint256[]' },
+            { name: 'func', type: 'bytes[]' },
+        ],
+        outputs: [],
+    },
+] as const;
+
+function resolveSepoliaSwapToken(tokenOrAddr: string): { symbol: string; address: `0x${string}`; decimals: number } | null {
+    const trimmed = tokenOrAddr.trim();
+    const upper = trimmed.toUpperCase();
+    const bySym = (SEPOLIA_SWAP_TOKENS as Record<string, { address: `0x${string}`; decimals: number }>)[upper];
+    if (bySym) return { symbol: upper, address: bySym.address, decimals: bySym.decimals };
+    const lower = trimmed.toLowerCase();
+    for (const [sym, info] of Object.entries(SEPOLIA_SWAP_TOKENS)) {
+        if (info.address.toLowerCase() === lower) {
+            return { symbol: sym, address: info.address, decimals: info.decimals };
+        }
+    }
+    return null;
+}
+
+async function buildCrossChainSwapCallData(params: {
+    currentAddress: `0x${string}`;
+    sourceChainId: number;
+    destChainId: number;
+    fromToken: string;
+    toToken: string;
+    amount: bigint;
+    recipient?: `0x${string}`;
+    rpcEndpoint: string;
+    tokenDecimalsMap: Record<string, number>;
+}): Promise<`0x${string}`> {
+    const fromMeta = resolveSepoliaSwapToken(params.fromToken);
+    const toMeta = resolveSepoliaSwapToken(params.toToken);
+    const fromSymbol = fromMeta?.symbol || params.fromToken.toUpperCase();
+    const toSymbol = toMeta?.symbol || params.toToken.toUpperCase();
+    const fromDecimals = fromMeta?.decimals ?? params.tokenDecimalsMap[fromSymbol] ?? 6;
+    const toDecimals = toMeta?.decimals ?? params.tokenDecimalsMap[toSymbol] ?? 6;
+    const fromFloat = Number(formatUnits(params.amount, fromDecimals));
+
+    const liveQuote = await fetchLifiQuote({
+        fromChainId: params.sourceChainId,
+        toChainId: params.destChainId,
+        fromSymbol,
+        toSymbol,
+        fromDecimals,
+        toDecimals,
+        amount: fromFloat,
+        fromAddress: params.currentAddress,
+    }).catch(() => null);
+
+    if (params.sourceChainId !== 421614) {
+        if (!liveQuote || liveQuote.indicative || !liveQuote.transactionRequest) {
+            throw new Error(`No executable Li.Fi route available for ${fromSymbol} -> ${toSymbol} on chain ${params.sourceChainId}.`);
+        }
+        const txReq = liveQuote.transactionRequest;
+        const txValue = txReq.value ? BigInt(txReq.value) : 0n;
+        if (
+            liveQuote.approvalAddress &&
+            liveQuote.fromTokenAddress &&
+            liveQuote.fromTokenAddress.toLowerCase() !== '0x0000000000000000000000000000000000000000'
+        ) {
+            const approveData = encodeFunctionData({
+                abi: ERC20_SWAP_ABI,
+                functionName: 'approve',
+                args: [liveQuote.approvalAddress, params.amount],
+            });
+            return encodeFunctionData({
+                abi: ACCOUNT_EXEC_ABI,
+                functionName: 'executeBatch',
+                args: [[liveQuote.fromTokenAddress, txReq.to], [0n, txValue], [approveData, txReq.data]],
+            });
+        }
+        return encodeFunctionData({
+            abi: ACCOUNT_EXEC_ABI,
+            functionName: 'execute',
+            args: [txReq.to, txValue, txReq.data],
+        });
+    }
+
+    const settlementRecipient = (params.recipient || params.currentAddress) as `0x${string}`;
+    if (!fromMeta || !toMeta) {
+        throw new Error(`Unsupported swap pair on Arbitrum Sepolia: ${params.fromToken} -> ${params.toToken}.`);
+    }
+
+    if (fromMeta.address.toLowerCase() === toMeta.address.toLowerCase()) {
+        const transferData = encodeFunctionData({
+            abi: ERC20_SWAP_ABI,
+            functionName: 'transfer',
+            args: [settlementRecipient, params.amount],
+        });
+        return encodeFunctionData({
+            abi: ACCOUNT_EXEC_ABI,
+            functionName: 'execute',
+            args: [fromMeta.address, 0n, transferData],
+        });
+    }
+
+    const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http(params.rpcEndpoint) });
+    const expectedOut = await publicClient.readContract({
+        address: SWAP_POOL_ADDRESS,
+        abi: SWAP_POOL_ABI,
+        functionName: 'getAmountOut',
+        args: [fromMeta.address, toMeta.address, params.amount],
+    }) as bigint;
+
+    if (expectedOut <= 0n) {
+        throw new Error(`SwapPool returned 0 output for ${fromFloat} ${fromMeta.symbol} -> ${toMeta.symbol}.`);
+    }
+    const minAmountOut = (expectedOut * 98n) / 100n;
+    const approveData = encodeFunctionData({
+        abi: ERC20_SWAP_ABI,
+        functionName: 'approve',
+        args: [SWAP_POOL_ADDRESS, params.amount],
+    });
+    const swapData = encodeFunctionData({
+        abi: SWAP_POOL_ABI,
+        functionName: 'swap',
+        args: [fromMeta.address, toMeta.address, params.amount, minAmountOut, settlementRecipient],
+    });
+    return encodeFunctionData({
+        abi: ACCOUNT_EXEC_ABI,
+        functionName: 'executeBatch',
+        args: [[fromMeta.address, SWAP_POOL_ADDRESS], [0n, 0n], [approveData, swapData]],
+    });
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
     let binary = '';
@@ -604,21 +829,20 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     const submitUserOp = async (
         callData: `0x${string}`,
         pin?: string,
-        _overrideChainId?: number,
+        overrideChainId?: number,
         customSignatureBuilder?: (userOpHashHex: `0x${string}`) => Promise<`0x${string}`>
     ): Promise<string> => {
         let currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
         if (!currentAddress) throw new Error('Wallet not initialized.');
 
-        // Smart account is deployed on Arbitrum Sepolia (421614)
-        const activeChainId = 421614;
-        const liveRpc = resolveRpcEndpoint(rpcUrl);
-        const liveBundler = resolveRpcEndpoint(paymasterUrl);
+        const activeChainId = overrideChainId || chainId || 421614;
+        const liveRpc = resolveChainEndpoint(rpcUrl, activeChainId);
+        const liveBundler = resolveChainEndpoint(paymasterUrl, activeChainId);
 
         const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(liveRpc) });
 
-        // Ensure currentAddress matches the user's stored P-256 public key on v2 factory
-        if (typeof window !== 'undefined') {
+        // Ensure currentAddress matches the user's stored P-256 public key on Arbitrum Sepolia v2 factory
+        if (activeChainId === 421614 && typeof window !== 'undefined') {
             const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
             if (pubKeyHex) {
                 const { walletAddress: canonicalAddr } = await resolveCanonicalAddress(pubKeyHex);
@@ -644,7 +868,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         const isDeployed = Boolean(existingBytecode && existingBytecode !== '0x');
 
         let initCode = '0x';
-        if (!isDeployed && typeof window !== 'undefined') {
+        if (!isDeployed && activeChainId === 421614 && typeof window !== 'undefined') {
             const pubKeyHex = localStorage.getItem('invisible_wallet_public_key');
             if (pubKeyHex) {
                 const viem = await import('viem');
@@ -699,53 +923,44 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             console.warn('[StylusSafe] Paymaster sponsorship bypassed:', e);
         }
 
-        // Canonical userOpHash from EntryPoint
-        let userOpHashHex: `0x${string}`;
-        let userOpHashBytes: Uint8Array;
-        try {
-            userOpHashHex = await publicClient.readContract({
-                address: CANONICAL_ENTRY_POINT,
-                abi: [{
-                    type: 'function', name: 'getUserOpHash', stateMutability: 'view',
-                    inputs: [{
-                        name: 'userOp', type: 'tuple', components: [
-                            { name: 'sender', type: 'address' },
-                            { name: 'nonce', type: 'uint256' },
-                            { name: 'initCode', type: 'bytes' },
-                            { name: 'callData', type: 'bytes' },
-                            { name: 'callGasLimit', type: 'uint256' },
-                            { name: 'verificationGasLimit', type: 'uint256' },
-                            { name: 'preVerificationGas', type: 'uint256' },
-                            { name: 'maxFeePerGas', type: 'uint256' },
-                            { name: 'maxPriorityFeePerGas', type: 'uint256' },
-                            { name: 'paymasterAndData', type: 'bytes' },
-                            { name: 'signature', type: 'bytes' },
-                        ]
-                    }],
-                    outputs: [{ type: 'bytes32' }],
+        // Canonical userOpHash from EntryPoint (no fake local hash fallback)
+        const userOpHashHex = await publicClient.readContract({
+            address: CANONICAL_ENTRY_POINT,
+            abi: [{
+                type: 'function', name: 'getUserOpHash', stateMutability: 'view',
+                inputs: [{
+                    name: 'userOp', type: 'tuple', components: [
+                        { name: 'sender', type: 'address' },
+                        { name: 'nonce', type: 'uint256' },
+                        { name: 'initCode', type: 'bytes' },
+                        { name: 'callData', type: 'bytes' },
+                        { name: 'callGasLimit', type: 'uint256' },
+                        { name: 'verificationGasLimit', type: 'uint256' },
+                        { name: 'preVerificationGas', type: 'uint256' },
+                        { name: 'maxFeePerGas', type: 'uint256' },
+                        { name: 'maxPriorityFeePerGas', type: 'uint256' },
+                        { name: 'paymasterAndData', type: 'bytes' },
+                        { name: 'signature', type: 'bytes' },
+                    ]
                 }],
-                functionName: 'getUserOpHash',
-                args: [{
-                    sender: userOp.sender as `0x${string}`,
-                    nonce: BigInt(userOp.nonce),
-                    initCode: userOp.initCode as `0x${string}`,
-                    callData: userOp.callData as `0x${string}`,
-                    callGasLimit: BigInt(userOp.callGasLimit),
-                    verificationGasLimit: BigInt(userOp.verificationGasLimit),
-                    preVerificationGas: BigInt(userOp.preVerificationGas),
-                    maxFeePerGas: BigInt(userOp.maxFeePerGas),
-                    maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
-                    paymasterAndData: userOp.paymasterAndData as `0x${string}`,
-                    signature: '0x',
-                }],
-            }) as `0x${string}`;
-            userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
-        } catch {
-            userOpHashBytes = await sha256(
-                new TextEncoder().encode(`${userOp.sender}:${userOp.nonce}:${userOp.callData}:${activeChainId}`)
-            );
-            userOpHashHex = `0x${bufferToHex(userOpHashBytes)}` as `0x${string}`;
-        }
+                outputs: [{ type: 'bytes32' }],
+            }],
+            functionName: 'getUserOpHash',
+            args: [{
+                sender: userOp.sender as `0x${string}`,
+                nonce: BigInt(userOp.nonce),
+                initCode: userOp.initCode as `0x${string}`,
+                callData: userOp.callData as `0x${string}`,
+                callGasLimit: BigInt(userOp.callGasLimit),
+                verificationGasLimit: BigInt(userOp.verificationGasLimit),
+                preVerificationGas: BigInt(userOp.preVerificationGas),
+                maxFeePerGas: BigInt(userOp.maxFeePerGas),
+                maxPriorityFeePerGas: BigInt(userOp.maxPriorityFeePerGas),
+                paymasterAndData: userOp.paymasterAndData as `0x${string}`,
+                signature: '0x',
+            }],
+        }) as `0x${string}`;
+        const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
 
         if (customSignatureBuilder) {
             userOp.signature = await customSignatureBuilder(userOpHashHex);
@@ -776,8 +991,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             }),
         });
         const bundlerJson = await bundlerResp.json().catch(() => ({ error: { message: `HTTP ${bundlerResp.status}` } }));
-        if (bundlerJson.error) {
-            throw new Error(bundlerJson.error.message || JSON.stringify(bundlerJson.error));
+        if (!bundlerResp.ok || bundlerJson?.error || !bundlerJson?.result) {
+            throw new Error(bundlerJson?.error?.message || JSON.stringify(bundlerJson?.error) || `Bundler rejected UserOperation (HTTP ${bundlerResp.status})`);
         }
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('stylussafe-balance-updated'));
@@ -867,48 +1082,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     // ── executeCrossChainSwap ─────────────────────────────────────────────────
 
-    const settleSwapBalances = async (
-        walletAddr: string,
-        fromToken: string,
-        toToken: string,
-        amountRaw: bigint,
-        recipientAddr: string,
-        sourceChainId: number = 421614,
-        destChainId: number = 421614
-    ) => {
-        const fromDec = TOKEN_DECIMALS[fromToken] ?? 6;
-        const fromFloat = Number(formatUnits(amountRaw, fromDec));
-        const fromUsd = fromFloat * (TOKEN_USD_PRICES[fromToken] ?? 1.0);
-        const toUsdPrice = TOKEN_USD_PRICES[toToken] ?? 1.0;
-
-        // Credit exactly what the live Li.Fi route would deliver (net of its fees);
-        // if no route can be quoted, fall back to the plain price ratio with no invented fee.
-        const liveQuote = await fetchLifiQuote({
-            fromChainId: sourceChainId,
-            toChainId: destChainId,
-            fromSymbol: fromToken,
-            toSymbol: toToken,
-            fromDecimals: fromDec,
-            toDecimals: TOKEN_DECIMALS[toToken] ?? 6,
-            amount: fromFloat,
-            fromAddress: walletAddr,
-        });
-        const toFloat = liveQuote ? liveQuote.toAmount : fromUsd / toUsdPrice;
-
-        // If swapping a non-USDG asset, deduct from local swapped ledger
-        if (fromToken !== 'USDG') {
-            recordSwappedDelta(walletAddr, fromToken, -fromFloat);
-        }
-
-        // Credit destination asset
-        const targetHolder = recipientAddr || walletAddr;
-        if (toToken === 'USDG') {
-            await ensureTestnetUsdgFunded(targetHolder, Math.max(100, Math.round(toFloat)), false);
-        } else {
-            recordSwappedDelta(targetHolder, toToken, toFloat);
-        }
-    };
-
     const executeCrossChainSwap = async (
         arg1: number,
         arg2: number | string,
@@ -951,46 +1124,23 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 pin = arg6 as string | undefined;
             }
 
-            // Encode real ERC-20 USDG transfer to solver liquidity vault on Arbitrum Sepolia when paying with USDG
-            let walletCallData: `0x${string}`;
-            const isPayingUsdg = fromToken === 'USDG' || fromToken.toLowerCase() === USDG_ADDRESS.toLowerCase();
-
-            if (isPayingUsdg) {
-                const settlementRecipient =
-                    !recipient || recipient.toLowerCase() === currentAddress.toLowerCase()
-                        ? SOLVER_LIQUIDITY_VAULT
-                        : recipient;
-
-                const erc20TransferData = encodeFunctionData({
-                    abi: [{
-                        type: 'function',
-                        name: 'transfer',
-                        stateMutability: 'nonpayable',
-                        inputs: [
-                            { name: 'to', type: 'address' },
-                            { name: 'amount', type: 'uint256' },
-                        ],
-                        outputs: [{ name: '', type: 'bool' }],
-                    }],
-                    functionName: 'transfer',
-                    args: [settlementRecipient, amount],
-                });
-
-                walletCallData = encodeFunctionData({
-                    abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
-                    functionName: 'execute',
-                    args: [USDG_ADDRESS, 0n, erc20TransferData],
-                });
-            } else {
-                walletCallData = encodeFunctionData({
-                    abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
-                    functionName: 'execute',
-                    args: [SOLVER_LIQUIDITY_VAULT, 0n, '0x'],
-                });
-            }
+            const liveRpc = resolveChainEndpoint(rpcUrl, sourceChainId);
+            const walletCallData = await buildCrossChainSwapCallData({
+                currentAddress: currentAddress as `0x${string}`,
+                sourceChainId,
+                destChainId,
+                fromToken,
+                toToken,
+                amount,
+                recipient: recipient || (currentAddress as `0x${string}`),
+                rpcEndpoint: liveRpc,
+                tokenDecimalsMap: TOKEN_DECIMALS,
+            });
 
             const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
-            await settleSwapBalances(currentAddress, fromToken, toToken, amount, recipient || currentAddress, sourceChainId, destChainId);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('stylussafe-balance-updated'));
+            }
 
             return { userOpHash };
         } catch (err: unknown) {
@@ -1086,27 +1236,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 );
             }
 
-            // Build ERC-20 transfer or solver call
-            const isPayingUsdg = params.fromToken === 'USDG';
-            const settlementRecipient =
-                !params.recipient || params.recipient.toLowerCase() === currentAddress.toLowerCase()
-                    ? SOLVER_LIQUIDITY_VAULT
-                    : params.recipient;
-
-            const erc20TransferData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'transfer',
-                    stateMutability: 'nonpayable',
-                    inputs: [
-                        { name: 'to', type: 'address' },
-                        { name: 'amount', type: 'uint256' },
-                    ],
-                    outputs: [{ name: '', type: 'bool' }],
-                }],
-                functionName: 'transfer',
-                args: [settlementRecipient, isPayingUsdg ? params.amount : usdSpendUnits],
-            });
+            // Build real StylusSafeSwapPool (421614) or Li.Fi (mainnet) execution payload
+            const fromMeta = resolveSepoliaSwapToken(params.fromToken);
+            const toMeta = resolveSepoliaSwapToken(params.toToken);
 
             const savedSessionPk =
                 typeof window !== 'undefined'
@@ -1115,57 +1247,94 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const { privateKeyToAccount } = await import('viem/accounts');
             const sessionAccount = savedSessionPk ? privateKeyToAccount(savedSessionPk as `0x${string}`) : null;
 
+            const zeroAddr = '0x0000000000000000000000000000000000000000';
             const canUseOnChainSessionSig =
                 !!sessionAccount &&
                 !!onChainSessionKey &&
-                onChainSessionKey !== '0x0000000000000000000000000000000000000000' &&
+                onChainSessionKey !== zeroAddr &&
                 onChainSessionKey.toLowerCase() === sessionAccount.address.toLowerCase() &&
-                (onChainAllowedTarget === '0x0000000000000000000000000000000000000000' ||
-                    onChainAllowedTarget.toLowerCase() === USDG_ADDRESS.toLowerCase());
+                (onChainAllowedTarget === zeroAddr ||
+                    onChainAllowedTarget.toLowerCase() === SWAP_POOL_ADDRESS.toLowerCase());
 
             let userOpHash: string;
-            if (canUseOnChainSessionSig && sessionAccount) {
-                const agentCallData = encodeFunctionData({
-                    abi: [{
-                        type: 'function',
-                        name: 'executeAsAgent',
-                        stateMutability: 'nonpayable',
-                        inputs: [
-                            { name: 'dest', type: 'address' },
-                            { name: 'value', type: 'uint256' },
-                            { name: 'func', type: 'bytes' },
-                        ],
-                        outputs: [],
-                    }],
-                    functionName: 'executeAsAgent',
-                    args: [USDG_ADDRESS, 0n, erc20TransferData],
-                });
+            const settlementRecipient = (params.recipient || currentAddress) as `0x${string}`;
+            let usedAgentSession = false;
 
-                userOpHash = await submitUserOp(
-                    agentCallData,
-                    undefined,
-                    421614,
-                    async (opHashHex) => {
-                        const rawSig = await sessionAccount.sign({ hash: opHashHex });
-                        return `0x01${rawSig.slice(2)}` as `0x${string}`;
+            if (canUseOnChainSessionSig && sessionAccount && params.sourceChainId === 421614 && fromMeta && toMeta && fromMeta.address.toLowerCase() !== toMeta.address.toLowerCase()) {
+                const currentAllowance = await publicClient.readContract({
+                    address: fromMeta.address,
+                    abi: ERC20_SWAP_ABI,
+                    functionName: 'allowance',
+                    args: [currentAddress as `0x${string}`, SWAP_POOL_ADDRESS],
+                }).catch(() => 0n) as bigint;
+
+                if (currentAllowance >= params.amount) {
+                    const expectedOut = await publicClient.readContract({
+                        address: SWAP_POOL_ADDRESS,
+                        abi: SWAP_POOL_ABI,
+                        functionName: 'getAmountOut',
+                        args: [fromMeta.address, toMeta.address, params.amount],
+                    }) as bigint;
+                    if (expectedOut <= 0n) {
+                        throw new Error(`SwapPool returned 0 output for ${fromMeta.symbol} -> ${toMeta.symbol}.`);
                     }
-                );
-            } else {
-                // Execute using silent enclave P-256 signature while enforcing the agent policy
-                const ownerCallData = encodeFunctionData({
-                    abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
-                    functionName: 'execute',
-                    args: [USDG_ADDRESS, 0n, isPayingUsdg ? erc20TransferData : '0x'],
+                    const minAmountOut = (expectedOut * 98n) / 100n;
+                    const swapCallData = encodeFunctionData({
+                        abi: SWAP_POOL_ABI,
+                        functionName: 'swap',
+                        args: [fromMeta.address, toMeta.address, params.amount, minAmountOut, settlementRecipient],
+                    });
+                    const agentCallData = encodeFunctionData({
+                        abi: [{
+                            type: 'function',
+                            name: 'executeAsAgent',
+                            stateMutability: 'nonpayable',
+                            inputs: [
+                                { name: 'dest', type: 'address' },
+                                { name: 'value', type: 'uint256' },
+                                { name: 'func', type: 'bytes' },
+                            ],
+                            outputs: [],
+                        }],
+                        functionName: 'executeAsAgent',
+                        args: [SWAP_POOL_ADDRESS, 0n, swapCallData],
+                    });
+                    userOpHash = await submitUserOp(
+                        agentCallData,
+                        undefined,
+                        421614,
+                        async (opHashHex) => {
+                            const rawSig = await sessionAccount.sign({ hash: opHashHex });
+                            return `0x01${rawSig.slice(2)}` as `0x${string}`;
+                        }
+                    );
+                    usedAgentSession = true;
+                }
+            }
+
+            if (!usedAgentSession) {
+                // Execute using silent enclave P-256 signature while enforcing agent policy limits
+                const targetRpc = resolveChainEndpoint(rpcUrl, params.sourceChainId);
+                const ownerCallData = await buildCrossChainSwapCallData({
+                    currentAddress: currentAddress as `0x${string}`,
+                    sourceChainId: params.sourceChainId,
+                    destChainId: params.destChainId,
+                    fromToken: params.fromToken,
+                    toToken: params.toToken,
+                    amount: params.amount,
+                    recipient: settlementRecipient,
+                    rpcEndpoint: targetRpc,
+                    tokenDecimalsMap: TOKEN_DECIMALS,
                 });
-                userOpHash = await submitUserOp(ownerCallData, undefined, 421614);
+                userOpHash = await submitUserOp(ownerCallData, undefined, params.sourceChainId);
             }
 
             if (typeof window !== 'undefined') {
                 localStorage.setItem('invisible_wallet_session_spent_today', (spentToday + usdSpendUnits).toString());
+                window.dispatchEvent(new CustomEvent('stylussafe-balance-updated'));
             }
 
-            await settleSwapBalances(currentAddress, params.fromToken, params.toToken, params.amount, params.recipient || currentAddress, params.sourceChainId, params.destChainId);
-            return { userOpHash };
+            return { userOpHash: userOpHash! };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
             throw err;

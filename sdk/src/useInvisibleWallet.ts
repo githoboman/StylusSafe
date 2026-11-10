@@ -5,7 +5,8 @@ import {
     http,
     custom,
     toHex,
-    encodeFunctionData
+    encodeFunctionData,
+    formatUnits
 } from 'viem';
 import { createPaymasterClient } from 'viem/account-abstraction';
 import {
@@ -21,7 +22,7 @@ import {
     sha256
 } from './utils';
 import { createPublicClient as _createPublicClient, http as _http } from 'viem';
-import { fetchLiveTokenPrices, FALLBACK_TOKEN_USD_PRICES } from './lifi';
+import { fetchLifiQuote, fetchLiveTokenPrices, FALLBACK_TOKEN_USD_PRICES } from './lifi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -91,8 +92,244 @@ export type InvisibleWallet = {
 const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string}`;
-const SOLVER_LIQUIDITY_VAULT = '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' as `0x${string}`;
+export const SWAP_POOL_ADDRESS = '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' as `0x${string}`;
+export const SEPOLIA_SWAP_TOKENS = {
+    USDG: { address: USDG_ADDRESS, decimals: 6 },
+    USDC: { address: '0x120A29db0F1Dd3F479D99B8DaaCf6BD1070CA56e' as `0x${string}`, decimals: 6 },
+    USDT: { address: '0xe5313FB74788cea60941dd0a171519cdCa14cCc6' as `0x${string}`, decimals: 6 },
+    ETH: { address: '0x2e05ED11a050106E15ceF55b7938dEB6249B14cF' as `0x${string}`, decimals: 18 },
+    ARB: { address: '0xa1AF657CEaF9566D21D7e596aeF923f368F5ead1' as `0x${string}`, decimals: 18 },
+    UNI: { address: '0xEC09D28A2f790630Bb97DE8313DB904aaF6FB6b7' as `0x${string}`, decimals: 18 },
+    WBTC: { address: '0x1aCa4D7bC53793c688d71e9061c19347EbAa8bC3' as `0x${string}`, decimals: 8 },
+    DEGEN: { address: '0xd6d2f4258A23636d650Ee6dD22bFA1978C3827A0' as `0x${string}`, decimals: 18 },
+} as const;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
+
+const MAINNET_PUBLIC_RPCS: Record<number, string> = {
+    1: 'https://ethereum-rpc.publicnode.com',
+    10: 'https://mainnet.optimism.io',
+    137: 'https://polygon-rpc.com',
+    8453: 'https://mainnet.base.org',
+    42161: 'https://arb1.arbitrum.io/rpc',
+};
+
+function resolveChainEndpoint(baseUrl: string, targetChainId: number): string {
+    if (typeof window !== 'undefined' && baseUrl.startsWith('/')) {
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        return targetChainId && targetChainId !== 421614
+            ? `${window.location.origin}${baseUrl}${sep}chainId=${targetChainId}`
+            : `${window.location.origin}${baseUrl}`;
+    }
+    if (targetChainId && targetChainId !== 421614 && (!baseUrl || baseUrl === FALLBACK_PUBLIC_RPC || baseUrl.includes('sepolia'))) {
+        return MAINNET_PUBLIC_RPCS[targetChainId] || baseUrl || FALLBACK_PUBLIC_RPC;
+    }
+    return baseUrl || FALLBACK_PUBLIC_RPC;
+}
+
+const SWAP_POOL_ABI = [
+    {
+        type: 'function',
+        name: 'getAmountOut',
+        stateMutability: 'view',
+        inputs: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+        ],
+        outputs: [{ name: 'amountOut', type: 'uint256' }],
+    },
+    {
+        type: 'function',
+        name: 'swap',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'minAmountOut', type: 'uint256' },
+            { name: 'recipient', type: 'address' },
+        ],
+        outputs: [{ name: 'amountOut', type: 'uint256' }],
+    },
+] as const;
+
+const ERC20_SWAP_ABI = [
+    {
+        type: 'function',
+        name: 'approve',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+        ],
+        outputs: [{ name: '', type: 'bool' }],
+    },
+    {
+        type: 'function',
+        name: 'transfer',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'to', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+        ],
+        outputs: [{ name: '', type: 'bool' }],
+    },
+] as const;
+
+const ACCOUNT_EXEC_ABI = [
+    {
+        type: 'function',
+        name: 'execute',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'dest', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'func', type: 'bytes' },
+        ],
+        outputs: [],
+    },
+    {
+        type: 'function',
+        name: 'executeBatch',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'dest', type: 'address[]' },
+            { name: 'value', type: 'uint256[]' },
+            { name: 'func', type: 'bytes[]' },
+        ],
+        outputs: [],
+    },
+] as const;
+
+const TOKEN_DECIMALS_MAP: Record<string, number> = {
+    USDG: 6,
+    USDC: 6,
+    USDT: 6,
+    ETH: 18,
+    ARB: 18,
+    UNI: 18,
+    WBTC: 8,
+    DEGEN: 18,
+};
+
+function resolveSepoliaSwapToken(tokenOrAddr: string): { symbol: string; address: `0x${string}`; decimals: number } | null {
+    const trimmed = tokenOrAddr.trim();
+    const upper = trimmed.toUpperCase();
+    const bySym = (SEPOLIA_SWAP_TOKENS as Record<string, { address: `0x${string}`; decimals: number }>)[upper];
+    if (bySym) return { symbol: upper, address: bySym.address, decimals: bySym.decimals };
+    const lower = trimmed.toLowerCase();
+    for (const [sym, info] of Object.entries(SEPOLIA_SWAP_TOKENS)) {
+        if (info.address.toLowerCase() === lower) {
+            return { symbol: sym, address: info.address, decimals: info.decimals };
+        }
+    }
+    return null;
+}
+
+async function buildCrossChainSwapCallData(params: {
+    currentAddress: `0x${string}`;
+    sourceChainId: number;
+    destChainId: number;
+    fromToken: string;
+    toToken: string;
+    amount: bigint;
+    recipient?: `0x${string}`;
+    rpcEndpoint: string;
+}): Promise<`0x${string}`> {
+    const fromMeta = resolveSepoliaSwapToken(params.fromToken);
+    const toMeta = resolveSepoliaSwapToken(params.toToken);
+    const fromSymbol = fromMeta?.symbol || params.fromToken.toUpperCase();
+    const toSymbol = toMeta?.symbol || params.toToken.toUpperCase();
+    const fromDecimals = fromMeta?.decimals ?? TOKEN_DECIMALS_MAP[fromSymbol] ?? 6;
+    const toDecimals = toMeta?.decimals ?? TOKEN_DECIMALS_MAP[toSymbol] ?? 6;
+    const fromFloat = Number(formatUnits(params.amount, fromDecimals));
+
+    const liveQuote = await fetchLifiQuote({
+        fromChainId: params.sourceChainId,
+        toChainId: params.destChainId,
+        fromSymbol,
+        toSymbol,
+        fromDecimals,
+        toDecimals,
+        amount: fromFloat,
+        fromAddress: params.currentAddress,
+    }).catch(() => null);
+
+    if (params.sourceChainId !== 421614) {
+        if (!liveQuote || liveQuote.indicative || !liveQuote.transactionRequest) {
+            throw new Error(`No executable Li.Fi route available for ${fromSymbol} -> ${toSymbol} on chain ${params.sourceChainId}.`);
+        }
+        const txReq = liveQuote.transactionRequest;
+        const txValue = txReq.value ? BigInt(txReq.value) : 0n;
+        if (
+            liveQuote.approvalAddress &&
+            liveQuote.fromTokenAddress &&
+            liveQuote.fromTokenAddress.toLowerCase() !== '0x0000000000000000000000000000000000000000'
+        ) {
+            const approveData = encodeFunctionData({
+                abi: ERC20_SWAP_ABI,
+                functionName: 'approve',
+                args: [liveQuote.approvalAddress, params.amount],
+            });
+            return encodeFunctionData({
+                abi: ACCOUNT_EXEC_ABI,
+                functionName: 'executeBatch',
+                args: [[liveQuote.fromTokenAddress, txReq.to], [0n, txValue], [approveData, txReq.data]],
+            });
+        }
+        return encodeFunctionData({
+            abi: ACCOUNT_EXEC_ABI,
+            functionName: 'execute',
+            args: [txReq.to, txValue, txReq.data],
+        });
+    }
+
+    const settlementRecipient = (params.recipient || params.currentAddress) as `0x${string}`;
+    if (!fromMeta || !toMeta) {
+        throw new Error(`Unsupported swap pair on Arbitrum Sepolia: ${params.fromToken} -> ${params.toToken}.`);
+    }
+
+    if (fromMeta.address.toLowerCase() === toMeta.address.toLowerCase()) {
+        const transferData = encodeFunctionData({
+            abi: ERC20_SWAP_ABI,
+            functionName: 'transfer',
+            args: [settlementRecipient, params.amount],
+        });
+        return encodeFunctionData({
+            abi: ACCOUNT_EXEC_ABI,
+            functionName: 'execute',
+            args: [fromMeta.address, 0n, transferData],
+        });
+    }
+
+    const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http(params.rpcEndpoint) });
+    const expectedOut = await publicClient.readContract({
+        address: SWAP_POOL_ADDRESS,
+        abi: SWAP_POOL_ABI,
+        functionName: 'getAmountOut',
+        args: [fromMeta.address, toMeta.address, params.amount],
+    }) as bigint;
+
+    if (expectedOut <= 0n) {
+        throw new Error(`SwapPool returned 0 output for ${fromFloat} ${fromMeta.symbol} -> ${toMeta.symbol}.`);
+    }
+    const minAmountOut = (expectedOut * 98n) / 100n;
+    const approveData = encodeFunctionData({
+        abi: ERC20_SWAP_ABI,
+        functionName: 'approve',
+        args: [SWAP_POOL_ADDRESS, params.amount],
+    });
+    const swapData = encodeFunctionData({
+        abi: SWAP_POOL_ABI,
+        functionName: 'swap',
+        args: [fromMeta.address, toMeta.address, params.amount, minAmountOut, settlementRecipient],
+    });
+    return encodeFunctionData({
+        abi: ACCOUNT_EXEC_ABI,
+        functionName: 'executeBatch',
+        args: [[fromMeta.address, SWAP_POOL_ADDRESS], [0n, 0n], [approveData, swapData]],
+    });
+}
 
 // Live DeFiLlama price cache (offline fallback seeded from FALLBACK_TOKEN_USD_PRICES).
 export const TOKEN_USD_PRICES: Record<string, number> = { ...FALLBACK_TOKEN_USD_PRICES };
@@ -416,8 +653,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         if (!currentAddress) throw new Error('Wallet not initialized.');
 
         const activeChainId = overrideChainId || chainId;
-        const liveRpc = resolveRpcEndpoint(rpcUrl);
-        const liveBundler = resolveRpcEndpoint(paymasterUrl);
+        const liveRpc = resolveChainEndpoint(rpcUrl, activeChainId);
+        const liveBundler = resolveChainEndpoint(paymasterUrl, activeChainId);
 
         const publicClient = createPublicClient({ chain: { id: activeChainId } as any, transport: http(liveRpc) });
 
@@ -548,9 +785,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             }),
         });
         const bundlerJson = await bundlerResp.json().catch(() => ({ error: { message: `HTTP ${bundlerResp.status}` } }));
-        if (bundlerJson.error) {
-            console.error('[StylusSafe] Bundler rejected UserOp:', bundlerJson.error, userOp);
-            throw new Error(`Bundler error: ${bundlerJson.error.message || JSON.stringify(bundlerJson.error)}`);
+        if (!bundlerResp.ok || bundlerJson?.error || !bundlerJson?.result) {
+            console.error('[StylusSafe] Bundler rejected UserOp:', bundlerJson?.error, userOp);
+            throw new Error(`Bundler error: ${bundlerJson?.error?.message || JSON.stringify(bundlerJson?.error) || `HTTP ${bundlerResp.status}`}`);
         }
         return bundlerJson.result as string;
     };
@@ -656,27 +893,17 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 pin = arg6 as string | undefined;
             }
 
-            // Paying with USDG encodes a real ERC-20 transfer to the solver vault (or the given
-            // recipient). Other tokens have no on-chain leg on testnet, so a zero-value call goes to the
-            // solver instead of passing the token amount as native ETH value.
-            const isPayingUsdg = fromToken === 'USDG' || fromToken.toLowerCase() === USDG_ADDRESS.toLowerCase();
-            const execAbi = [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }] as const;
-            let walletCallData: `0x${string}`;
-
-            if (isPayingUsdg) {
-                const settlementRecipient =
-                    !recipient || recipient.toLowerCase() === currentAddress.toLowerCase()
-                        ? SOLVER_LIQUIDITY_VAULT
-                        : recipient;
-                const erc20TransferData = encodeFunctionData({
-                    abi: [{ type: 'function', name: 'transfer', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
-                    functionName: 'transfer',
-                    args: [settlementRecipient, amount],
-                });
-                walletCallData = encodeFunctionData({ abi: execAbi, functionName: 'execute', args: [USDG_ADDRESS, 0n, erc20TransferData] });
-            } else {
-                walletCallData = encodeFunctionData({ abi: execAbi, functionName: 'execute', args: [SOLVER_LIQUIDITY_VAULT, 0n, '0x'] });
-            }
+            const liveRpc = resolveChainEndpoint(rpcUrl, sourceChainId);
+            const walletCallData = await buildCrossChainSwapCallData({
+                currentAddress: currentAddress as `0x${string}`,
+                sourceChainId,
+                destChainId,
+                fromToken,
+                toToken,
+                amount,
+                recipient: recipient || (currentAddress as `0x${string}`),
+                rpcEndpoint: liveRpc,
+            });
 
             const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
             return { userOpHash };

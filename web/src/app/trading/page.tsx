@@ -18,6 +18,7 @@ import {
 } from '@/lib/agentPolicy';
 
 const POPULAR_TARGETS = [
+  { name: 'StylusSafe Swap Pool (421614)', address: '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' },
   { name: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
   { name: 'USDG Stablecoin Treasury', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' },
   { name: 'GMX V2 Exchange', address: '0xabbc5f99639c083a0475225492f311419527fb45' },

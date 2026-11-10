@@ -2,22 +2,38 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, http, formatEther, formatUnits } from 'viem';
 
 export const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as const;
+export const SWAP_POOL_ADDRESS = '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' as const;
+
+export const SEPOLIA_SWAP_TOKENS = {
+  USDG: { address: USDG_ADDRESS, decimals: 6, displayDecimals: 2 },
+  USDC: { address: '0x120A29db0F1Dd3F479D99B8DaaCf6BD1070CA56e' as `0x${string}`, decimals: 6, displayDecimals: 2 },
+  USDT: { address: '0xe5313FB74788cea60941dd0a171519cdCa14cCc6' as `0x${string}`, decimals: 6, displayDecimals: 2 },
+  ETH: { address: '0x2e05ED11a050106E15ceF55b7938dEB6249B14cF' as `0x${string}`, decimals: 18, displayDecimals: 4 },
+  ARB: { address: '0xa1AF657CEaF9566D21D7e596aeF923f368F5ead1' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+  UNI: { address: '0xEC09D28A2f790630Bb97DE8313DB904aaF6FB6b7' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+  WBTC: { address: '0x1aCa4D7bC53793c688d71e9061c19347EbAa8bC3' as `0x${string}`, decimals: 8, displayDecimals: 6 },
+  DEGEN: { address: '0xd6d2f4258A23636d650Ee6dD22bFA1978C3827A0' as `0x${string}`, decimals: 18, displayDecimals: 2 },
+} as const;
+
+function resolveChainRpc(chainId: number, ssrFallback: string): string {
+  return typeof window !== 'undefined' ? `${window.location.origin}/api/rpc?chainId=${chainId}` : ssrFallback;
+}
 
 const CHAIN_CONFIGS: Record<number, { rpc: string; usdc: `0x${string}`; usdg?: `0x${string}` }> = {
   // Arbitrum Sepolia - proxied via server route to avoid client key exposure
   421614: {
-    rpc: typeof window !== 'undefined' ? `${window.location.origin}/api/rpc` : 'https://sepolia-rollup.arbitrum.io/rpc',
+    rpc: resolveChainRpc(421614, 'https://sepolia-rollup.arbitrum.io/rpc'),
     usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     usdg: USDG_ADDRESS,
   },
   // Base
-  8453: { rpc: 'https://mainnet.base.org', usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
+  8453: { rpc: resolveChainRpc(8453, 'https://mainnet.base.org'), usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' },
   // Optimism
-  10: { rpc: 'https://mainnet.optimism.io', usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
+  10: { rpc: resolveChainRpc(10, 'https://mainnet.optimism.io'), usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' },
   // Polygon
-  137: { rpc: 'https://polygon.llamarpc.com', usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
+  137: { rpc: resolveChainRpc(137, 'https://polygon-rpc.com'), usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' },
   // Ethereum
-  1: { rpc: 'https://cloudflare-eth.com', usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+  1: { rpc: resolveChainRpc(1, 'https://ethereum-rpc.publicnode.com'), usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
 };
 
 const ERC20_ABI = [
@@ -51,30 +67,6 @@ export type CustomTokenBalance = {
   balance: string;
   chainId: number;
 };
-
-export function getSwappedLedger(walletAddress: string | null): Record<string, number> {
-  if (typeof window === 'undefined' || !walletAddress) return {};
-  try {
-    const raw = localStorage.getItem(`invisible_wallet_swapped_balances_${walletAddress.toLowerCase()}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function recordSwappedDelta(walletAddress: string, symbol: string, delta: number) {
-  if (typeof window === 'undefined' || !walletAddress) return;
-  try {
-    const key = `invisible_wallet_swapped_balances_${walletAddress.toLowerCase()}`;
-    const current = getSwappedLedger(walletAddress);
-    const nextVal = Math.max(0, (Number(current[symbol]) || 0) + delta);
-    current[symbol] = nextVal;
-    localStorage.setItem(key, JSON.stringify(current));
-    window.dispatchEvent(new CustomEvent('stylussafe-balance-updated'));
-  } catch {
-    // ignore storage errors
-  }
-}
 
 export function useBalances(walletAddress: string | null, chainId: number = 421614) {
   const [usdgBalance, setUsdgBalance] = useState('0.00');
@@ -119,7 +111,12 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
       setIsFetching(true);
       setError(null);
       try {
-        const [nativeBalRaw, usdc, usdgRaw] = await Promise.all([
+        const poolEntries = Object.entries(SEPOLIA_SWAP_TOKENS) as Array<[
+          keyof typeof SEPOLIA_SWAP_TOKENS,
+          (typeof SEPOLIA_SWAP_TOKENS)[keyof typeof SEPOLIA_SWAP_TOKENS]
+        ]>;
+
+        const [nativeBalRaw, usdc, poolRaws] = await Promise.all([
           publicClient.getBalance({ address: walletAddress as `0x${string}` }).catch(() => BigInt(0)),
           publicClient
             .readContract({
@@ -129,17 +126,26 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
               args: [walletAddress as `0x${string}`],
             })
             .catch(() => BigInt(0)),
-          config.usdg
-            ? publicClient
-                .readContract({
-                  address: config.usdg,
-                  abi: ERC20_ABI,
-                  functionName: 'balanceOf',
-                  args: [walletAddress as `0x${string}`],
-                })
-                .catch(() => BigInt(0))
-            : Promise.resolve(BigInt(0)),
+          chainId === 421614
+            ? Promise.all(
+                poolEntries.map(([, info]) =>
+                  publicClient
+                    .readContract({
+                      address: info.address,
+                      abi: ERC20_ABI,
+                      functionName: 'balanceOf',
+                      args: [walletAddress as `0x${string}`],
+                    })
+                    .catch(() => BigInt(0))
+                )
+              )
+            : Promise.resolve(poolEntries.map(() => BigInt(0))),
         ]);
+
+        const poolMap: Record<string, bigint> = {};
+        poolEntries.forEach(([sym], idx) => {
+          poolMap[sym] = (poolRaws[idx] as bigint) ?? BigInt(0);
+        });
 
         const savedTokens = JSON.parse(localStorage.getItem('custom_tokens') || '[]') as {
           address: string;
@@ -182,33 +188,29 @@ export function useBalances(walletAddress: string | null, chainId: number = 4216
         );
 
         if (isMounted) {
-          const ledger = getSwappedLedger(walletAddress);
-          const onChainEth = Number(formatEther(nativeBalRaw));
-          const onChainUsdg = Number(formatUnits(usdgRaw as bigint, 6));
-          const onChainUsdc = Number(formatUnits(usdc as bigint, 6));
+          const onChainEth = Number(formatEther(nativeBalRaw + (chainId === 421614 ? (poolMap.ETH ?? BigInt(0)) : BigInt(0))));
+          const onChainUsdg = Number(formatUnits(chainId === 421614 ? (poolMap.USDG ?? BigInt(0)) : BigInt(0), 6));
+          const onChainUsdc = Number(formatUnits((usdc as bigint) + (chainId === 421614 ? (poolMap.USDC ?? BigInt(0)) : BigInt(0)), 6));
 
-          const totalEth = Math.max(0, onChainEth + (Number(ledger.ETH) || 0));
-          // USDG is settled directly on-chain on Arbitrum Sepolia (421614); on other chains fall back to ledger if needed
-          const totalUsdg = chainId === 421614 ? Math.max(0, onChainUsdg + (Number(ledger.USDG_LOCAL_DELTA) || 0)) : onChainUsdg;
-          const totalUsdc = Math.max(0, onChainUsdc + (Number(ledger.USDC) || 0));
+          const formattedNative = Math.max(0, onChainEth).toFixed(4);
+          const formattedUsdg = Math.max(0, onChainUsdg).toFixed(2);
+          const formattedUsdc = Math.max(0, onChainUsdc).toFixed(2);
 
-          const formattedNative = totalEth.toFixed(4);
-          const formattedUsdg = totalUsdg.toFixed(2);
-          const formattedUsdc = totalUsdc.toFixed(2);
+          const nextTokenBalances: Record<string, string> = {
+            USDG: formattedUsdg,
+            USDC: formattedUsdc,
+            ETH: formattedNative,
+          };
+          for (const [sym, info] of poolEntries) {
+            if (sym === 'USDG' || sym === 'USDC' || sym === 'ETH') continue;
+            const rawBal = chainId === 421614 ? (poolMap[sym] ?? BigInt(0)) : BigInt(0);
+            nextTokenBalances[sym] = Number(formatUnits(rawBal, info.decimals)).toFixed(info.displayDecimals);
+          }
 
           setUsdgBalance(formattedUsdg);
           setEthBalance(formattedNative);
           setUsdcBalance(formattedUsdc);
-          setTokenBalances({
-            USDG: formattedUsdg,
-            USDC: formattedUsdc,
-            ETH: formattedNative,
-            ARB: Math.max(0, Number(ledger.ARB) || 0).toFixed(2),
-            USDT: Math.max(0, Number(ledger.USDT) || 0).toFixed(2),
-            DEGEN: Math.max(0, Number(ledger.DEGEN) || 0).toFixed(2),
-            UNI: Math.max(0, Number(ledger.UNI) || 0).toFixed(2),
-            WBTC: Math.max(0, Number(ledger.WBTC) || 0).toFixed(6),
-          });
+          setTokenBalances(nextTokenBalances);
           setCustomTokens(customResults.filter(Boolean) as CustomTokenBalance[]);
         }
       } catch (err: any) {

@@ -1,0 +1,49 @@
+{
+  "network": "arbitrum-sepolia",
+  "chainId": 421614,
+  "swapPool": "0xD306521Ff547Ab4523f0a77cb9EaE53873be143b",
+  "tokens": {
+    "USDG": {
+      "address": "0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36",
+      "decimals": 6,
+      "symbol": "USDG"
+    },
+    "USDC": {
+      "address": "0x120A29db0F1Dd3F479D99B8DaaCf6BD1070CA56e",
+      "decimals": 6,
+      "symbol": "USDC"
+    },
+    "USDT": {
+      "address": "0xe5313FB74788cea60941dd0a171519cdCa14cCc6",
+      "decimals": 6,
+      "symbol": "USDT"
+    },
+    "ETH": {
+      "address": "0x2e05ED11a050106E15ceF55b7938dEB6249B14cF",
+      "decimals": 18,
+      "symbol": "ETH"
+    },
+    "ARB": {
+      "address": "0xa1AF657CEaF9566D21D7e596aeF923f368F5ead1",
+      "decimals": 18,
+      "symbol": "ARB"
+    },
+    "UNI": {
+      "address": "0xEC09D28A2f790630Bb97DE8313DB904aaF6FB6b7",
+      "decimals": 18,
+      "symbol": "UNI"
+    },
+    "WBTC": {
+      "address": "0x1aCa4D7bC53793c688d71e9061c19347EbAa8bC3",
+      "decimals": 8,
+      "symbol": "WBTC"
+    },
+    "DEGEN": {
+      "address": "0xd6d2f4258A23636d650Ee6dD22bFA1978C3827A0",
+      "decimals": 18,
+      "symbol": "DEGEN"
+    }
+  },
+  "verifiedSwapTx": "0xa4be01559c4f770f1f567f4a4d0bf01dcc3322d96b87592a659edaea6af19e85",
+  "deployedAt": "2026-11-10T15:09:05.134Z"
+}
