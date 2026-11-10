@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Platform,
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
+import { FALLBACK_TOKEN_USD_PRICES, fetchLifiQuote, fetchLiveTokenPrices, type LifiQuote } from '@/lib/lifi';
 
 const SUPPORTED_TOKENS = [
   { symbol: 'USDG', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', decimals: 6, name: 'USDG Treasury (6 Decimals)', color: '#ff4500' },
@@ -25,11 +26,68 @@ export default function TransferScreen() {
   const [amount, setAmount] = useState('50');
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
-  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[0]);
+  const [selectedDestToken, setSelectedDestToken] = useState(SUPPORTED_TOKENS[1]);
+  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[1]);
   const [customToToken, setCustomToToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const { address, executeCrossChainSwap } = useInvisibleWallet();
+
+  const [livePrices, setLivePrices] = useState<Record<string, number>>(FALLBACK_TOKEN_USD_PRICES);
+  const [quote, setQuote] = useState<LifiQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLiveTokenPrices(controller.signal).then(({ prices }) => {
+      if (!controller.signal.aborted) setLivePrices(prices);
+    });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const parsed = parseFloat(amount);
+    if (!parsed || parsed <= 0) {
+      setQuote(null);
+      return;
+    }
+    const destSym = (customToToken.trim().toUpperCase() || selectedDestToken.symbol);
+    const destTok = SUPPORTED_TOKENS.find((t) => t.symbol === destSym) ?? selectedDestToken;
+    const controller = new AbortController();
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      const q = await fetchLifiQuote({
+        fromChainId: 421614,
+        toChainId: selectedChain.id,
+        fromSymbol: selectedToken.symbol,
+        toSymbol: destSym,
+        fromDecimals: selectedToken.decimals,
+        toDecimals: destTok.decimals,
+        amount: parsed,
+        fromAddress: address,
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) {
+        setQuote(q);
+        setQuoteLoading(false);
+      }
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [amount, selectedToken, selectedDestToken, selectedChain, customToToken, address]);
+
+  const computeEstimatedOutput = () => {
+    const parsed = parseFloat(amount || '0');
+    if (!parsed || parsed <= 0) return '0.00';
+    if (quote) return quote.toAmount.toFixed(quote.toAmount < 1 ? 5 : 2);
+    const destSym = (customToToken.trim().toUpperCase() || selectedDestToken.symbol);
+    const inUsd = parsed * (livePrices[selectedToken.symbol] ?? 1);
+    const outPrice = livePrices[destSym] ?? 1;
+    const out = inUsd / outPrice;
+    return out.toFixed(out < 1 ? 5 : 2);
+  };
 
   const handleTransfer = async () => {
     const parsed = parseFloat(amount);
@@ -39,11 +97,11 @@ export default function TransferScreen() {
     try {
       const targetRecipient = (recipient.trim() || address || '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc') as `0x${string}`;
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
-      const toToken = customToToken || selectedToken.address;
+      const toToken = customToToken || selectedDestToken.address;
       const res = await executeCrossChainSwap(
         selectedChain.id,
-        selectedToken.address as `0x${string}`,
-        toToken as `0x${string}`,
+        selectedToken.symbol,
+        toToken,
         amountRaw,
         targetRecipient,
       );
@@ -96,10 +154,29 @@ export default function TransferScreen() {
             </View>
           </ScrollView>
 
-          <View style={[styles.inputRow, { marginTop: Spacing.sm }]}>
+          <Text style={[styles.fieldLabel, { marginTop: Spacing.xs }]}>Receive Token</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.tokenRow}>
+              {SUPPORTED_TOKENS.map((token) => (
+                <TouchableOpacity
+                  key={`dest-${token.symbol}`}
+                  style={[styles.tokenChip, selectedDestToken.symbol === token.symbol && !customToToken && styles.tokenChipActive]}
+                  onPress={() => { setSelectedDestToken(token); setCustomToToken(''); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.tokenDot, { backgroundColor: token.color }]} />
+                  <Text style={[styles.tokenChipText, selectedDestToken.symbol === token.symbol && !customToToken && { color: Colors.textPrimary, fontWeight: '600' }]}>
+                    {token.symbol}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          <View style={[styles.inputRow, { marginTop: Spacing.xs }]}>
             <TextInput
               style={[styles.amountInput, { fontSize: 14 }]}
-              placeholder="Destination Token Symbol or Address (Optional)"
+              placeholder="Or custom destination token symbol / 0x address"
               placeholderTextColor={Colors.textMuted + '60'}
               value={customToToken}
               onChangeText={setCustomToToken}
@@ -161,9 +238,11 @@ export default function TransferScreen() {
           <Text style={styles.summaryTitle}>Transaction Summary</Text>
           <View style={{ gap: Spacing.md, marginTop: Spacing.xs }}>
             {[
-              { label: 'Network Fee', value: 'Sponsored ($0.00)', valueColor: '#ffffff' },
-              { label: 'Routing Protocol', value: 'StylusSafe Solver' },
-              { label: 'Est. Time', value: '~3 seconds' },
+              { label: 'Estimated Output', value: `${computeEstimatedOutput()} ${customToToken.trim().toUpperCase() || selectedDestToken.symbol}`, valueColor: '#ffffff' },
+              { label: 'Route', value: quoteLoading ? 'Fetching live quote...' : quote ? `Li.Fi (${quote.tool})` : 'Price estimate (no Li.Fi route)' },
+              { label: 'Network Fees', value: quote ? `$${quote.feeUsd.toFixed(2)} fees + $${quote.gasUsd.toFixed(2)} gas` : 'Unavailable' },
+              { label: 'Your Gas', value: 'Sponsored ($0.00)', valueColor: '#ffffff' },
+              { label: 'Est. Time', value: quote ? `~${Math.max(quote.durationSec, 1)}s` : 'Unavailable' },
             ].map(row => (
               <View key={row.label} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{row.label}</Text>

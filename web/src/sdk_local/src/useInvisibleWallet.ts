@@ -26,6 +26,7 @@ import {
     loadVaultRegistry,
 } from '@/lib/faceverify/biometricVaultRegistry';
 import { recordSwappedDelta, USDG_ADDRESS } from '@/hooks/useBalances';
+import { fetchLifiQuote, fetchLiveTokenPrices, FALLBACK_TOKEN_USD_PRICES } from '@/lib/lifi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ export type InvisibleWallet = {
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
     setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}` }, pin?: string) => Promise<{ userOpHash: string } | null>;
     revokeSessionKey: (pin?: string) => Promise<{ userOpHash: string } | null>;
-    setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<{ userOpHash: string } | null>;
+    setupDCA: (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<{ userOpHash: string } | null>;
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
@@ -115,42 +116,13 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Offline fallback only. Overwritten with live DeFiLlama prices by refreshTokenPrices().
-const TOKEN_USD_PRICES: Record<string, number> = {
-    USDG: 1.0,
-    USDC: 1.0,
-    USDT: 1.0,
-    ETH: 2500.0,
-    ARB: 0.85,
-    DEGEN: 0.01,
-    UNI: 7.5,
-    WBTC: 65000.0,
-};
-
-const LLAMA_PRICE_IDS: Record<string, string> = {
-    ETH: 'coingecko:ethereum',
-    ARB: 'coingecko:arbitrum',
-    UNI: 'coingecko:uniswap',
-    WBTC: 'coingecko:wrapped-bitcoin',
-    DEGEN: 'coingecko:degen-base',
-    USDC: 'coingecko:usd-coin',
-    USDT: 'coingecko:tether',
-};
+// Offline fallback only; overwritten with live DeFiLlama prices by refreshTokenPrices().
+const TOKEN_USD_PRICES: Record<string, number> = { ...FALLBACK_TOKEN_USD_PRICES };
 
 /** Fetches live USD prices and updates the shared table; silently keeps fallback on failure. */
 export async function refreshTokenPrices(): Promise<Record<string, number>> {
-    try {
-        const res = await fetch(`https://coins.llama.fi/prices/current/${Object.values(LLAMA_PRICE_IDS).join(',')}`);
-        if (res.ok) {
-            const json = await res.json();
-            for (const [symbol, id] of Object.entries(LLAMA_PRICE_IDS)) {
-                const p = json?.coins?.[id]?.price;
-                if (typeof p === 'number' && p > 0) TOKEN_USD_PRICES[symbol] = p;
-            }
-        }
-    } catch {
-        // offline: keep fallback prices
-    }
+    const { prices } = await fetchLiveTokenPrices();
+    Object.assign(TOKEN_USD_PRICES, prices);
     return TOKEN_USD_PRICES;
 }
 
@@ -857,13 +829,28 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         fromToken: string,
         toToken: string,
         amountRaw: bigint,
-        recipientAddr: string
+        recipientAddr: string,
+        sourceChainId: number = 421614,
+        destChainId: number = 421614
     ) => {
         const fromDec = TOKEN_DECIMALS[fromToken] ?? 6;
         const fromFloat = Number(formatUnits(amountRaw, fromDec));
         const fromUsd = fromFloat * (TOKEN_USD_PRICES[fromToken] ?? 1.0);
         const toUsdPrice = TOKEN_USD_PRICES[toToken] ?? 1.0;
-        const toFloat = (fromUsd / toUsdPrice) * 0.998; // 0.2% solver fee
+
+        // Credit exactly what the live Li.Fi route would deliver (net of its fees);
+        // if no route can be quoted, fall back to the plain price ratio with no invented fee.
+        const liveQuote = await fetchLifiQuote({
+            fromChainId: sourceChainId,
+            toChainId: destChainId,
+            fromSymbol: fromToken,
+            toSymbol: toToken,
+            fromDecimals: fromDec,
+            toDecimals: TOKEN_DECIMALS[toToken] ?? 6,
+            amount: fromFloat,
+            fromAddress: walletAddr,
+        });
+        const toFloat = liveQuote ? liveQuote.toAmount : fromUsd / toUsdPrice;
 
         // If swapping a non-USDG asset, deduct from local swapped ledger
         if (fromToken !== 'USDG') {
@@ -960,7 +947,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             }
 
             const userOpHash = await submitUserOp(walletCallData, pin, sourceChainId);
-            await settleSwapBalances(currentAddress, fromToken, toToken, amount, recipient || currentAddress);
+            await settleSwapBalances(currentAddress, fromToken, toToken, amount, recipient || currentAddress, sourceChainId, destChainId);
 
             return { userOpHash };
         } catch (err: unknown) {
@@ -985,6 +972,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
+            await refreshTokenPrices();
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
@@ -1108,7 +1096,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 localStorage.setItem('invisible_wallet_session_spent_today', (spentToday + usdSpendUnits).toString());
             }
 
-            await settleSwapBalances(currentAddress, params.fromToken, params.toToken, params.amount, params.recipient || currentAddress);
+            await settleSwapBalances(currentAddress, params.fromToken, params.toToken, params.amount, params.recipient || currentAddress, params.sourceChainId, params.destChainId);
             return { userOpHash };
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : String(err));
@@ -1273,18 +1261,21 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    const setupDCA = async (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string): Promise<{ userOpHash: string } | null> => {
+    const setupDCA = async (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            // StylusSafeAccount.setupSubscription requires payee != address(this) and payee != address(0)
-            const payee =
-                tokenIn && tokenIn.toLowerCase() !== currentAddress.toLowerCase() && tokenIn !== '0x0000000000000000000000000000000000000000'
-                    ? tokenIn
-                    : ('0xaf88d065e77c8cC2239327C5EDb3A432268e5831' as `0x${string}`);
+            // StylusSafeAccount.setupSubscription reverts (InvalidPolicy) for a zero payee or the account itself.
+            // The payee must be chosen by the user; there is no default recipient.
+            if (!payee || !/^0x[0-9a-fA-F]{40}$/.test(payee)) {
+                throw new Error('Enter a valid payee address (0x followed by 40 characters).');
+            }
+            if (payee === '0x0000000000000000000000000000000000000000' || payee.toLowerCase() === currentAddress.toLowerCase()) {
+                throw new Error('The payee cannot be your own wallet or the zero address.');
+            }
 
             const callData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'setupSubscription', inputs: [{ name: 'payee', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'frequencyDays', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],

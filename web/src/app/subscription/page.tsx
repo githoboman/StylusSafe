@@ -66,6 +66,12 @@ export default function SubscriptionPage() {
       if (modalMode === 'create') {
         const parsed = parseFloat(amountInput);
         if (!parsed || parsed <= 0) throw new Error('Enter a valid recurring USDG amount.');
+        if (!/^0x[0-9a-fA-F]{40}$/.test(merchantAddress.trim())) {
+          throw new Error('Enter a valid payee address (0x followed by 40 characters).');
+        }
+        if (address && merchantAddress.trim().toLowerCase() === address.toLowerCase()) {
+          throw new Error('The payee cannot be your own wallet.');
+        }
         const amountRaw = BigInt(Math.round(parsed * 1e6));
         const result = await setupDCA(merchantAddress as `0x${string}`, amountRaw, frequency, pin);
         if (!result) throw new Error('Failed to register subscription on Arbitrum Sepolia.');

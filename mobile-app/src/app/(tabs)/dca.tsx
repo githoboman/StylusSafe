@@ -6,23 +6,43 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
+const PAYEE_PRESETS = [
+  { label: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
+  { label: 'Weekly Savings Vault', address: '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' },
+];
+
 export default function DCAScreen() {
   const router = useRouter();
-  const { setupDCA } = useInvisibleWallet();
+  const { address, setupDCA } = useInvisibleWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [freqIndex, setFreqIndex] = useState(1); // Weekly by default
   const [amountStr, setAmountStr] = useState('100.00');
+  const [payeeAddress, setPayeeAddress] = useState('');
 
   const handleCreate = async () => {
+    const trimmedPayee = payeeAddress.trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(trimmedPayee)) {
+      Alert.alert('Valid Payee Required', 'Enter a valid 0x address for the authorized payee or auto-swap router.');
+      return;
+    }
+    if (address && trimmedPayee.toLowerCase() === address.toLowerCase()) {
+      Alert.alert('Invalid Payee', 'Payee cannot be your own wallet address.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const freqDays = freqIndex === 0 ? 1 : freqIndex === 1 ? 7 : 30;
-      const parsedAmount = BigInt(Math.floor((Number(amountStr) || 100) * 1_000_000));
-      const usdgToken = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string}`;
-      
-      const success = await setupDCA(usdgToken, parsedAmount, freqDays, '0000');
+      const parsedNum = parseFloat(amountStr);
+      if (!parsedNum || parsedNum <= 0) {
+        Alert.alert('Invalid Amount', 'Enter a USDG amount greater than zero.');
+        setIsSubmitting(false);
+        return;
+      }
+      const parsedAmount = BigInt(Math.floor(parsedNum * 1_000_000));
+
+      const success = await setupDCA(trimmedPayee as `0x${string}`, parsedAmount, freqDays, '0000');
       if (success) {
-        Alert.alert('DCA Strategy Created', `Recurring swap of $${amountStr} USDG scheduled every ${freqDays} days on-chain.`, [
+        Alert.alert('DCA Strategy Created', `Recurring authorization of $${amountStr} USDG every ${freqDays} days for ${trimmedPayee.slice(0, 6)}...${trimmedPayee.slice(-4)} saved on-chain.`, [
           { text: 'OK', onPress: () => router.back() }
         ]);
       } else {
@@ -76,6 +96,32 @@ export default function DCAScreen() {
             <View style={[styles.chip, { backgroundColor: Colors.primary + '20', borderColor: Colors.primary + '50' }]}>
               <Text style={[styles.chipText, { color: Colors.primary }]}>ETH</Text>
             </View>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Authorized Payee / Router Address</Text>
+        <View style={styles.card}>
+          <TextInput
+            style={[styles.input, { fontSize: 13 }]}
+            value={payeeAddress}
+            onChangeText={setPayeeAddress}
+            placeholder="0x... (merchant or DEX router)"
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <View style={[styles.row, { marginTop: Spacing.sm }]}>
+            {PAYEE_PRESETS.map((preset) => (
+              <TouchableOpacity
+                key={preset.address}
+                style={[styles.freqBtn, payeeAddress.toLowerCase() === preset.address.toLowerCase() && styles.freqBtnActive]}
+                onPress={() => setPayeeAddress(preset.address)}
+              >
+                <Text style={[styles.freqText, { fontSize: 12 }, payeeAddress.toLowerCase() === preset.address.toLowerCase() && { color: Colors.primary }]}>
+                  {preset.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 

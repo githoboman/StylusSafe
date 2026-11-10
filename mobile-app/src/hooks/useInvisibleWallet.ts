@@ -22,6 +22,7 @@ import {
 } from './utils';
 import { createPublicClient as _createPublicClient, http as _http } from 'viem';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchLiveTokenPrices, FALLBACK_TOKEN_USD_PRICES } from '../lib/lifi';
 import {
     getMobileBiometricStatus,
     generateMobileOpenBRTemplate,
@@ -90,7 +91,7 @@ export type InvisibleWallet = {
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
     setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}` }, pin?: string) => Promise<{ userOpHash: string } | null>;
     revokeSessionKey: (pin?: string) => Promise<{ userOpHash: string } | null>;
-    setupDCA: (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
+    setupDCA: (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
@@ -100,6 +101,16 @@ const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string
 const SOLVER_LIQUIDITY_VAULT = '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
+
+// Live DeFiLlama price cache (offline fallback seeded from FALLBACK_TOKEN_USD_PRICES).
+export const TOKEN_USD_PRICES: Record<string, number> = { ...FALLBACK_TOKEN_USD_PRICES };
+
+/** Fetches live USD prices and updates the shared table; keeps fallback on failure. */
+export async function refreshTokenPrices(): Promise<Record<string, number>> {
+    const { prices } = await fetchLiveTokenPrices();
+    Object.assign(TOKEN_USD_PRICES, prices);
+    return TOKEN_USD_PRICES;
+}
 
 function bytesToBase64Url(bytes: Uint8Array): string {
     let binary = '';
@@ -726,6 +737,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
+            await refreshTokenPrices();
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized. Call login() or register().');
             
@@ -938,18 +950,21 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    const setupDCA = async (tokenIn: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string): Promise<boolean> => {
+    const setupDCA = async (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string): Promise<boolean> => {
         setIsPending(true);
         setError(null);
         try {
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            // StylusSafeAccount.setupSubscription reverts (InvalidPolicy) if payee is the account itself or zero.
-            const payee =
-                tokenIn && tokenIn.toLowerCase() !== currentAddress.toLowerCase() && tokenIn !== '0x0000000000000000000000000000000000000000'
-                    ? tokenIn
-                    : SOLVER_LIQUIDITY_VAULT;
+            // StylusSafeAccount.setupSubscription reverts (InvalidPolicy) for a zero payee or the account itself.
+            // The payee must be chosen by the user; there is no default recipient.
+            if (!payee || !/^0x[0-9a-fA-F]{40}$/.test(payee)) {
+                throw new Error('Enter a valid payee address (0x followed by 40 characters).');
+            }
+            if (payee === '0x0000000000000000000000000000000000000000' || payee.toLowerCase() === currentAddress.toLowerCase()) {
+                throw new Error('The payee cannot be your own wallet or the zero address.');
+            }
             const callData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'setupSubscription', inputs: [{ name: 'payee', type: 'address' }, { name: 'amount', type: 'uint256' }, { name: 'frequencyDays', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
                 functionName: 'setupSubscription',

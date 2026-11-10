@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { fetchLifiQuote } from '@/lib/lifi';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrandLogo } from '@/components/BrandLogo';
 import { ThreeVaultScene } from '@/components/ThreeVaultScene';
@@ -95,6 +96,38 @@ export default function LandingPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executed, setExecuted] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const [swapOut, setSwapOut] = useState<number | null>(null);
+
+  // Live Li.Fi quote for the demo widget (USDG is quoted as USDC; Arbitrum Sepolia as Arbitrum One).
+  useEffect(() => {
+    const amt = parseFloat(swapAmount);
+    if (!amt || amt <= 0) {
+      setSwapOut(0);
+      return;
+    }
+    const chainId = (name: string) => (name === 'Base' ? 8453 : 421614);
+    const controller = new AbortController();
+    setSwapOut(null);
+    const t = setTimeout(async () => {
+      const q = await fetchLifiQuote({
+        fromChainId: chainId(sourceChain),
+        toChainId: chainId(destChain),
+        fromSymbol: sourceToken,
+        toSymbol: destToken,
+        fromDecimals: 6,
+        toDecimals: 6,
+        amount: amt,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      // No route available: show the 1:1 stable-to-stable value rather than an invented fee.
+      setSwapOut(q ? q.toAmount : amt);
+    }, 400);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [swapAmount, sourceChain, destChain, sourceToken, destToken]);
 
   const [selectedGuardrail, setSelectedGuardrail] = useState<number>(0);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -389,7 +422,7 @@ export default function LandingPage() {
                       </div>
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-2xl sm:text-3xl font-mono font-bold text-white tabular-nums truncate">
-                          {(parseFloat(swapAmount || '0') * 0.998).toFixed(2)}
+                          {swapOut === null ? '...' : swapOut.toFixed(2)}
                         </div>
                         <div className="bg-[#141418] px-3 py-1.5 rounded-lg border border-white/[0.08] text-xs sm:text-sm font-mono font-semibold text-white shrink-0">
                           {destToken}

@@ -115,7 +115,8 @@ export default function IntentsPage() {
         for (const step of steps) {
           if (step.kind === 'swap_usdg_to_usdc') {
             const amt = parseFloat(step.amountUsdg || '0');
-            if (amt > 0) recordSwappedDelta(address, 'USDC', amt * 0.998);
+            // USDG and USDC are both $1 stables, so the swap credits 1:1 (no invented fee).
+            if (amt > 0) recordSwappedDelta(address, 'USDC', amt);
           }
         }
       }

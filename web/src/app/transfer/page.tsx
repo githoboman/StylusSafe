@@ -7,27 +7,19 @@ import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 import { IconSwapVert, IconCheck, IconShield, IconFingerprint, IconArrowUpRight } from '@/components/Icons';
+import { FALLBACK_TOKEN_USD_PRICES, fetchLifiQuote, fetchLiveTokenPrices, type LifiQuote } from '@/lib/lifi';
+import { unitsToUsdg, useOnChainAgentPolicy } from '@/lib/agentPolicy';
 
 const TOKENS = [
-  { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, priceUsd: 1.0, isNative: true },
-  { symbol: 'USDC', name: 'USD Coin', decimals: 6, priceUsd: 1.0, isNative: false },
-  { symbol: 'ETH', name: 'Ether', decimals: 18, priceUsd: 2500.0, isNative: false },
-  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, priceUsd: 0.85, isNative: false },
-  { symbol: 'USDT', name: 'Tether USD', decimals: 6, priceUsd: 1.0, isNative: false },
-  { symbol: 'DEGEN', name: 'Degen Base', decimals: 18, priceUsd: 0.01, isNative: false },
-  { symbol: 'UNI', name: 'Uniswap', decimals: 18, priceUsd: 7.5, isNative: false },
-  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, priceUsd: 65000.0, isNative: false },
+  { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, isNative: true },
+  { symbol: 'USDC', name: 'USD Coin', decimals: 6, isNative: false },
+  { symbol: 'ETH', name: 'Ether', decimals: 18, isNative: false },
+  { symbol: 'ARB', name: 'Arbitrum', decimals: 18, isNative: false },
+  { symbol: 'USDT', name: 'Tether USD', decimals: 6, isNative: false },
+  { symbol: 'DEGEN', name: 'Degen Base', decimals: 18, isNative: false },
+  { symbol: 'UNI', name: 'Uniswap', decimals: 18, isNative: false },
+  { symbol: 'WBTC', name: 'Wrapped Bitcoin', decimals: 8, isNative: false },
 ];
-
-const LLAMA_IDS: Record<string, string> = {
-  ETH: 'coingecko:ethereum',
-  ARB: 'coingecko:arbitrum',
-  UNI: 'coingecko:uniswap',
-  WBTC: 'coingecko:wrapped-bitcoin',
-  DEGEN: 'coingecko:degen-base',
-  USDC: 'coingecko:usd-coin',
-  USDT: 'coingecko:tether',
-};
 
 const CHAINS = [
   { name: 'Arbitrum Sepolia', id: 421614 },
@@ -37,7 +29,6 @@ const CHAINS = [
   { name: 'Ethereum', id: 1 },
 ];
 
-type AcrossFee = { relayFeeTotal: string; estimatedFillTimeSec: number } | null;
 
 export default function TransferPage() {
   const { address, login, executeCrossChainSwap, executeAgentSwap, isPending } = useInvisibleWallet();
@@ -52,11 +43,18 @@ export default function TransferPage() {
 
   const { usdgBalance, ethBalance, usdcBalance, tokenBalances, refetch } = useBalances(address, 421614);
 
-  const [agentMaxPerTx, setAgentMaxPerTx] = useState<number>(100);
-  const [agentDailyLimit, setAgentDailyLimit] = useState<number>(500);
+  const { policy: onChainPolicy, refresh: refreshPolicy } = useOnChainAgentPolicy(address);
+  const [agentMaxPerTx, setAgentMaxPerTx] = useState<number>(0);
+  const [agentDailyLimit, setAgentDailyLimit] = useState<number>(0);
   const [agentSpentToday, setAgentSpentToday] = useState<number>(0);
 
   const syncAgentLimits = useCallback(() => {
+    if (onChainPolicy) {
+      setAgentMaxPerTx(Number(unitsToUsdg(onChainPolicy.maxPerTx)));
+      setAgentDailyLimit(Number(unitsToUsdg(onChainPolicy.dailyLimit)));
+      setAgentSpentToday(Number(unitsToUsdg(onChainPolicy.effectiveSpentToday)));
+      return;
+    }
     if (typeof window === 'undefined') return;
     const maxStr = localStorage.getItem('invisible_wallet_session_max_per_tx');
     const dailyStr = localStorage.getItem('invisible_wallet_session_daily_limit');
@@ -64,7 +62,7 @@ export default function TransferPage() {
     if (maxStr) setAgentMaxPerTx(Number(maxStr) / 1e6);
     if (dailyStr) setAgentDailyLimit(Number(dailyStr) / 1e6);
     if (spentStr) setAgentSpentToday(Number(spentStr) / 1e6);
-  }, []);
+  }, [onChainPolicy]);
 
   useEffect(() => {
     syncAgentLimits();
@@ -78,71 +76,77 @@ export default function TransferPage() {
     return '0.00';
   };
 
-  // Live USD prices from DeFiLlama; the static table above is only an offline fallback.
-  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  // Live USD prices from DeFiLlama; FALLBACK_TOKEN_USD_PRICES is only an offline fallback.
+  const [livePrices, setLivePrices] = useState<Record<string, number>>(FALLBACK_TOKEN_USD_PRICES);
   const [pricesLive, setPricesLive] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     const load = async () => {
-      try {
-        const keys = Object.values(LLAMA_IDS).join(',');
-        const res = await fetch(`https://coins.llama.fi/prices/current/${keys}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const next: Record<string, number> = {};
-        for (const [symbol, id] of Object.entries(LLAMA_IDS)) {
-          const p = json?.coins?.[id]?.price;
-          if (typeof p === 'number' && p > 0) next[symbol] = p;
-        }
-        if (!cancelled && Object.keys(next).length > 0) {
-          setLivePrices(next);
-          setPricesLive(true);
-        }
-      } catch {
-        if (!cancelled) setPricesLive(false);
+      const { prices, isLive } = await fetchLiveTokenPrices(controller.signal);
+      if (!controller.signal.aborted) {
+        setLivePrices(prices);
+        setPricesLive(isLive);
       }
     };
-    load();
+    void load();
     const t = setInterval(load, 60_000);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearInterval(t);
     };
   }, []);
 
-  const priceOf = (token: { symbol: string; priceUsd: number }) =>
-    livePrices[token.symbol] ?? token.priceUsd;
+  const priceOf = (token: { symbol: string }) =>
+    livePrices[token.symbol] ?? FALLBACK_TOKEN_USD_PRICES[token.symbol] ?? 1.0;
 
   const computeEstimatedOutput = () => {
     const parsed = parseFloat(amount || '0');
     if (!parsed || parsed <= 0) return '0.00';
-    const usdIn = parsed * priceOf(selectedToken);
     const destPrice = priceOf(selectedDestToken);
-    const outTokens = (usdIn / destPrice) * 0.998;
+    // Prefer the live Li.Fi quote (already net of every fee); otherwise a plain price-ratio estimate.
+    const outTokens = quote ? quote.toAmount : (parsed * priceOf(selectedToken)) / destPrice;
     const decimalsToShow = destPrice >= 1000 ? 5 : destPrice < 0.1 ? 0 : 2;
     return outTokens.toFixed(decimalsToShow);
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [acrossFee, setAcrossFee] = useState<AcrossFee>(null);
+  const [quote, setQuote] = useState<LifiQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchLifiQuote = useCallback(async () => {
+  useEffect(() => {
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) {
-      setAcrossFee(null);
+      setQuote(null);
       return;
     }
-    setAcrossFee({ relayFeeTotal: '0', estimatedFillTimeSec: 3 });
-  }, [amount]);
-
-  useEffect(() => {
-    const timer = setTimeout(fetchLifiQuote, 300);
-    return () => clearTimeout(timer);
-  }, [fetchLifiQuote]);
+    const controller = new AbortController();
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      const q = await fetchLifiQuote({
+        fromChainId: selectedSourceChain.id,
+        toChainId: selectedDestChain.id,
+        fromSymbol: selectedToken.symbol,
+        toSymbol: selectedDestToken.symbol,
+        fromDecimals: selectedToken.decimals,
+        toDecimals: selectedDestToken.decimals,
+        amount: parsed,
+        fromAddress: address,
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) {
+        setQuote(q);
+        setQuoteLoading(false);
+      }
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [amount, selectedToken, selectedDestToken, selectedSourceChain, selectedDestChain, address]);
 
   const handleFlipDirection = () => {
     const prevSrcChain = selectedSourceChain;
@@ -249,6 +253,7 @@ export default function TransferPage() {
         setTxHash(result.userOpHash);
         setStatus('success');
         recordSwapActivity(result.userOpHash, outFormatted, true);
+        void refreshPolicy();
         syncAgentLimits();
         refetch();
       }
@@ -582,13 +587,33 @@ export default function TransferPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Settlement Time</span>
-                    <span className="text-white tabular-nums">~{acrossFee?.estimatedFillTimeSec || 3} seconds</span>
+                    <span>Route</span>
+                    <span className="text-white font-mono">
+                      {quoteLoading ? 'Fetching live quote...' : quote ? `via ${quote.tool}` : 'No live route (price estimate)'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Gas Fee</span>
+                    <span>Settlement Time</span>
+                    <span className="text-white tabular-nums">
+                      {quote ? `~${Math.max(quote.durationSec, 1)} seconds` : 'Unavailable'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Network Fees</span>
+                    <span className="text-white font-medium">
+                      {quote ? `$${quote.feeUsd.toFixed(2)} fees + $${quote.gasUsd.toFixed(2)} gas` : 'Unavailable'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Your Gas</span>
                     <span className="text-white font-medium">Sponsored ($0.00)</span>
                   </div>
+                  {quote?.indicative && (
+                    <p className="text-[11px] leading-relaxed text-zinc-500">
+                      Li.Fi only routes real networks, so this is the live quote for the matching Arbitrum One route.
+                      Testnet swaps still settle through the Arbitrum Sepolia solver.
+                    </p>
+                  )}
                   <div className="pt-2.5 border-t border-white/[0.06] flex justify-between text-white font-medium">
                     <span>Estimated Output</span>
                     <span className="font-mono">
@@ -612,11 +637,15 @@ export default function TransferPage() {
                 <div className="pt-2 space-y-2 text-[#8e8e98]">
                   <div className="flex justify-between">
                     <span>Max Per Trade</span>
-                    <span className="text-white font-mono font-semibold">${agentMaxPerTx.toFixed(2)} USDG</span>
+                    <span className="text-white font-mono font-semibold">
+                      {agentMaxPerTx > 0 ? `$${agentMaxPerTx.toFixed(2)} USDG` : 'Not configured'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Remaining 24h Allowance</span>
-                    <span className="text-white font-mono font-semibold">${remainingDailyCap.toFixed(2)} / ${agentDailyLimit.toFixed(2)} USDG</span>
+                    <span className="text-white font-mono font-semibold">
+                      {agentDailyLimit > 0 ? `$${remainingDailyCap.toFixed(2)} / $${agentDailyLimit.toFixed(2)} USDG` : 'Not configured'}
+                    </span>
                   </div>
                 </div>
               </div>
