@@ -95,7 +95,18 @@ export default function TransferScreen() {
     setIsSubmitting(true);
     setLastTxHash(null);
     try {
-      const targetRecipient = (recipient.trim() || address || '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc') as `0x${string}`;
+      const trimmedRecipient = recipient.trim();
+      if (trimmedRecipient && !/^0x[0-9a-fA-F]{40}$/.test(trimmedRecipient)) {
+        alert('Enter a valid 0x recipient address.');
+        setIsSubmitting(false);
+        return;
+      }
+      const targetRecipient = (trimmedRecipient || address) as `0x${string}`;
+      if (!targetRecipient) {
+        alert('Unlock or create your wallet first, or enter a recipient address.');
+        setIsSubmitting(false);
+        return;
+      }
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const toToken = customToToken || selectedDestToken.address;
       const res = await executeCrossChainSwap(

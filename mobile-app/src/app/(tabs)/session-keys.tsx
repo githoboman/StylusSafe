@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,30 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { decodeErrorResult, encodeFunctionData, padHex, parseAbi, toHex, type Address, type Hex } from 'viem';
+import { createPublicClient, decodeErrorResult, encodeFunctionData, formatUnits, http, padHex, parseAbi, toHex, type Address, type Hex } from 'viem';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 const DEPLOYED_ACCOUNT_IMPL: Address = '0x0D666af60c511a65d7fe704090632AFE05C932fA';
 const ARB_SEPOLIA_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
-const DEFAULT_AGENT: Address = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
-const ALLOWED_TARGET: Address = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
+
+const TARGET_PRESETS: { name: string; address: Address }[] = [
+  { name: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
+  { name: 'USDG Treasury', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' },
+];
 
 const POLICY_ABI = parseAbi([
+  'function sessionKey() view returns (address)',
+  'function sessionMaxPerTx() view returns (uint256)',
+  'function sessionDailyLimit() view returns (uint256)',
+  'function sessionSpentToday() view returns (uint256)',
+  'function sessionAllowedTarget() view returns (address)',
   'function executeWithPolicy(address dest, uint256 value, bytes func)',
   'error NotAuthorized()',
   'error InvalidPolicy()',
@@ -50,10 +60,15 @@ function wordHex(val: bigint | number | Address): Hex {
 
 export default function SessionKeysScreen() {
   const router = useRouter();
-  const { createSessionKey, setAgentPolicy, revokeSessionKey } = useInvisibleWallet();
+  const { address, createSessionKey, setAgentPolicy, revokeSessionKey } = useInvisibleWallet();
   const [isEnabled, setIsEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSession, setActiveSession] = useState<string | null>(null);
+
+  const [durationStr, setDurationStr] = useState('24');
+  const [dailyLimitStr, setDailyLimitStr] = useState('500');
+  const [maxPerTxStr, setMaxPerTxStr] = useState('100');
+  const [allowedTarget, setAllowedTarget] = useState<Address>(TARGET_PRESETS[0].address);
 
   const [spentTodayUnits, setSpentTodayUnits] = useState<bigint>(0n);
   const [simRunning, setSimRunning] = useState<string | null>(null);
@@ -63,10 +78,54 @@ export default function SessionKeysScreen() {
     detail: string;
   } | null>(null);
 
+  // Sync live on-chain policy if the wallet already has one deployed on Arbitrum Sepolia.
+  useEffect(() => {
+    if (!address) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = createPublicClient({ transport: http(ARB_SEPOLIA_RPC) });
+        const wallet = address as Address;
+        const code = await client.getBytecode({ address: wallet });
+        if (!code || code === '0x') return;
+        const [key, perTx, daily, spent, target] = await Promise.all([
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionKey' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionMaxPerTx' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionDailyLimit' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionSpentToday' }),
+          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionAllowedTarget' }),
+        ]);
+        if (cancelled) return;
+        if (key !== '0x0000000000000000000000000000000000000000') {
+          setActiveSession(key);
+          setMaxPerTxStr(formatUnits(perTx, 6));
+          setDailyLimitStr(formatUnits(daily, 6));
+          setSpentTodayUnits(spent);
+          if (target !== '0x0000000000000000000000000000000000000000') {
+            setAllowedTarget(target);
+          }
+        }
+      } catch {
+        // leave editable fields as entered
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [address]);
+
+  const dailyNum = Math.max(1, parseFloat(dailyLimitStr) || 0);
+  const perTxNum = Math.max(1, parseFloat(maxPerTxStr) || 0);
+  const durationHours = Math.max(1, Math.min(720, Math.round(parseFloat(durationStr) || 24)));
+  const dailyUnits = BigInt(Math.floor(dailyNum * 1_000_000));
+  const perTxUnits = BigInt(Math.floor(perTxNum * 1_000_000));
+
   const handleGenerate = async () => {
+    if (!parseFloat(dailyLimitStr) || !parseFloat(maxPerTxStr) || perTxNum > dailyNum) {
+      Alert.alert('Check Limits', 'Max per trade and daily limit must be positive, and per-trade cannot exceed daily.');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const sessionRes = await createSessionKey(24, '0000');
+      const sessionRes = await createSessionKey(durationHours, '0000');
       if (sessionRes?.sessionKey) {
         const sessionAddr = sessionRes.sessionKey;
         setActiveSession(sessionAddr);
@@ -74,10 +133,10 @@ export default function SessionKeysScreen() {
           await setAgentPolicy(
             {
               sessionKey: sessionAddr as `0x${string}`,
-              durationHours: 24,
-              maxPerTx: 100_000_000n,
-              dailyLimit: 500_000_000n,
-              allowedTarget: ALLOWED_TARGET,
+              durationHours,
+              maxPerTx: perTxUnits,
+              dailyLimit: dailyUnits,
+              allowedTarget,
             },
             '0000'
           );
@@ -87,7 +146,7 @@ export default function SessionKeysScreen() {
         setSpentTodayUnits(0n);
         Alert.alert(
           'AI Allowance Saved',
-          'Helper key authorized for 24 hours on Arbitrum Sepolia with a $500 USDG daily limit.'
+          `Helper key authorized for ${durationHours} hours on Arbitrum Sepolia with a $${dailyNum} USDG daily limit ($${perTxNum} max/trade).`
         );
       } else {
         throw new Error('Failed to generate helper key');
@@ -115,13 +174,16 @@ export default function SessionKeysScreen() {
     }
   };
 
+  const withinTestAmount = Math.max(1, Math.floor(Math.min(50, perTxNum)));
+  const overTestAmount = Math.max(perTxNum + 100, Math.floor(dailyNum * 2));
+
   const runLiveChainCheck = async (kind: 'within' | 'over' | 'unapproved') => {
     setSimRunning(kind);
-    const agentKey = (activeSession || DEFAULT_AGENT) as Address;
+    const agentKey = (activeSession || privateKeyToAccount(generatePrivateKey()).address) as Address;
     const unapproved: Address = '0x1111111111111111111111111111111111111111';
-    const dest: Address = kind === 'unapproved' ? unapproved : ALLOWED_TARGET;
-    const amountUsdg = kind === 'over' ? 5000 : kind === 'within' ? 50 : 10;
-    const units = BigInt(amountUsdg) * 1_000_000n;
+    const dest: Address = kind === 'unapproved' ? unapproved : allowedTarget;
+    const amountUsdg = kind === 'over' ? overTestAmount : kind === 'within' ? withinTestAmount : Math.min(10, perTxNum);
+    const units = BigInt(Math.floor(amountUsdg * 1_000_000));
     const now = Math.floor(Date.now() / 1000);
 
     const func = encodeFunctionData({
@@ -137,12 +199,12 @@ export default function SessionKeysScreen() {
 
     const stateDiff: Record<Hex, Hex> = {
       [slotHex(5)]: wordHex(agentKey),
-      [slotHex(6)]: wordHex(now + 86400),
-      [slotHex(7)]: wordHex(100_000_000n),
-      [slotHex(8)]: wordHex(500_000_000n),
+      [slotHex(6)]: wordHex(now + durationHours * 3600),
+      [slotHex(7)]: wordHex(perTxUnits),
+      [slotHex(8)]: wordHex(dailyUnits),
       [slotHex(9)]: wordHex(spentTodayUnits),
       [slotHex(10)]: wordHex(now - 60),
-      [slotHex(11)]: wordHex(ALLOWED_TARGET),
+      [slotHex(11)]: wordHex(allowedTarget),
       [slotHex(12)]: wordHex(86400n),
     };
 
@@ -172,9 +234,9 @@ export default function SessionKeysScreen() {
             verdict: 'Blocked',
             detail:
               decoded.errorName === 'PerTxLimitExceeded'
-                ? `$${amountUsdg.toLocaleString()} USDG exceeds the $100 single-trade limit. $0.00 spent.`
+                ? `$${amountUsdg.toLocaleString()} USDG exceeds the $${perTxNum} single-trade limit. $0.00 spent.`
                 : decoded.errorName === 'DailyLimitExceeded'
-                  ? `Adding $${amountUsdg} USDG exceeds the $500 daily limit. $0.00 spent.`
+                  ? `Adding $${amountUsdg} USDG exceeds the $${dailyNum} daily limit. $0.00 spent.`
                   : `That app is not on your approved allowlist (${decoded.errorName}).`,
           });
           setSimRunning(null);
@@ -187,7 +249,7 @@ export default function SessionKeysScreen() {
       setSimResult({
         title: 'Approved by Vault',
         verdict: 'Allowed',
-        detail: `Arbitrum Sepolia contract verified $${amountUsdg} USDG is inside your $100/trade and $500/day limits. Spent today: $${Number(nextSpent / 1_000_000n)} / $500 USDG.`,
+        detail: `Arbitrum Sepolia contract verified $${amountUsdg} USDG is inside your $${perTxNum}/trade and $${dailyNum}/day limits. Spent today: $${Number(nextSpent / 1_000_000n)} / $${dailyNum} USDG.`,
       });
     } catch (err: any) {
       setSimResult({
@@ -230,25 +292,58 @@ export default function SessionKeysScreen() {
         <Text style={styles.sectionTitle}>Allowance Rules</Text>
         <View style={styles.card}>
           <View style={styles.row}>
-            <Text style={styles.label}>Time Limit</Text>
-            <Text style={styles.value}>24 Hours</Text>
+            <Text style={styles.label}>Time Limit (Hours)</Text>
+            <TextInput
+              style={styles.numInput}
+              value={durationStr}
+              onChangeText={setDurationStr}
+              keyboardType="number-pad"
+              placeholder="24"
+              placeholderTextColor={Colors.textMuted}
+            />
           </View>
           <View style={[styles.row, styles.borderTop]}>
-            <Text style={styles.label}>Daily Spending Limit</Text>
-            <Text style={styles.value}>$500 USDG</Text>
+            <Text style={styles.label}>Daily Limit (USDG)</Text>
+            <TextInput
+              style={styles.numInput}
+              value={dailyLimitStr}
+              onChangeText={setDailyLimitStr}
+              keyboardType="decimal-pad"
+              placeholder="500"
+              placeholderTextColor={Colors.textMuted}
+            />
           </View>
           <View style={[styles.row, styles.borderTop]}>
-            <Text style={styles.label}>Max Per Single Trade</Text>
-            <Text style={styles.value}>$100 USDG</Text>
+            <Text style={styles.label}>Max Per Trade (USDG)</Text>
+            <TextInput
+              style={styles.numInput}
+              value={maxPerTxStr}
+              onChangeText={setMaxPerTxStr}
+              keyboardType="decimal-pad"
+              placeholder="100"
+              placeholderTextColor={Colors.textMuted}
+            />
           </View>
-          <View style={[styles.row, styles.borderTop]}>
+          <View style={styles.borderTop}>
             <Text style={styles.label}>Approved App</Text>
-            <Text style={styles.value}>Uniswap V3 Router</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              {TARGET_PRESETS.map((p) => (
+                <TouchableOpacity
+                  key={p.address}
+                  style={[styles.presetBtn, allowedTarget.toLowerCase() === p.address.toLowerCase() && styles.presetBtnActive]}
+                  onPress={() => setAllowedTarget(p.address)}
+                >
+                  <Text style={[styles.presetText, allowedTarget.toLowerCase() === p.address.toLowerCase() && { color: Colors.primary }]}>
+                    {p.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
           <View style={[styles.row, styles.borderTop]}>
             <Text style={styles.label}>Spent Today</Text>
             <Text style={styles.value}>
-              ${Number(spentTodayUnits / 1_000_000n)} / $500 USDG
+              ${Number(spentTodayUnits / 1_000_000n)} / ${dailyNum} USDG
             </Text>
           </View>
         </View>
@@ -289,7 +384,7 @@ export default function SessionKeysScreen() {
               onPress={() => runLiveChainCheck('within')}
             >
               <Text style={styles.testBtnTitle}>
-                {simRunning === 'within' ? 'Calling Arbitrum Sepolia...' : 'Try a $50 Trade'}
+                {simRunning === 'within' ? 'Calling Arbitrum Sepolia...' : `Try a $${withinTestAmount} Trade`}
               </Text>
               <Text style={styles.testBtnHint}>Inside limits</Text>
             </TouchableOpacity>
@@ -300,7 +395,7 @@ export default function SessionKeysScreen() {
               onPress={() => runLiveChainCheck('over')}
             >
               <Text style={styles.testBtnTitle}>
-                {simRunning === 'over' ? 'Calling Arbitrum Sepolia...' : 'Try a $5,000 Trade'}
+                {simRunning === 'over' ? 'Calling Arbitrum Sepolia...' : `Try a $${overTestAmount.toLocaleString()} Trade`}
               </Text>
               <Text style={styles.testBtnHint}>Above limits</Text>
             </TouchableOpacity>
@@ -424,4 +519,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceContainer,
   },
   resultDetail: { color: '#D4D4D8', fontSize: 13, lineHeight: 19 },
+  numInput: {
+    minWidth: 88,
+    textAlign: 'right',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: monoFont,
+    color: Colors.textPrimary,
+    backgroundColor: Colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  presetBtn: {
+    flex: 1,
+    backgroundColor: Colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  presetBtnActive: {
+    borderColor: Colors.primary + '60',
+    backgroundColor: Colors.primary + '12',
+  },
+  presetText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted },
 });

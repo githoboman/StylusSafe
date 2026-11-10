@@ -106,7 +106,6 @@ const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${s
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const SOLVER_LIQUIDITY_VAULT = '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
-const DEFAULT_HELPER_PK = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as const;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
     let binary = '';
@@ -979,17 +978,56 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const fromFloat = Number(formatUnits(params.amount, params.fromDecimals));
             const usdSpendUnits = BigInt(Math.round(fromFloat * (TOKEN_USD_PRICES[params.fromToken] ?? 1.0) * 1_000_000));
 
-            // Check policy guardrails configured by user
+            // Check policy guardrails configured by user (local cache or live Arbitrum Sepolia contract)
+            const liveRpc = resolveRpcEndpoint(rpcUrl);
+            const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http(liveRpc) });
+
             const maxPerTxStr = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_session_max_per_tx') : null;
             const dailyLimitStr = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_session_daily_limit') : null;
             const spentTodayStr = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_session_spent_today') : null;
             const expiryStr = typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_session_expiry') : null;
 
-            const maxPerTx = maxPerTxStr ? BigInt(maxPerTxStr) : 100_000_000n; // default $100
-            const dailyLimit = dailyLimitStr ? BigInt(dailyLimitStr) : 500_000_000n; // default $500
-            const spentToday = spentTodayStr ? BigInt(spentTodayStr) : 0n;
-            const expiry = expiryStr ? Number(expiryStr) : Math.floor(Date.now() / 1000) + 86400;
+            const [onChainSessionKey, onChainAllowedTarget, onChainMaxPerTx, onChainDailyLimit, onChainSpent, onChainExpiry] = await Promise.all([
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }],
+                    functionName: 'sessionKey',
+                }).catch(() => '0x0000000000000000000000000000000000000000'),
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionAllowedTarget', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }],
+                    functionName: 'sessionAllowedTarget',
+                }).catch(() => '0x0000000000000000000000000000000000000000'),
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionMaxPerTx', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                    functionName: 'sessionMaxPerTx',
+                }).catch(() => 0n),
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionDailyLimit', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                    functionName: 'sessionDailyLimit',
+                }).catch(() => 0n),
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionSpentToday', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                    functionName: 'sessionSpentToday',
+                }).catch(() => 0n),
+                publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{ type: 'function', name: 'sessionExpiry', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                    functionName: 'sessionExpiry',
+                }).catch(() => 0n),
+            ]);
 
+            const maxPerTx = maxPerTxStr ? BigInt(maxPerTxStr) : (onChainMaxPerTx as bigint);
+            const dailyLimit = dailyLimitStr ? BigInt(dailyLimitStr) : (onChainDailyLimit as bigint);
+            const spentToday = spentTodayStr ? BigInt(spentTodayStr) : (onChainSpent as bigint);
+            const expiry = expiryStr ? Number(expiryStr) : Number(onChainExpiry as bigint);
+
+            if (dailyLimit === 0n || maxPerTx === 0n || expiry === 0) {
+                throw new Error('Agent Firewall Blocked: No AI allowance rules configured. Set your limits on the AI Rules page first.');
+            }
             if (expiry <= Math.floor(Date.now() / 1000)) {
                 throw new Error('Agent Firewall Blocked: Session key has expired. Renew your AI allowance on the AI Rules page.');
             }
@@ -1026,37 +1064,23 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 args: [settlementRecipient, isPayingUsdg ? params.amount : usdSpendUnits],
             });
 
-            // Check if on-chain sessionKey is already registered on this smart wallet
-            const liveRpc = resolveRpcEndpoint(rpcUrl);
-            const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http(liveRpc) });
-            const [onChainSessionKey, onChainAllowedTarget] = await Promise.all([
-                publicClient.readContract({
-                    address: currentAddress as `0x${string}`,
-                    abi: [{ type: 'function', name: 'sessionKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }],
-                    functionName: 'sessionKey',
-                }).catch(() => '0x0000000000000000000000000000000000000000'),
-                publicClient.readContract({
-                    address: currentAddress as `0x${string}`,
-                    abi: [{ type: 'function', name: 'sessionAllowedTarget', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }],
-                    functionName: 'sessionAllowedTarget',
-                }).catch(() => '0x0000000000000000000000000000000000000000'),
-            ]);
-
             const savedSessionPk =
-                (typeof window !== 'undefined' && (localStorage.getItem('invisible_wallet_session_pk') || localStorage.getItem('stylussafe_agent_helper_pk'))) ||
-                DEFAULT_HELPER_PK;
+                typeof window !== 'undefined'
+                    ? localStorage.getItem('invisible_wallet_session_pk') || localStorage.getItem('stylussafe_agent_helper_pk')
+                    : null;
             const { privateKeyToAccount } = await import('viem/accounts');
-            const sessionAccount = privateKeyToAccount(savedSessionPk as `0x${string}`);
+            const sessionAccount = savedSessionPk ? privateKeyToAccount(savedSessionPk as `0x${string}`) : null;
 
             const canUseOnChainSessionSig =
-                onChainSessionKey &&
+                !!sessionAccount &&
+                !!onChainSessionKey &&
                 onChainSessionKey !== '0x0000000000000000000000000000000000000000' &&
                 onChainSessionKey.toLowerCase() === sessionAccount.address.toLowerCase() &&
                 (onChainAllowedTarget === '0x0000000000000000000000000000000000000000' ||
                     onChainAllowedTarget.toLowerCase() === USDG_ADDRESS.toLowerCase());
 
             let userOpHash: string;
-            if (canUseOnChainSessionSig) {
+            if (canUseOnChainSessionSig && sessionAccount) {
                 const agentCallData = encodeFunctionData({
                     abi: [{
                         type: 'function',
@@ -1201,9 +1225,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             const userOpHash = await submitUserOp(walletCallData, pin);
             if (typeof window !== 'undefined') {
                 localStorage.setItem('invisible_wallet_session_key', params.sessionKey);
-                if (!localStorage.getItem('invisible_wallet_session_pk')) {
-                    localStorage.setItem('invisible_wallet_session_pk', DEFAULT_HELPER_PK);
-                }
                 localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
                 localStorage.setItem('invisible_wallet_session_max_per_tx', params.maxPerTx.toString());
                 localStorage.setItem('invisible_wallet_session_daily_limit', params.dailyLimit.toString());

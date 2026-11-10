@@ -100,13 +100,12 @@ function readLocalPolicyFallback(): OnChainPolicy | null {
   if (typeof window === 'undefined') return null;
   const savedKey = localStorage.getItem('invisible_wallet_session_key');
   const savedExpiry = localStorage.getItem('invisible_wallet_session_expiry');
-  if (!savedKey || !savedExpiry) return null;
-
   const savedDaily = localStorage.getItem('invisible_wallet_session_daily_limit');
   const savedMax = localStorage.getItem('invisible_wallet_session_max_per_tx');
   const savedTarget = localStorage.getItem('invisible_wallet_session_target');
   const savedSpent = localStorage.getItem('invisible_wallet_session_spent_today');
   const savedReset = localStorage.getItem('invisible_wallet_session_last_reset');
+  if (!savedKey || !savedExpiry || !savedDaily || !savedMax || !savedTarget) return null;
 
   const now = Math.floor(Date.now() / 1000);
   const expiryNum = Number(savedExpiry);
@@ -118,12 +117,12 @@ function readLocalPolicyFallback(): OnChainPolicy | null {
   return {
     sessionKey: savedKey as Address,
     expiry: expiryNum,
-    maxPerTx: savedMax ? BigInt(savedMax) : usdgToUnits(100),
-    dailyLimit: savedDaily ? BigInt(savedDaily) : usdgToUnits(500),
+    maxPerTx: BigInt(savedMax),
+    dailyLimit: BigInt(savedDaily),
     spentToday: spentRaw,
     lastReset: lastResetNum,
     windowSeconds: windowNum,
-    allowedTarget: (savedTarget || '0xE592427A0AEce92De3Edee1F18E0157C05861564') as Address,
+    allowedTarget: savedTarget as Address,
     isActive: now < expiryNum,
     effectiveSpentToday: windowExpired ? 0n : spentRaw,
   };

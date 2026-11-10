@@ -46,7 +46,7 @@ export default function TradingPage() {
   const [status, setStatus] = useState<'idle' | 'authorizing'>('idle');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [agentAddress, setAgentAddress] = useState<string>('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
+  const [agentAddress, setAgentAddress] = useState<string>('');
   const [targetAddress, setTargetAddress] = useState<string>(POPULAR_TARGETS[0].address);
   const [dailyLimit, setDailyLimit] = useState<string>('500');
   const [maxPerTx, setMaxPerTx] = useState<string>('100');
@@ -70,10 +70,15 @@ export default function TradingPage() {
     if (savedPk) {
       try {
         setAgentAddress(privateKeyToAccount(savedPk as `0x${string}`).address);
+        return;
       } catch {
         // ignore malformed value
       }
     }
+    const pk = generatePrivateKey();
+    localStorage.setItem('stylussafe_agent_helper_pk', pk);
+    localStorage.setItem('invisible_wallet_session_pk', pk);
+    setAgentAddress(privateKeyToAccount(pk).address);
   }, []);
 
   const handleGenerateHelperKey = () => {
@@ -166,10 +171,10 @@ export default function TradingPage() {
   const effectivePolicy: OnChainPolicy = policy ?? {
     sessionKey: (isAddress(agentAddress)
       ? agentAddress
-      : '0x70997970C51812dc3A010C7d01b50e0d17dc79C8') as Address,
+      : '0x0000000000000000000000000000000000000000') as Address,
     expiry: Math.floor(Date.now() / 1000) + durationHours * 3600,
-    maxPerTx: usdgToUnits(maxPerTx || '100'),
-    dailyLimit: usdgToUnits(dailyLimit || '500'),
+    maxPerTx: usdgToUnits(maxPerTx || '0'),
+    dailyLimit: usdgToUnits(dailyLimit || '0'),
     spentToday: previewSpentUnits,
     lastReset: Math.floor(Date.now() / 1000) - 60,
     windowSeconds: 86400,
