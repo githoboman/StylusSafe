@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
 import { useBalances, USDG_ADDRESS } from '@/hooks/useBalances';
+import { unitsToUsdg, useOnChainAgentPolicies } from '@/lib/agentPolicy';
 import { SignModal } from '@/components/SignModal';
 import Link from 'next/link';
 import { IconArrowLeft, IconCheck, IconAutoRenew, IconArrowUpRight } from '@/components/Icons';
@@ -28,6 +29,7 @@ const PRESET_MERCHANTS = [
 export default function SubscriptionPage() {
   const { address, setupDCA, sendTransaction, revokeSessionKey } = useInvisibleWallet();
   const { usdgBalance, refetch } = useBalances(address);
+  const { subscriptionPolicies, agentPolicies, refresh: refreshPolicies } = useOnChainAgentPolicies(address);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'charge' | 'cancel'>('create');
@@ -40,24 +42,48 @@ export default function SubscriptionPage() {
   const [merchantAddress, setMerchantAddress] = useState(PRESET_MERCHANTS[0].address);
   const [amountInput, setAmountInput] = useState(PRESET_MERCHANTS[0].amount);
   const [frequency, setFrequency] = useState(PRESET_MERCHANTS[0].days);
-  const [subscriptions, setSubscriptions] = useState<SavedSubscription[]>([]);
+  const [savedSubs, setSavedSubs] = useState<SavedSubscription[]>([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const raw = localStorage.getItem('invisible_wallet_subscriptions');
-      if (raw) setSubscriptions(JSON.parse(raw));
+      if (raw) setSavedSubs(JSON.parse(raw));
     } catch {
       // ignore
     }
   }, []);
 
   const saveSubscriptions = (next: SavedSubscription[]) => {
-    setSubscriptions(next);
+    setSavedSubs(next);
     if (typeof window !== 'undefined') {
       localStorage.setItem('invisible_wallet_subscriptions', JSON.stringify(next));
     }
   };
+
+  // Merge live on-chain v3 SUBSCRIPTION policies with locally saved metadata labels
+  const subscriptions: SavedSubscription[] = useMemo(() => {
+    const byMerchant = new Map<string, SavedSubscription>();
+    for (const s of savedSubs) {
+      byMerchant.set(s.merchant.toLowerCase(), s);
+    }
+    for (const onChain of subscriptionPolicies) {
+      const key = onChain.sessionKey.toLowerCase();
+      if (!byMerchant.has(key)) {
+        const preset = PRESET_MERCHANTS.find((p) => p.address.toLowerCase() === key);
+        byMerchant.set(key, {
+          id: onChain.sessionKey,
+          label: preset?.label || onChain.label || 'On-Chain Pull Subscription',
+          merchant: onChain.sessionKey,
+          amount: Number(unitsToUsdg(onChain.maxPerTx)).toFixed(2),
+          frequencyDays: Math.max(1, Math.round(onChain.windowSeconds / 86400)),
+          createdAt: new Date().toISOString(),
+          txHash: '',
+        });
+      }
+    }
+    return Array.from(byMerchant.values());
+  }, [savedSubs, subscriptionPolicies]);
 
   const handleModalSign = async (pin: string) => {
     setStatus('authorizing');
@@ -85,8 +111,9 @@ export default function SubscriptionPage() {
           createdAt: new Date().toISOString(),
           txHash: result.userOpHash,
         };
-        saveSubscriptions([newSub, ...subscriptions]);
+        saveSubscriptions([newSub, ...savedSubs.filter((s) => s.merchant.toLowerCase() !== merchantAddress.toLowerCase())]);
         setLastTxHash(result.userOpHash);
+        await refreshPolicies();
 
         try {
           const stored = localStorage.getItem('invisible_wallet_activity');
@@ -95,7 +122,7 @@ export default function SubscriptionPage() {
             id: result.userOpHash || `sub-${Date.now()}`,
             type: 'subscription',
             title: `Subscription Authorized: ${newSub.label}`,
-            subtitle: `$${newSub.amount} USDG every ${frequency} days • ${merchantAddress.slice(0, 6)}...${merchantAddress.slice(-4)}`,
+            subtitle: `$${newSub.amount} USDG every ${frequency} days · ${merchantAddress.slice(0, 6)}...${merchantAddress.slice(-4)}`,
             amount: `${newSub.amount} USDG`,
             amountPositive: false,
             status: 'executed',
@@ -110,7 +137,7 @@ export default function SubscriptionPage() {
         const amountRaw = BigInt(Math.round(parseFloat(selectedSub.amount) * 1e6));
         const res = await sendTransaction(USDG_ADDRESS, amountRaw, selectedSub.merchant as `0x${string}`, pin);
         if (!res) throw new Error('Pull payment execution failed.');
-        const updated = subscriptions.map((s) =>
+        const updated = savedSubs.map((s) =>
           s.id === selectedSub.id ? { ...s, lastChargedAt: new Date().toISOString(), txHash: res.userOpHash } : s
         );
         saveSubscriptions(updated);
@@ -118,9 +145,10 @@ export default function SubscriptionPage() {
         refetch();
         setStatus('success');
       } else if (modalMode === 'cancel' && selectedSub) {
-        await revokeSessionKey(pin);
-        const updated = subscriptions.filter((s) => s.id !== selectedSub.id);
+        await revokeSessionKey(selectedSub.merchant, pin);
+        const updated = savedSubs.filter((s) => s.merchant.toLowerCase() !== selectedSub.merchant.toLowerCase());
         saveSubscriptions(updated);
+        await refreshPolicies();
         setStatus('idle');
       }
     } catch (e: any) {
@@ -153,7 +181,7 @@ export default function SubscriptionPage() {
               Recurring Pull Payments
             </h1>
             <p className="text-[#8e8e98] text-sm mt-1">
-              Set up automated USDG billing rules on Arbitrum Sepolia. Capped per billing cycle so merchants can never overcharge.
+              Concurrent per-merchant USDG billing rules on StylusSafe v3 — adding or canceling subscriptions preserves all AI Agents ({agentPolicies.length} active).
             </p>
           </div>
         </div>

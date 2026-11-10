@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
 
 const PAYEE_PRESETS = [
+  { label: 'StylusSafe Swap Pool (421614)', address: '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' },
   { label: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
   { label: 'Weekly Savings Vault', address: '0xFE5759aA7C45421b773E937B7B4aea2E21adD3Fc' },
 ];

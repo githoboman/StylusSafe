@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,18 +14,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { createPublicClient, decodeErrorResult, encodeFunctionData, formatUnits, http, padHex, parseAbi, toHex, type Address, type Hex } from 'viem';
+import { createPublicClient, decodeErrorResult, encodeFunctionData, formatUnits, http, padHex, parseAbi, toHex, zeroAddress, type Address, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
+import { SWAP_POOL_ADDRESS } from '@/hooks/useBalances';
 
-const DEPLOYED_ACCOUNT_IMPL: Address = '0x0D666af60c511a65d7fe704090632AFE05C932fA';
+const DEPLOYED_ACCOUNT_IMPL: Address = '0x0242E382976489B6E5aceEB7507a449B01535888';
 const ARB_SEPOLIA_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
 
 const TARGET_PRESETS: { name: string; address: Address }[] = [
+  { name: 'SwapPool (421614)', address: SWAP_POOL_ADDRESS },
   { name: 'Uniswap V3 Router', address: '0xE592427A0AEce92De3Edee1F18E0157C05861564' },
   { name: 'USDG Treasury', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' },
+  { name: 'Any External App', address: zeroAddress },
 ];
+
+const KIND_LABELS: Record<number, string> = {
+  0: 'AI Agent',
+  1: 'DCA Bot',
+  2: 'Subscription',
+};
 
 const POLICY_ABI = parseAbi([
   'function sessionKey() view returns (address)',
@@ -33,6 +42,7 @@ const POLICY_ABI = parseAbi([
   'function sessionDailyLimit() view returns (uint256)',
   'function sessionSpentToday() view returns (uint256)',
   'function sessionAllowedTarget() view returns (address)',
+  'function getAllPolicies() view returns ((address key, uint48 expiry, uint8 kind, bool active, uint256 maxPerTx, uint256 dailyLimit, uint256 spent, uint256 lastReset, address allowedTarget, uint256 window)[])',
   'function executeWithPolicy(address dest, uint256 value, bytes func)',
   'error NotAuthorized()',
   'error InvalidPolicy()',
@@ -47,6 +57,17 @@ const ERC20_ABI = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)',
 ]);
 
+type MobilePolicy = {
+  key: Address;
+  expiry: number;
+  kind: number;
+  maxPerTx: bigint;
+  dailyLimit: bigint;
+  spent: bigint;
+  allowedTarget: Address;
+  windowSeconds: number;
+};
+
 function slotHex(slot: number): Hex {
   return padHex(toHex(slot), { size: 32 });
 }
@@ -58,17 +79,24 @@ function wordHex(val: bigint | number | Address): Hex {
   return padHex(toHex(BigInt(val)), { size: 32 });
 }
 
+function shortAddr(a: string) {
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+}
+
 export default function SessionKeysScreen() {
   const router = useRouter();
   const { address, createSessionKey, setAgentPolicy, revokeSessionKey } = useInvisibleWallet();
   const [isEnabled, setIsEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeSession, setActiveSession] = useState<string | null>(null);
+  const [policies, setPolicies] = useState<MobilePolicy[]>([]);
+  const [selectedPolicyKey, setSelectedPolicyKey] = useState<Address | null>(null);
 
+  const [ruleKind, setRuleKind] = useState<0 | 1>(0);
   const [durationStr, setDurationStr] = useState('24');
   const [dailyLimitStr, setDailyLimitStr] = useState('500');
   const [maxPerTxStr, setMaxPerTxStr] = useState('100');
-  const [allowedTarget, setAllowedTarget] = useState<Address>(TARGET_PRESETS[0].address);
+  const [allowedTarget, setAllowedTarget] = useState<Address>(SWAP_POOL_ADDRESS);
+  const [customTargetInput, setCustomTargetInput] = useState('');
 
   const [spentTodayUnits, setSpentTodayUnits] = useState<bigint>(0n);
   const [simRunning, setSimRunning] = useState<string | null>(null);
@@ -78,16 +106,39 @@ export default function SessionKeysScreen() {
     detail: string;
   } | null>(null);
 
-  // Sync live on-chain policy if the wallet already has one deployed on Arbitrum Sepolia.
-  useEffect(() => {
+  const loadPolicies = useCallback(async () => {
     if (!address) return;
-    let cancelled = false;
-    (async () => {
+    try {
+      const client = createPublicClient({ transport: http(ARB_SEPOLIA_RPC) });
+      const wallet = address as Address;
+      const code = await client.getBytecode({ address: wallet });
+      if (!code || code === '0x') return;
+
       try {
-        const client = createPublicClient({ transport: http(ARB_SEPOLIA_RPC) });
-        const wallet = address as Address;
-        const code = await client.getBytecode({ address: wallet });
-        if (!code || code === '0x') return;
+        const all = (await client.readContract({
+          address: wallet,
+          abi: POLICY_ABI,
+          functionName: 'getAllPolicies',
+        })) as any[];
+
+        const active = all
+          .filter((p) => p.active && p.key !== zeroAddress)
+          .map((p) => ({
+            key: p.key as Address,
+            expiry: Number(p.expiry),
+            kind: Number(p.kind),
+            maxPerTx: p.maxPerTx as bigint,
+            dailyLimit: p.dailyLimit as bigint,
+            spent: p.spent as bigint,
+            allowedTarget: p.allowedTarget as Address,
+            windowSeconds: Number(p.window || 86400n),
+          }));
+        setPolicies(active);
+        if (active.length > 0 && !selectedPolicyKey) {
+          setSelectedPolicyKey(active[0].key);
+          setSpentTodayUnits(active[0].spent);
+        }
+      } catch {
         const [key, perTx, daily, spent, target] = await Promise.all([
           client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionKey' }),
           client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionMaxPerTx' }),
@@ -95,58 +146,70 @@ export default function SessionKeysScreen() {
           client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionSpentToday' }),
           client.readContract({ address: wallet, abi: POLICY_ABI, functionName: 'sessionAllowedTarget' }),
         ]);
-        if (cancelled) return;
-        if (key !== '0x0000000000000000000000000000000000000000') {
-          setActiveSession(key);
-          setMaxPerTxStr(formatUnits(perTx, 6));
-          setDailyLimitStr(formatUnits(daily, 6));
-          setSpentTodayUnits(spent);
-          if (target !== '0x0000000000000000000000000000000000000000') {
-            setAllowedTarget(target);
-          }
+        if (key !== zeroAddress) {
+          setPolicies([
+            {
+              key: key as Address,
+              expiry: Math.floor(Date.now() / 1000) + 86400,
+              kind: 0,
+              maxPerTx: perTx as bigint,
+              dailyLimit: daily as bigint,
+              spent: spent as bigint,
+              allowedTarget: target as Address,
+              windowSeconds: 86400,
+            },
+          ]);
+          setSelectedPolicyKey(key as Address);
+          setSpentTodayUnits(spent as bigint);
         }
-      } catch {
-        // leave editable fields as entered
       }
-    })();
-    return () => { cancelled = true; };
-  }, [address]);
+    } catch {
+      // keep existing UI state
+    }
+  }, [address, selectedPolicyKey]);
+
+  useEffect(() => {
+    void loadPolicies();
+  }, [loadPolicies]);
 
   const dailyNum = Math.max(1, parseFloat(dailyLimitStr) || 0);
   const perTxNum = Math.max(1, parseFloat(maxPerTxStr) || 0);
   const durationHours = Math.max(1, Math.min(720, Math.round(parseFloat(durationStr) || 24)));
   const dailyUnits = BigInt(Math.floor(dailyNum * 1_000_000));
   const perTxUnits = BigInt(Math.floor(perTxNum * 1_000_000));
+  const resolvedTarget = /^0x[0-9a-fA-F]{40}$/.test(customTargetInput.trim())
+    ? (customTargetInput.trim() as Address)
+    : allowedTarget;
 
   const handleGenerate = async () => {
     if (!parseFloat(dailyLimitStr) || !parseFloat(maxPerTxStr) || perTxNum > dailyNum) {
-      Alert.alert('Check Limits', 'Max per trade and daily limit must be positive, and per-trade cannot exceed daily.');
+      Alert.alert('Check Limits', 'Max per trade and window budget must be positive, and per-trade cannot exceed window limit.');
       return;
     }
     setIsSubmitting(true);
     try {
       const sessionRes = await createSessionKey(durationHours, '0000');
       if (sessionRes?.sessionKey) {
-        const sessionAddr = sessionRes.sessionKey;
-        setActiveSession(sessionAddr);
-        try {
-          await setAgentPolicy(
-            {
-              sessionKey: sessionAddr as `0x${string}`,
-              durationHours,
-              maxPerTx: perTxUnits,
-              dailyLimit: dailyUnits,
-              allowedTarget,
-            },
-            '0000'
-          );
-        } catch {
-          // Local fallback handled by createSessionKey
-        }
+        const sessionAddr = sessionRes.sessionKey as Address;
+        const windowSecs = ruleKind === 1 ? 7 * 86400 : 86400;
+        await setAgentPolicy(
+          {
+            sessionKey: sessionAddr,
+            durationHours,
+            maxPerTx: perTxUnits,
+            dailyLimit: dailyUnits,
+            allowedTarget: resolvedTarget,
+            kind: ruleKind,
+            windowSeconds: windowSecs,
+          },
+          '0000'
+        );
+        setSelectedPolicyKey(sessionAddr);
         setSpentTodayUnits(0n);
+        await loadPolicies();
         Alert.alert(
-          'AI Allowance Saved',
-          `Helper key authorized for ${durationHours} hours on Arbitrum Sepolia with a $${dailyNum} USDG daily limit ($${perTxNum} max/trade).`
+          `${KIND_LABELS[ruleKind]} Added`,
+          `Authorized concurrently without overwriting existing rules (${durationHours}h, $${perTxNum}/tx, $${dailyNum} cap).`
         );
       } else {
         throw new Error('Failed to generate helper key');
@@ -158,31 +221,38 @@ export default function SessionKeysScreen() {
     }
   };
 
-  const handleRevoke = async () => {
+  const handleRevokeKey = async (key: Address) => {
     setIsSubmitting(true);
     try {
-      await revokeSessionKey('0000');
-      setActiveSession(null);
-      setIsEnabled(false);
-      setSpentTodayUnits(0n);
+      await revokeSessionKey(key, '0000');
+      setPolicies((prev) => prev.filter((p) => p.key.toLowerCase() !== key.toLowerCase()));
       setSimResult(null);
-      Alert.alert('Turned Off', 'AI helper key permissions removed.');
+      await loadPolicies();
+      Alert.alert('Rule Revoked', `Removed ${shortAddr(key)}. Other active keys and subscriptions remain intact.`);
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to revoke helper key');
+      Alert.alert('Error', e?.message || 'Failed to revoke policy key');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const withinTestAmount = Math.max(1, Math.floor(Math.min(50, perTxNum)));
-  const overTestAmount = Math.max(perTxNum + 100, Math.floor(dailyNum * 2));
+  const inspectedPolicy = policies.find((p) => p.key.toLowerCase() === (selectedPolicyKey || '').toLowerCase());
+  const simMaxPerTx = inspectedPolicy ? inspectedPolicy.maxPerTx : perTxUnits;
+  const simDailyLimit = inspectedPolicy ? inspectedPolicy.dailyLimit : dailyUnits;
+  const simSpent = inspectedPolicy ? inspectedPolicy.spent : spentTodayUnits;
+  const simTarget = inspectedPolicy ? inspectedPolicy.allowedTarget : resolvedTarget;
+  const simPerTxNum = Math.max(1, Number(formatUnits(simMaxPerTx, 6)));
+  const simDailyNum = Math.max(1, Number(formatUnits(simDailyLimit, 6)));
+
+  const withinTestAmount = Math.max(1, Math.floor(Math.min(50, simPerTxNum)));
+  const overTestAmount = Math.max(simPerTxNum + 100, Math.floor(simDailyNum * 2));
 
   const runLiveChainCheck = async (kind: 'within' | 'over' | 'unapproved') => {
     setSimRunning(kind);
-    const agentKey = (activeSession || privateKeyToAccount(generatePrivateKey()).address) as Address;
+    const agentKey = (inspectedPolicy?.key || privateKeyToAccount(generatePrivateKey()).address) as Address;
     const unapproved: Address = '0x1111111111111111111111111111111111111111';
-    const dest: Address = kind === 'unapproved' ? unapproved : allowedTarget;
-    const amountUsdg = kind === 'over' ? overTestAmount : kind === 'within' ? withinTestAmount : Math.min(10, perTxNum);
+    const dest: Address = kind === 'unapproved' ? unapproved : (simTarget === zeroAddress ? SWAP_POOL_ADDRESS : simTarget);
+    const amountUsdg = kind === 'over' ? overTestAmount : kind === 'within' ? withinTestAmount : Math.min(10, simPerTxNum);
     const units = BigInt(Math.floor(amountUsdg * 1_000_000));
     const now = Math.floor(Date.now() / 1000);
 
@@ -200,11 +270,11 @@ export default function SessionKeysScreen() {
     const stateDiff: Record<Hex, Hex> = {
       [slotHex(5)]: wordHex(agentKey),
       [slotHex(6)]: wordHex(now + durationHours * 3600),
-      [slotHex(7)]: wordHex(perTxUnits),
-      [slotHex(8)]: wordHex(dailyUnits),
-      [slotHex(9)]: wordHex(spentTodayUnits),
+      [slotHex(7)]: wordHex(simMaxPerTx),
+      [slotHex(8)]: wordHex(simDailyLimit),
+      [slotHex(9)]: wordHex(simSpent),
       [slotHex(10)]: wordHex(now - 60),
-      [slotHex(11)]: wordHex(allowedTarget),
+      [slotHex(11)]: wordHex(simTarget),
       [slotHex(12)]: wordHex(86400n),
     };
 
@@ -234,9 +304,9 @@ export default function SessionKeysScreen() {
             verdict: 'Blocked',
             detail:
               decoded.errorName === 'PerTxLimitExceeded'
-                ? `$${amountUsdg.toLocaleString()} USDG exceeds the $${perTxNum} single-trade limit. $0.00 spent.`
+                ? `$${amountUsdg.toLocaleString()} USDG exceeds the $${simPerTxNum} single-trade limit. $0.00 spent.`
                 : decoded.errorName === 'DailyLimitExceeded'
-                  ? `Adding $${amountUsdg} USDG exceeds the $${dailyNum} daily limit. $0.00 spent.`
+                  ? `Adding $${amountUsdg} USDG exceeds the $${simDailyNum} window limit. $0.00 spent.`
                   : `That app is not on your approved allowlist (${decoded.errorName}).`,
           });
           setSimRunning(null);
@@ -244,12 +314,12 @@ export default function SessionKeysScreen() {
         }
       }
 
-      const nextSpent = spentTodayUnits + units;
+      const nextSpent = simSpent + units;
       setSpentTodayUnits(nextSpent);
       setSimResult({
         title: 'Approved by Vault',
         verdict: 'Allowed',
-        detail: `Arbitrum Sepolia contract verified $${amountUsdg} USDG is inside your $${perTxNum}/trade and $${dailyNum}/day limits. Spent today: $${Number(nextSpent / 1_000_000n)} / $${dailyNum} USDG.`,
+        detail: `StylusSafeAccount v3 verified $${amountUsdg} USDG is inside $${simPerTxNum}/trade and $${simDailyNum} caps.`,
       });
     } catch (err: any) {
       setSimResult({
@@ -268,7 +338,7 @@ export default function SessionKeysScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Helper Allowance</Text>
+        <Text style={styles.headerTitle}>Multi-Agent &amp; DCA Studio</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -276,9 +346,9 @@ export default function SessionKeysScreen() {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={{ flex: 1, paddingRight: 16 }}>
-              <Text style={styles.title}>Enable AI Helper Key</Text>
+              <Text style={styles.title}>Concurrent ERC-7579 Rules</Text>
               <Text style={styles.subtitle}>
-                Give an automated helper a strict daily budget so it can never spend past your limit.
+                Authorize multiple AI traders, DCA bots, and subscriptions simultaneously without overwriting keys.
               </Text>
             </View>
             <Switch
@@ -289,8 +359,28 @@ export default function SessionKeysScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Allowance Rules</Text>
+        <Text style={styles.sectionTitle}>Add New Policy Rule</Text>
         <View style={styles.card}>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            {([
+              { k: 0 as const, label: 'AI Trading Agent (24h)' },
+              { k: 1 as const, label: 'DCA Bot (7d Window)' },
+            ]).map((item) => (
+              <TouchableOpacity
+                key={item.k}
+                style={[styles.presetBtn, ruleKind === item.k && styles.presetBtnActive]}
+                onPress={() => {
+                  setRuleKind(item.k);
+                  setDurationStr(item.k === 1 ? '720' : '24');
+                }}
+              >
+                <Text style={[styles.presetText, ruleKind === item.k && { color: Colors.primary }]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.row}>
             <Text style={styles.label}>Time Limit (Hours)</Text>
             <TextInput
@@ -303,7 +393,7 @@ export default function SessionKeysScreen() {
             />
           </View>
           <View style={[styles.row, styles.borderTop]}>
-            <Text style={styles.label}>Daily Limit (USDG)</Text>
+            <Text style={styles.label}>Window Limit (USDG)</Text>
             <TextInput
               style={styles.numInput}
               value={dailyLimitStr}
@@ -325,26 +415,31 @@ export default function SessionKeysScreen() {
             />
           </View>
           <View style={styles.borderTop}>
-            <Text style={styles.label}>Approved App</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <Text style={styles.label}>Approved Target Contract</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {TARGET_PRESETS.map((p) => (
                 <TouchableOpacity
                   key={p.address}
-                  style={[styles.presetBtn, allowedTarget.toLowerCase() === p.address.toLowerCase() && styles.presetBtnActive]}
-                  onPress={() => setAllowedTarget(p.address)}
+                  style={[styles.presetBtn, { minWidth: '46%' }, allowedTarget.toLowerCase() === p.address.toLowerCase() && !customTargetInput && styles.presetBtnActive]}
+                  onPress={() => {
+                    setAllowedTarget(p.address);
+                    setCustomTargetInput('');
+                  }}
                 >
-                  <Text style={[styles.presetText, allowedTarget.toLowerCase() === p.address.toLowerCase() && { color: Colors.primary }]}>
+                  <Text style={[styles.presetText, allowedTarget.toLowerCase() === p.address.toLowerCase() && !customTargetInput && { color: Colors.primary }]}>
                     {p.name}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-          <View style={[styles.row, styles.borderTop]}>
-            <Text style={styles.label}>Spent Today</Text>
-            <Text style={styles.value}>
-              ${Number(spentTodayUnits / 1_000_000n)} / ${dailyNum} USDG
-            </Text>
+            <TextInput
+              style={[styles.numInput, { textAlign: 'left', marginTop: 10, width: '100%' }]}
+              value={customTargetInput}
+              onChangeText={setCustomTargetInput}
+              placeholder="Or custom 0x contract address"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
           </View>
         </View>
 
@@ -356,25 +451,56 @@ export default function SessionKeysScreen() {
           {isSubmitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Save &amp; Approve Allowance</Text>
+            <Text style={styles.saveButtonText}>Authorize Concurrent {KIND_LABELS[ruleKind]}</Text>
           )}
         </TouchableOpacity>
 
-        {activeSession && (
-          <TouchableOpacity
-            style={styles.revokeButton}
-            disabled={isSubmitting}
-            onPress={handleRevoke}
-          >
-            <Text style={styles.revokeButtonText}>Turn Off AI Helper Key</Text>
-          </TouchableOpacity>
+        {/* Active Concurrent Policies List */}
+        <Text style={styles.sectionTitle}>Active On-Chain Policies ({policies.length})</Text>
+        {policies.length === 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.subtitle}>No concurrent policies deployed on-chain yet.</Text>
+          </View>
+        ) : (
+          policies.map((p) => {
+            const isSel = (selectedPolicyKey || '').toLowerCase() === p.key.toLowerCase();
+            return (
+              <TouchableOpacity
+                key={p.key}
+                activeOpacity={0.85}
+                onPress={() => setSelectedPolicyKey(p.key)}
+                style={[styles.card, isSel && { borderColor: Colors.accentOrange }]}
+              >
+                <View style={styles.row}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={styles.title}>
+                      {KIND_LABELS[p.kind] || 'Policy'} · {shortAddr(p.key)}
+                    </Text>
+                    <Text style={styles.subtitle}>
+                      Target: {TARGET_PRESETS.find((t) => t.address.toLowerCase() === p.allowedTarget.toLowerCase())?.name || shortAddr(p.allowedTarget)} · Max ${formatUnits(p.maxPerTx, 6)}/tx
+                    </Text>
+                    <Text style={[styles.value, { fontSize: 12, marginTop: 2 }]}>
+                      Spent ${formatUnits(p.spent, 6)} / ${formatUnits(p.dailyLimit, 6)} USDG
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.revokeButton, { paddingHorizontal: 12, height: 36 }]}
+                    disabled={isSubmitting}
+                    onPress={() => handleRevokeKey(p.key)}
+                  >
+                    <Text style={[styles.revokeButtonText, { fontSize: 12 }]}>Revoke</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
 
         {/* Live On-Chain Allowance Tester */}
-        <Text style={styles.sectionTitle}>Test Rules (Live Arbitrum Sepolia Check)</Text>
+        <Text style={styles.sectionTitle}>Test Selected Rule (Arbitrum Sepolia)</Text>
         <View style={styles.card}>
           <Text style={styles.subtitle}>
-            Tap any check below to run a real eth_call against the deployed StylusSafeAccount contract (0x0D66...32fA).
+            Runs real eth_call checks against deployed StylusSafeAccount v3 (0x0242...5888).
           </Text>
 
           <View style={{ gap: 10, marginTop: 14 }}>
@@ -455,8 +581,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
   },
-  title: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary },
-  subtitle: { fontSize: 14, color: Colors.textMuted, marginTop: 4, lineHeight: 20 },
+  title: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  subtitle: { fontSize: 13, color: Colors.textMuted, marginTop: 4, lineHeight: 19 },
   sectionTitle: {
     fontSize: 12,
     color: Colors.textMuted,
@@ -540,6 +666,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.sm,
     paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
   presetBtnActive: {

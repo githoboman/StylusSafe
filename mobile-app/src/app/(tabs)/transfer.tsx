@@ -6,13 +6,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useInvisibleWallet } from '@/hooks/useInvisibleWallet';
+import { SEPOLIA_SWAP_TOKENS, useBalances } from '@/hooks/useBalances';
 import { FALLBACK_TOKEN_USD_PRICES, fetchLifiQuote, fetchLiveTokenPrices, type LifiQuote } from '@/lib/lifi';
 
 const SUPPORTED_TOKENS = [
-  { symbol: 'USDG', address: '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36', decimals: 6, name: 'USDG Treasury (6 Decimals)', color: '#ff4500' },
-  { symbol: 'USDC', address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d', decimals: 6, name: 'USD Coin', color: Colors.secondary },
-  { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18, name: 'Ether', color: Colors.primary },
-  { symbol: 'WBTC', address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', decimals: 8, name: 'Wrapped Bitcoin', color: '#F7931A' },
+  { symbol: 'USDG', address: SEPOLIA_SWAP_TOKENS.USDG.address, decimals: 6, name: 'USDG Treasury (6 Decimals)', color: '#ff4500' },
+  { symbol: 'USDC', address: SEPOLIA_SWAP_TOKENS.USDC.address, decimals: 6, name: 'USD Coin', color: Colors.secondary },
+  { symbol: 'ETH', address: SEPOLIA_SWAP_TOKENS.ETH.address, decimals: 18, name: 'Ether', color: Colors.primary },
+  { symbol: 'WBTC', address: SEPOLIA_SWAP_TOKENS.WBTC.address, decimals: 8, name: 'Wrapped Bitcoin', color: '#F7931A' },
+  { symbol: 'ARB', address: SEPOLIA_SWAP_TOKENS.ARB.address, decimals: 18, name: 'Arbitrum', color: '#28A0F0' },
+  { symbol: 'UNI', address: SEPOLIA_SWAP_TOKENS.UNI.address, decimals: 18, name: 'Uniswap', color: '#FF007A' },
+  { symbol: 'USDT', address: SEPOLIA_SWAP_TOKENS.USDT.address, decimals: 6, name: 'Tether USD', color: '#26A17B' },
+  { symbol: 'DEGEN', address: SEPOLIA_SWAP_TOKENS.DEGEN.address, decimals: 18, name: 'Degen', color: '#A36EFD' },
 ];
 
 const SUPPORTED_CHAINS = [
@@ -27,11 +32,13 @@ export default function TransferScreen() {
   const [recipient, setRecipient] = useState('');
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
   const [selectedDestToken, setSelectedDestToken] = useState(SUPPORTED_TOKENS[1]);
-  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[1]);
+  const [selectedChain, setSelectedChain] = useState(SUPPORTED_CHAINS[0]);
+  const [executionMode, setExecutionMode] = useState<'personal' | 'agent'>('personal');
   const [customToToken, setCustomToToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
-  const { address, executeCrossChainSwap } = useInvisibleWallet();
+  const { address, executeCrossChainSwap, executeAgentSwap } = useInvisibleWallet();
+  const { tokenBalances, refetch } = useBalances(address, 421614);
 
   const [livePrices, setLivePrices] = useState<Record<string, number>>(FALLBACK_TOKEN_USD_PRICES);
   const [quote, setQuote] = useState<LifiQuote | null>(null);
@@ -109,15 +116,27 @@ export default function TransferScreen() {
       }
       const amountRaw = BigInt(Math.floor(parsed * 10 ** selectedToken.decimals));
       const toToken = customToToken.trim() || selectedDestToken.symbol;
-      const res = await executeCrossChainSwap(
-        selectedChain.id,
-        selectedToken.symbol,
-        toToken,
-        amountRaw,
-        targetRecipient,
-      );
+      const res = executionMode === 'agent'
+        ? await executeAgentSwap({
+            sourceChainId: 421614,
+            destChainId: selectedChain.id,
+            fromToken: selectedToken.symbol,
+            toToken,
+            amount: amountRaw,
+            fromDecimals: selectedToken.decimals,
+            recipient: targetRecipient,
+          })
+        : await executeCrossChainSwap(
+            421614,
+            selectedChain.id,
+            selectedToken.symbol,
+            toToken,
+            amountRaw,
+            targetRecipient,
+          );
       if (res?.userOpHash) {
         setLastTxHash(res.userOpHash);
+        refetch();
       }
       setAmount('');
       setRecipient('');
@@ -135,18 +154,47 @@ export default function TransferScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         <Text style={styles.pageTitle}>Cross-Chain Swap</Text>
-        <Text style={styles.pageSubtitle}>Bridge and swap assets with sponsored gas on Arbitrum Sepolia.</Text>
+        <Text style={styles.pageSubtitle}>
+          Swap assets on-chain via StylusSafeSwapPool with FaceID signing or passwordless AI Agent keys.
+        </Text>
+
+        {/* Execution Mode Toggle */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.chainChip, { flex: 1, justifyContent: 'center' }, executionMode === 'personal' && { borderColor: '#ff4500', backgroundColor: 'rgba(255,69,0,0.14)' }]}
+            onPress={() => setExecutionMode('personal')}
+          >
+            <Text style={[styles.chainText, executionMode === 'personal' && { color: '#fff', fontWeight: '700' }]}>
+              Personal (Passkey)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chainChip, { flex: 1, justifyContent: 'center' }, executionMode === 'agent' && { borderColor: '#ff4500', backgroundColor: 'rgba(255,69,0,0.14)' }]}
+            onPress={() => setExecutionMode('agent')}
+          >
+            <Text style={[styles.chainText, executionMode === 'agent' && { color: '#fff', fontWeight: '700' }]}>
+              Guarded AI Agent
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {lastTxHash && (
           <View style={styles.successBanner}>
-            <Text style={styles.successTitle}>Swap Executed On-Chain</Text>
+            <Text style={styles.successTitle}>
+              {executionMode === 'agent' ? 'Agent Swap Executed On-Chain' : 'Swap Executed On-Chain'}
+            </Text>
             <Text style={styles.successHash} numberOfLines={1}>{lastTxHash}</Text>
           </View>
         )}
 
         {/* Token selector */}
         <View style={styles.card}>
-          <Text style={styles.fieldLabel}>Asset</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.fieldLabel}>Asset</Text>
+            <Text style={styles.summaryLabel}>
+              Bal: {tokenBalances[selectedToken.symbol] ?? '0.00'} {selectedToken.symbol}
+            </Text>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.sm }}>
             <View style={styles.tokenRow}>
               {SUPPORTED_TOKENS.map((token) => (
@@ -276,7 +324,11 @@ export default function TransferScreen() {
         >
           {isSubmitting
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitButtonText}>Execute Swap ({amount || '0'} {selectedToken.symbol})</Text>
+            : <Text style={styles.submitButtonText}>
+                {executionMode === 'agent'
+                  ? `Execute Agent Swap (${amount || '0'} ${selectedToken.symbol})`
+                  : `Execute Swap (${amount || '0'} ${selectedToken.symbol})`}
+              </Text>
           }
         </TouchableOpacity>
 

@@ -15,7 +15,15 @@ import {
 } from 'viem';
 
 export const ARBITRUM_SEPOLIA_CHAIN_ID = 421614;
-export const DEPLOYED_ACCOUNT_IMPL: Address = '0x0D666af60c511a65d7fe704090632AFE05C932fA';
+export const DEPLOYED_ACCOUNT_IMPL: Address = '0x0242E382976489B6E5aceEB7507a449B01535888';
+export const POLICY_STORAGE_KEY = 'stylussafe_local_policies';
+
+export type PolicyKind = 0 | 1 | 2;
+export const POLICY_KIND_LABELS: Record<PolicyKind, string> = {
+  0: 'AI Agent',
+  1: 'DCA Bot',
+  2: 'Subscription',
+};
 
 const POLICY_ABI = parseAbi([
   'function sessionKey() view returns (address)',
@@ -26,6 +34,8 @@ const POLICY_ABI = parseAbi([
   'function sessionLastReset() view returns (uint256)',
   'function sessionWindow() view returns (uint256)',
   'function sessionAllowedTarget() view returns (address)',
+  'function getAllPolicies() view returns ((address key, uint48 expiry, uint8 kind, bool active, uint256 maxPerTx, uint256 dailyLimit, uint256 spent, uint256 lastReset, address allowedTarget, uint256 window)[])',
+  'function getPolicy(address key) view returns ((address key, uint48 expiry, uint8 kind, bool active, uint256 maxPerTx, uint256 dailyLimit, uint256 spent, uint256 lastReset, address allowedTarget, uint256 window))',
   'function executeWithPolicy(address dest, uint256 value, bytes func)',
   'error NotAuthorized()',
   'error InvalidPolicy()',
@@ -43,7 +53,7 @@ const ERC20_ABI = parseAbi([
 
 const USDG_DECIMALS = 6;
 
-// Storage layout of StylusSafeAccount v2 (contracts/StylusSafeAccount.sol)
+// Legacy mirror slots preserved identically across StylusSafeAccount v2 & v3
 const POLICY_SLOTS = {
   sessionKey: 5,
   sessionExpiry: 6,
@@ -57,6 +67,7 @@ const POLICY_SLOTS = {
 
 export type OnChainPolicy = {
   sessionKey: Address;
+  kind: PolicyKind;
   expiry: number;
   maxPerTx: bigint;
   dailyLimit: bigint;
@@ -64,10 +75,24 @@ export type OnChainPolicy = {
   lastReset: number;
   windowSeconds: number;
   allowedTarget: Address;
-  /** true when a key is set and the allowance has not expired */
+  /** true when active on-chain/local and not expired */
   isActive: boolean;
-  /** spend counter after applying the rolling-window reset the contract would apply now */
+  /** spend counter after applying rolling-window reset */
   effectiveSpentToday: bigint;
+  label?: string;
+};
+
+type StoredLocalPolicy = {
+  sessionKey: Address;
+  kind: PolicyKind;
+  expiry: number;
+  maxPerTx: string;
+  dailyLimit: string;
+  spentToday: string;
+  lastReset: number;
+  windowSeconds: number;
+  allowedTarget: Address;
+  label?: string;
 };
 
 function getRpcUrl(): string {
@@ -96,103 +121,245 @@ export function unitsToUsdg(units: bigint): string {
   return `${whole}.${frac.toString().padStart(USDG_DECIMALS, '0').replace(/0+$/, '')}`;
 }
 
-function readLocalPolicyFallback(): OnChainPolicy | null {
-  if (typeof window === 'undefined') return null;
+function hydratePolicy(raw: {
+  sessionKey: Address;
+  kind?: number;
+  expiry: number;
+  maxPerTx: bigint;
+  dailyLimit: bigint;
+  spent: bigint;
+  lastReset: number;
+  windowSeconds: number;
+  allowedTarget: Address;
+  active?: boolean;
+  label?: string;
+}): OnChainPolicy {
+  const now = Math.floor(Date.now() / 1000);
+  const win = raw.windowSeconds || 86400;
+  const expiredWindow = now >= raw.lastReset + win;
+  const effectiveSpent = expiredWindow ? 0n : raw.spent;
+  const normalizedKind: PolicyKind = raw.kind === 1 ? 1 : raw.kind === 2 ? 2 : 0;
+  return {
+    sessionKey: raw.sessionKey,
+    kind: normalizedKind,
+    expiry: raw.expiry,
+    maxPerTx: raw.maxPerTx,
+    dailyLimit: raw.dailyLimit,
+    spentToday: raw.spent,
+    lastReset: raw.lastReset,
+    windowSeconds: win,
+    allowedTarget: raw.allowedTarget,
+    isActive: (raw.active ?? true) && now < raw.expiry,
+    effectiveSpentToday: effectiveSpent,
+    label: raw.label,
+  };
+}
+
+export function readLocalPolicies(): OnChainPolicy[] {
+  if (typeof window === 'undefined') return [];
+  const results: OnChainPolicy[] = [];
+  const seen = new Set<string>();
+
+  try {
+    const rawMap = JSON.parse(localStorage.getItem(POLICY_STORAGE_KEY) || '{}') as Record<string, StoredLocalPolicy>;
+    for (const item of Object.values(rawMap)) {
+      if (!item?.sessionKey) continue;
+      seen.add(item.sessionKey.toLowerCase());
+      results.push(
+        hydratePolicy({
+          sessionKey: item.sessionKey,
+          kind: item.kind ?? 0,
+          expiry: Number(item.expiry),
+          maxPerTx: BigInt(item.maxPerTx || '0'),
+          dailyLimit: BigInt(item.dailyLimit || '0'),
+          spent: BigInt(item.spentToday || '0'),
+          lastReset: Number(item.lastReset || Math.floor(Date.now() / 1000)),
+          windowSeconds: Number(item.windowSeconds || 86400),
+          allowedTarget: item.allowedTarget || zeroAddress,
+          label: item.label,
+        })
+      );
+    }
+  } catch {
+    // ignore corrupt map
+  }
+
+  // Legacy single-policy local fallback
   const savedKey = localStorage.getItem('invisible_wallet_session_key');
   const savedExpiry = localStorage.getItem('invisible_wallet_session_expiry');
   const savedDaily = localStorage.getItem('invisible_wallet_session_daily_limit');
   const savedMax = localStorage.getItem('invisible_wallet_session_max_per_tx');
   const savedTarget = localStorage.getItem('invisible_wallet_session_target');
-  const savedSpent = localStorage.getItem('invisible_wallet_session_spent_today');
-  const savedReset = localStorage.getItem('invisible_wallet_session_last_reset');
-  if (!savedKey || !savedExpiry || !savedDaily || !savedMax || !savedTarget) return null;
+  if (savedKey && savedExpiry && savedDaily && savedMax && savedTarget && !seen.has(savedKey.toLowerCase())) {
+    const now = Math.floor(Date.now() / 1000);
+    results.push(
+      hydratePolicy({
+        sessionKey: savedKey as Address,
+        kind: 0,
+        expiry: Number(savedExpiry),
+        maxPerTx: BigInt(savedMax),
+        dailyLimit: BigInt(savedDaily),
+        spent: BigInt(localStorage.getItem('invisible_wallet_session_spent_today') || '0'),
+        lastReset: Number(localStorage.getItem('invisible_wallet_session_last_reset') || now - 60),
+        windowSeconds: 86400,
+        allowedTarget: savedTarget as Address,
+      })
+    );
+  }
 
-  const now = Math.floor(Date.now() / 1000);
-  const expiryNum = Number(savedExpiry);
-  const lastResetNum = savedReset ? Number(savedReset) : now - 60;
-  const windowNum = 86400;
-  const spentRaw = savedSpent ? BigInt(savedSpent) : 0n;
-  const windowExpired = now >= lastResetNum + windowNum;
+  return results;
+}
 
-  return {
-    sessionKey: savedKey as Address,
-    expiry: expiryNum,
-    maxPerTx: BigInt(savedMax),
-    dailyLimit: BigInt(savedDaily),
-    spentToday: spentRaw,
-    lastReset: lastResetNum,
-    windowSeconds: windowNum,
-    allowedTarget: savedTarget as Address,
-    isActive: now < expiryNum,
-    effectiveSpentToday: windowExpired ? 0n : spentRaw,
-  };
+export function upsertLocalPolicy(policy: {
+  sessionKey: Address;
+  kind: PolicyKind;
+  expiry: number;
+  maxPerTx: bigint;
+  dailyLimit: bigint;
+  spentToday?: bigint;
+  lastReset?: number;
+  windowSeconds: number;
+  allowedTarget: Address;
+  label?: string;
+}): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const rawMap = JSON.parse(localStorage.getItem(POLICY_STORAGE_KEY) || '{}') as Record<string, StoredLocalPolicy>;
+    const k = policy.sessionKey.toLowerCase();
+    rawMap[k] = {
+      sessionKey: policy.sessionKey,
+      kind: policy.kind,
+      expiry: policy.expiry,
+      maxPerTx: policy.maxPerTx.toString(),
+      dailyLimit: policy.dailyLimit.toString(),
+      spentToday: (policy.spentToday ?? 0n).toString(),
+      lastReset: policy.lastReset ?? Math.floor(Date.now() / 1000),
+      windowSeconds: policy.windowSeconds,
+      allowedTarget: policy.allowedTarget,
+      label: policy.label ?? rawMap[k]?.label,
+    };
+    localStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(rawMap));
+  } catch {
+    // ignore
+  }
+}
+
+export function removeLocalPolicy(sessionKey: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const rawMap = JSON.parse(localStorage.getItem(POLICY_STORAGE_KEY) || '{}') as Record<string, StoredLocalPolicy>;
+    delete rawMap[sessionKey.toLowerCase()];
+    localStorage.setItem(POLICY_STORAGE_KEY, JSON.stringify(rawMap));
+  } catch {
+    // ignore
+  }
 }
 
 /**
- * Reads the agent policy from the user's smart account on Arbitrum Sepolia,
- * falling back to the locally authorized session state when the account is counterfactual
- * or using the local bundler relay.
+ * Reads all concurrent policies (AGENT, DCA, SUBSCRIPTION) from StylusSafeAccount v3 `getAllPolicies()`,
+ * falling back to v2 single-key slots when reading legacy v2 wallets, and merging local metadata.
  */
-export async function readOnChainPolicy(wallet?: Address | null): Promise<OnChainPolicy | null> {
+export async function readAllOnChainPolicies(wallet?: Address | null): Promise<OnChainPolicy[]> {
+  const local = readLocalPolicies();
+  const labelMap = new Map<string, string>();
+  for (const item of local) {
+    if (item.label) labelMap.set(item.sessionKey.toLowerCase(), item.label);
+  }
+
   if (wallet) {
     try {
       const client = getClient();
       const code = await client.getBytecode({ address: wallet });
       if (code && code !== '0x') {
-        const read = (functionName: string) =>
-          client.readContract({ address: wallet, abi: POLICY_ABI, functionName: functionName as any });
+        try {
+          const all = (await client.readContract({
+            address: wallet,
+            abi: POLICY_ABI,
+            functionName: 'getAllPolicies',
+          })) as readonly {
+            key: Address;
+            expiry: number;
+            kind: number;
+            active: boolean;
+            maxPerTx: bigint;
+            dailyLimit: bigint;
+            spent: bigint;
+            lastReset: bigint;
+            allowedTarget: Address;
+            window: bigint;
+          }[];
 
-        const [key, expiry, maxPerTx, dailyLimit, spent, lastReset, windowSecs, target] = await Promise.all([
-          read('sessionKey'),
-          read('sessionExpiry'),
-          read('sessionMaxPerTx'),
-          read('sessionDailyLimit'),
-          read('sessionSpentToday'),
-          read('sessionLastReset'),
-          read('sessionWindow'),
-          read('sessionAllowedTarget'),
-        ]);
-
-        const sessionKey = key as Address;
-        if (sessionKey !== zeroAddress) {
-          const now = Math.floor(Date.now() / 1000);
-          const expiryNum = Number(expiry as bigint);
-          const windowNum = Number((windowSecs as bigint) || 86400n);
-          const lastResetNum = Number(lastReset as bigint);
-          const windowExpired = now >= lastResetNum + windowNum;
-
-          return {
-            sessionKey,
-            expiry: expiryNum,
-            maxPerTx: maxPerTx as bigint,
-            dailyLimit: dailyLimit as bigint,
-            spentToday: spent as bigint,
-            lastReset: lastResetNum,
-            windowSeconds: windowNum,
-            allowedTarget: target as Address,
-            isActive: now < expiryNum,
-            effectiveSpentToday: windowExpired ? 0n : (spent as bigint),
-          };
+          return all
+            .filter((p) => p.active && p.key !== zeroAddress)
+            .map((p) =>
+              hydratePolicy({
+                sessionKey: p.key,
+                kind: p.kind,
+                expiry: Number(p.expiry),
+                maxPerTx: p.maxPerTx,
+                dailyLimit: p.dailyLimit,
+                spent: p.spent,
+                lastReset: Number(p.lastReset),
+                windowSeconds: Number(p.window || 86400n),
+                allowedTarget: p.allowedTarget,
+                active: p.active,
+                label: labelMap.get(p.key.toLowerCase()),
+              })
+            );
+        } catch {
+          // Legacy v2 smart account fallback
+          const read = (fn: string) =>
+            client.readContract({ address: wallet, abi: POLICY_ABI, functionName: fn as any });
+          const [key, expiry, maxPerTx, dailyLimit, spent, lastReset, windowSecs, target] = await Promise.all([
+            read('sessionKey'),
+            read('sessionExpiry'),
+            read('sessionMaxPerTx'),
+            read('sessionDailyLimit'),
+            read('sessionSpentToday'),
+            read('sessionLastReset'),
+            read('sessionWindow'),
+            read('sessionAllowedTarget'),
+          ]);
+          const k = key as Address;
+          if (k !== zeroAddress) {
+            return [
+              hydratePolicy({
+                sessionKey: k,
+                kind: 0,
+                expiry: Number(expiry as bigint),
+                maxPerTx: maxPerTx as bigint,
+                dailyLimit: dailyLimit as bigint,
+                spent: spent as bigint,
+                lastReset: Number(lastReset as bigint),
+                windowSeconds: Number((windowSecs as bigint) || 86400n),
+                allowedTarget: target as Address,
+                label: labelMap.get(k.toLowerCase()),
+              }),
+            ];
+          }
+          return [];
         }
       }
     } catch {
-      // Fall through to local policy state if RPC read fails on counterfactual address
+      // Fall through to counterfactual local cache
     }
   }
 
-  return readLocalPolicyFallback();
+  return local;
+}
+
+export async function readOnChainPolicy(wallet?: Address | null): Promise<OnChainPolicy | null> {
+  const all = await readAllOnChainPolicies(wallet);
+  return all.find((p) => p.kind !== 2) ?? all[0] ?? null;
 }
 
 export type SimulationKind = 'within_limit' | 'over_limit' | 'unapproved_app';
 
 export type SimulationResult = {
-  /** 'approved' = vault policy accepted it, 'blocked' = vault policy reverted it, 'error' = could not simulate */
   verdict: 'approved' | 'blocked' | 'error';
   title: string;
   explanation: string;
-  /** Contract error name, e.g. PerTxLimitExceeded */
   revertName?: string;
-  /** Updated spentToday in USDG units if the simulated trade succeeded */
   newSpentToday?: bigint;
 };
 
@@ -205,7 +372,7 @@ const BLOCK_COPY: Record<string, { title: string; why: (p: OnChainPolicy, amount
   DailyLimitExceeded: {
     title: 'Blocked by your vault (DailyLimitExceeded)',
     why: (p, amt) =>
-      `Adding $${amt.toLocaleString()} USDG to today's $${unitsToUsdg(p.effectiveSpentToday)} USDG spent would exceed your $${unitsToUsdg(p.dailyLimit)} USDG daily cap, so the contract rejected it.`,
+      `Adding $${amt.toLocaleString()} USDG to current $${unitsToUsdg(p.effectiveSpentToday)} USDG spent would exceed your $${unitsToUsdg(p.dailyLimit)} USDG window cap, so the contract rejected it.`,
   },
   TargetNotAllowed: {
     title: 'Blocked by your vault (TargetNotAllowed)',
@@ -233,10 +400,8 @@ function wordHex(val: bigint | number | Address): Hex {
 }
 
 /**
- * Executes a REAL read-only `eth_call` of `executeWithPolicy` on Arbitrum Sepolia
- * against the deployed `StylusSafeAccount` v2 bytecode (`0x0D666af60c511a65d7fe704090632AFE05C932fA`),
- * injecting the active policy's exact storage slots (5..12) so the live EVM contract
- * evaluates `_enforcePolicy` and returns the real Solidity outcome or custom revert error.
+ * Runs a real read-only `eth_call` of `executeWithPolicy` against deployed `StylusSafeAccount` v3
+ * (`0x0242E382976489B6E5aceEB7507a449B01535888`) with the selected policy's limits injected.
  */
 export async function simulateAgentSpend(
   _wallet: Address | null | undefined,
@@ -245,7 +410,12 @@ export async function simulateAgentSpend(
   amountUsdg: number
 ): Promise<SimulationResult> {
   const unapprovedApp: Address = '0x1111111111111111111111111111111111111111';
-  const dest: Address = kind === 'unapproved_app' ? unapprovedApp : policy.allowedTarget;
+  const dest: Address =
+    kind === 'unapproved_app'
+      ? unapprovedApp
+      : policy.allowedTarget === zeroAddress
+        ? '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b'
+        : policy.allowedTarget;
   const units = usdgToUnits(amountUsdg);
 
   const func = encodeFunctionData({
@@ -296,21 +466,29 @@ export async function simulateAgentSpend(
     const json = await resp.json();
 
     if (json?.error) {
-      const rawData: string | undefined =
-        json.error?.data ?? json.error?.error?.data;
+      const rawData: string | undefined = json.error?.data ?? json.error?.error?.data;
 
       if (typeof rawData === 'string' && rawData.startsWith('0x') && rawData.length >= 10) {
         const decoded = decodeErrorResult({ abi: POLICY_ABI, data: rawData as Hex });
 
         if (decoded.errorName === 'CallFailed') {
           const nextSpent = policy.effectiveSpentToday + units;
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('invisible_wallet_session_spent_today', nextSpent.toString());
-          }
+          upsertLocalPolicy({
+            sessionKey: policy.sessionKey,
+            kind: policy.kind,
+            expiry: policy.expiry,
+            maxPerTx: policy.maxPerTx,
+            dailyLimit: policy.dailyLimit,
+            spentToday: nextSpent,
+            lastReset: policy.lastReset,
+            windowSeconds: policy.windowSeconds,
+            allowedTarget: policy.allowedTarget,
+            label: policy.label,
+          });
           return {
             verdict: 'approved',
             title: 'Approved by your vault',
-            explanation: `The deployed Arbitrum Sepolia contract verified that $${amountUsdg.toLocaleString()} USDG is inside your $${unitsToUsdg(policy.maxPerTx)} per-trade cap and $${unitsToUsdg(policy.dailyLimit)} daily limit. Spent today is now $${unitsToUsdg(nextSpent)} / $${unitsToUsdg(policy.dailyLimit)} USDG.`,
+            explanation: `The deployed Arbitrum Sepolia contract verified that $${amountUsdg.toLocaleString()} USDG is inside your $${unitsToUsdg(policy.maxPerTx)} per-trade cap and $${unitsToUsdg(policy.dailyLimit)} window limit. Window spend is now $${unitsToUsdg(nextSpent)} / $${unitsToUsdg(policy.dailyLimit)} USDG.`,
             newSpentToday: nextSpent,
           };
         }
@@ -340,15 +518,11 @@ export async function simulateAgentSpend(
       };
     }
 
-    // Call succeeded cleanly on-chain
     const nextSpent = policy.effectiveSpentToday + units;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('invisible_wallet_session_spent_today', nextSpent.toString());
-    }
     return {
       verdict: 'approved',
       title: 'Approved by your vault',
-      explanation: `The deployed Arbitrum Sepolia contract verified that $${amountUsdg.toLocaleString()} USDG is inside your $${unitsToUsdg(policy.maxPerTx)} per-trade cap and $${unitsToUsdg(policy.dailyLimit)} daily limit. Spent today is now $${unitsToUsdg(nextSpent)} / $${unitsToUsdg(policy.dailyLimit)} USDG.`,
+      explanation: `The deployed Arbitrum Sepolia contract verified that $${amountUsdg.toLocaleString()} USDG is inside your $${unitsToUsdg(policy.maxPerTx)} per-trade cap and $${unitsToUsdg(policy.dailyLimit)} window limit.`,
       newSpentToday: nextSpent,
     };
   } catch (err: any) {
@@ -360,8 +534,8 @@ export async function simulateAgentSpend(
   }
 }
 
-export function useOnChainAgentPolicy(wallet: string | null | undefined) {
-  const [policy, setPolicy] = useState<OnChainPolicy | null>(null);
+export function useOnChainAgentPolicies(wallet: string | null | undefined) {
+  const [policies, setPolicies] = useState<OnChainPolicy[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
@@ -370,13 +544,13 @@ export function useOnChainAgentPolicy(wallet: string | null | undefined) {
     setLoading(true);
     setError(null);
     try {
-      const p = await readOnChainPolicy(wallet ? (wallet as Address) : null);
-      setPolicy(p);
+      const list = await readAllOnChainPolicies(wallet ? (wallet as Address) : null);
+      setPolicies(list);
       setCheckedAt(Date.now());
-      return p;
+      return list;
     } catch (e: any) {
       setError(String(e?.shortMessage || e?.message || 'Could not read the network').slice(0, 160));
-      return null;
+      return [];
     } finally {
       setLoading(false);
     }
@@ -386,5 +560,27 @@ export function useOnChainAgentPolicy(wallet: string | null | undefined) {
     refresh();
   }, [refresh]);
 
-  return { policy, loading, error, checkedAt, refresh };
+  const agentPolicies = policies.filter((p) => p.kind !== 2);
+  const subscriptionPolicies = policies.filter((p) => p.kind === 2);
+  const primaryPolicy = agentPolicies[0] ?? policies[0] ?? null;
+
+  return {
+    policies,
+    agentPolicies,
+    subscriptionPolicies,
+    primaryPolicy,
+    loading,
+    error,
+    checkedAt,
+    refresh,
+  };
+}
+
+export function useOnChainAgentPolicy(wallet: string | null | undefined) {
+  const { primaryPolicy, loading, error, checkedAt, refresh: refreshAll } = useOnChainAgentPolicies(wallet);
+  const refresh = useCallback(async () => {
+    const list = await refreshAll();
+    return list.find((p) => p.kind !== 2) ?? list[0] ?? null;
+  }, [refreshAll]);
+  return { policy: primaryPolicy, loading, error, checkedAt, refresh };
 }

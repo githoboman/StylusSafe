@@ -737,26 +737,26 @@ export default function LandingPage() {
 
             <div className="bg-[#141418] border border-white/[0.08] rounded-2xl overflow-hidden font-mono text-xs sm:text-sm divide-y divide-white/[0.06]">
               <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-zinc-400">Wallet Factory (CREATE2)</span>
+                <span className="text-zinc-400">Wallet Factory v3 (CREATE2)</span>
                 <a
-                  href="https://sepolia.arbiscan.io/address/0xd364b7339099E7633015FD5Cda7e21d4c40833f7"
+                  href="https://sepolia.arbiscan.io/address/0x1168B0CBc316d9194Eff58e2A27F1FfD33904465"
                   target="_blank"
                   rel="noreferrer"
                   className="text-white hover:text-[#ff4500] transition-colors inline-flex items-center gap-1.5"
                 >
-                  <span className="truncate">0xd364b7339099E7633015FD5Cda7e21d4c40833f7</span>
+                  <span className="truncate">0x1168B0CBc316d9194Eff58e2A27F1FfD33904465</span>
                   <IconArrowUpRight size={14} className="shrink-0" />
                 </a>
               </div>
               <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-zinc-400">Smart Account Vault v2</span>
+                <span className="text-zinc-400">Smart Account Vault v3 (ERC-7579)</span>
                 <a
-                  href="https://sepolia.arbiscan.io/address/0x0D666af60c511a65d7fe704090632AFE05C932fA"
+                  href="https://sepolia.arbiscan.io/address/0x0242E382976489B6E5aceEB7507a449B01535888"
                   target="_blank"
                   rel="noreferrer"
                   className="text-white hover:text-[#ff4500] transition-colors inline-flex items-center gap-1.5"
                 >
-                  <span className="truncate">0xd666af60c511a65d7fe704090632AFE05C932fA</span>
+                  <span className="truncate">0x0242E382976489B6E5aceEB7507a449B01535888</span>
                   <IconArrowUpRight size={14} className="shrink-0" />
                 </a>
               </div>

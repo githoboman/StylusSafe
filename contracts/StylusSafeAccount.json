@@ -87,6 +87,106 @@
   },
   {
     "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "module",
+        "type": "address"
+      }
+    ],
+    "name": "ModuleInstalled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "module",
+        "type": "address"
+      }
+    ],
+    "name": "ModuleUninstalled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      }
+    ],
+    "name": "PolicyRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "kind",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "expiry",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxPerTx",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "dailyLimit",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "allowedTarget",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "window",
+        "type": "uint256"
+      }
+    ],
+    "name": "PolicyUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
     "inputs": [],
     "name": "SessionKeyRevoked",
     "type": "event"
@@ -158,6 +258,84 @@
     ],
     "name": "WalletInitialized",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "MODULE_TYPE_EXECUTOR",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MODULE_TYPE_VALIDATOR",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "POLICY_AGENT",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "POLICY_DCA",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "POLICY_SUBSCRIPTION",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "accountId",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
   },
   {
     "inputs": [
@@ -239,6 +417,62 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      },
+      {
+        "internalType": "address[]",
+        "name": "dest",
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "value",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "func",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "executeAsAgentBatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "dest",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "func",
+        "type": "bytes"
+      }
+    ],
+    "name": "executeAsAgentFor",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address[]",
         "name": "dest",
         "type": "address[]"
@@ -283,6 +517,142 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getAllPolicies",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "key",
+            "type": "address"
+          },
+          {
+            "internalType": "uint48",
+            "name": "expiry",
+            "type": "uint48"
+          },
+          {
+            "internalType": "uint8",
+            "name": "kind",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxPerTx",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyLimit",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "spent",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastReset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "allowedTarget",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "window",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct StylusSafeAccount.Policy[]",
+        "name": "list",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      }
+    ],
+    "name": "getPolicy",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "key",
+            "type": "address"
+          },
+          {
+            "internalType": "uint48",
+            "name": "expiry",
+            "type": "uint48"
+          },
+          {
+            "internalType": "uint8",
+            "name": "kind",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxPerTx",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "dailyLimit",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "spent",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastReset",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "allowedTarget",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "window",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct StylusSafeAccount.Policy",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -311,6 +681,58 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "module",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "initData",
+        "type": "bytes"
+      }
+    ],
+    "name": "installModule",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "module",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "name": "isModuleInstalled",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "origin",
     "outputs": [
@@ -318,6 +740,19 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "policyCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -338,6 +773,19 @@
   },
   {
     "inputs": [],
+    "name": "revokeSessionKey",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "key",
+        "type": "address"
+      }
+    ],
     "name": "revokeSessionKey",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -497,6 +945,49 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "key",
+        "type": "address"
+      },
+      {
+        "internalType": "uint8",
+        "name": "kind",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expiry",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxPerTx",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "dailyLimit",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "allowedTarget",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "windowSeconds",
+        "type": "uint256"
+      }
+    ],
+    "name": "setPolicy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "payee",
         "type": "address"
       },
@@ -527,6 +1018,48 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      }
+    ],
+    "name": "supportsModule",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "moduleTypeId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "module",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "name": "uninstallModule",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

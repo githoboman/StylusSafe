@@ -90,16 +90,26 @@ export type InvisibleWallet = {
         arg6?: any,
         arg7?: any
     ) => Promise<{ userOpHash: string } | null>;
+    executeAgentSwap: (params: {
+        sourceChainId: number;
+        destChainId: number;
+        fromToken: string;
+        toToken: string;
+        amount: bigint;
+        fromDecimals: number;
+        recipient?: `0x${string}`;
+        sessionKey?: `0x${string}`;
+    }) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
-    setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}` }, pin?: string) => Promise<{ userOpHash: string } | null>;
-    revokeSessionKey: (pin?: string) => Promise<{ userOpHash: string } | null>;
+    setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}`; kind?: 0 | 1 | 2; windowSeconds?: number }, pin?: string) => Promise<{ userOpHash: string } | null>;
+    revokeSessionKey: (keyOrPin?: string, pin?: string) => Promise<{ userOpHash: string } | null>;
     setupDCA: (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
-// ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
-const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
+// ── Canonical Deployed Addresses on Arbitrum Sepolia (v3 Multi-Policy & ERC-7579) ──
+const CANONICAL_FACTORY = '0x1168B0CBc316d9194Eff58e2A27F1FfD33904465' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const FALLBACK_PUBLIC_RPC = 'https://sepolia-rollup.arbitrum.io/rpc';
 
@@ -795,7 +805,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     const submitUserOp = async (
         callData: `0x${string}`,
         pin?: string,
-        overrideChainId?: number
+        overrideChainId?: number,
+        customSignatureBuilder?: (userOpHashHex: `0x${string}`) => Promise<`0x${string}`>
     ): Promise<string> => {
         const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
         if (!currentAddress) throw new Error('Wallet not initialized.');
@@ -906,21 +917,25 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }) as `0x${string}`;
 
         const userOpHashBytes = hexToUint8Array(userOpHashHex.slice(2));
-        const webauthnSig = await signAuthEntry(userOpHashBytes, pin);
-        if (!webauthnSig) throw new Error('Failed to sign UserOperation.');
+        if (customSignatureBuilder) {
+            userOp.signature = await customSignatureBuilder(userOpHashHex);
+        } else {
+            const webauthnSig = await signAuthEntry(userOpHashBytes, pin);
+            if (!webauthnSig) throw new Error('Failed to sign UserOperation.');
 
-        // Format: abi.encode(bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s)
-        const viem = await import('viem');
-        const encoded = viem.encodeAbiParameters(
-            viem.parseAbiParameters('bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s'),
-            [
-                toHex(webauthnSig.authData),
-                toHex(webauthnSig.clientDataJSON),
-                toHex(webauthnSig.signature.slice(0, 32)),
-                toHex(webauthnSig.signature.slice(32, 64)),
-            ]
-        );
-        userOp.signature = encoded;
+            // Format: abi.encode(bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s)
+            const viem = await import('viem');
+            const encoded = viem.encodeAbiParameters(
+                viem.parseAbiParameters('bytes authData, bytes clientDataJSON, bytes32 r, bytes32 s'),
+                [
+                    toHex(webauthnSig.authData),
+                    toHex(webauthnSig.clientDataJSON),
+                    toHex(webauthnSig.signature.slice(0, 32)),
+                    toHex(webauthnSig.signature.slice(32, 64)),
+                ]
+            );
+            userOp.signature = encoded;
+        }
 
         // Submit UserOp to real ERC-4337 bundler (no fake local hash fallback)
         if (!liveBundler) {
@@ -1065,13 +1080,222 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    // ── Session Policies & Spending Firewall ──────────────────────────────────
+    // ── Session Policies & Spending Firewall (Multi-Policy v3) ─────────────────
+
+    const loadSessionPrivateKey = async (sessionKeyAddr?: string): Promise<`0x${string}` | null> => {
+        if (sessionKeyAddr) {
+            try {
+                const rawMap = await getPersistItem('stylussafe_session_pks');
+                const map = JSON.parse(rawMap || '{}') as Record<string, string>;
+                const found = map[sessionKeyAddr.toLowerCase()];
+                if (found && found.startsWith('0x')) return found as `0x${string}`;
+            } catch {}
+        }
+        const legacy = (await getPersistItem('invisible_wallet_session_pk')) || (await getPersistItem('stylussafe_agent_helper_pk'));
+        return legacy && legacy.startsWith('0x') ? (legacy as `0x${string}`) : null;
+    };
+
+    const saveSessionPrivateKey = async (sessionKeyAddr: string, pk: string) => {
+        try {
+            const rawMap = await getPersistItem('stylussafe_session_pks');
+            const map = JSON.parse(rawMap || '{}') as Record<string, string>;
+            map[sessionKeyAddr.toLowerCase()] = pk;
+            await setPersistItem('stylussafe_session_pks', JSON.stringify(map));
+        } catch {}
+    };
+
+    const executeAgentSwap = async (params: {
+        sourceChainId: number;
+        destChainId: number;
+        fromToken: string;
+        toToken: string;
+        amount: bigint;
+        fromDecimals: number;
+        recipient?: `0x${string}`;
+        sessionKey?: `0x${string}`;
+    }): Promise<{ userOpHash: string } | null> => {
+        setIsPending(true);
+        setError(null);
+        try {
+            await refreshTokenPrices();
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
+            if (!currentAddress) throw new Error('Wallet not initialized.');
+
+            const fromFloat = Number(formatUnits(params.amount, params.fromDecimals));
+            const usdSpendUnits = BigInt(Math.round(fromFloat * (TOKEN_USD_PRICES[params.fromToken.toUpperCase()] ?? 1.0) * 1_000_000));
+
+            const liveRpc = resolveChainEndpoint(rpcUrl, 421614);
+            const publicClient = createPublicClient({ chain: { id: 421614 } as any, transport: http(liveRpc) });
+
+            let targetKey = params.sessionKey;
+            let maxPerTx = 0n;
+            let dailyLimit = 0n;
+            let spentToday = 0n;
+            let expiry = 0;
+            let allowedTarget = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+
+            const zeroAddr = '0x0000000000000000000000000000000000000000';
+            if (targetKey) {
+                const pol = await publicClient.readContract({
+                    address: currentAddress as `0x${string}`,
+                    abi: [{
+                        type: 'function',
+                        name: 'getPolicy',
+                        stateMutability: 'view',
+                        inputs: [{ name: 'key', type: 'address' }],
+                        outputs: [{
+                            type: 'tuple',
+                            components: [
+                                { name: 'key', type: 'address' },
+                                { name: 'expiry', type: 'uint48' },
+                                { name: 'kind', type: 'uint8' },
+                                { name: 'active', type: 'bool' },
+                                { name: 'maxPerTx', type: 'uint256' },
+                                { name: 'dailyLimit', type: 'uint256' },
+                                { name: 'spent', type: 'uint256' },
+                                { name: 'lastReset', type: 'uint256' },
+                                { name: 'allowedTarget', type: 'address' },
+                                { name: 'window', type: 'uint256' },
+                            ],
+                        }],
+                    }],
+                    functionName: 'getPolicy',
+                    args: [targetKey],
+                }).catch(() => null) as any;
+
+                if (pol && pol.active) {
+                    maxPerTx = pol.maxPerTx;
+                    dailyLimit = pol.dailyLimit;
+                    spentToday = pol.spent;
+                    expiry = Number(pol.expiry);
+                    allowedTarget = pol.allowedTarget;
+                }
+            }
+
+            if (dailyLimit === 0n) {
+                const [onChainKey, onChainTarget, onChainPerTx, onChainDaily, onChainSpent, onChainExpiry] = await Promise.all([
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionKey', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }], functionName: 'sessionKey' }).catch(() => zeroAddr),
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionAllowedTarget', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] }], functionName: 'sessionAllowedTarget' }).catch(() => zeroAddr),
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionMaxPerTx', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }], functionName: 'sessionMaxPerTx' }).catch(() => 0n),
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionDailyLimit', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }], functionName: 'sessionDailyLimit' }).catch(() => 0n),
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionSpentToday', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }], functionName: 'sessionSpentToday' }).catch(() => 0n),
+                    publicClient.readContract({ address: currentAddress as `0x${string}`, abi: [{ type: 'function', name: 'sessionExpiry', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }], functionName: 'sessionExpiry' }).catch(() => 0n),
+                ]);
+
+                const maxStr = await getPersistItem('invisible_wallet_session_max_per_tx');
+                const dailyStr = await getPersistItem('invisible_wallet_session_daily_limit');
+                const spentStr = await getPersistItem('invisible_wallet_session_spent_today');
+                const expStr = await getPersistItem('invisible_wallet_session_expiry');
+
+                targetKey = targetKey || (onChainKey !== zeroAddr ? (onChainKey as `0x${string}`) : undefined);
+                maxPerTx = maxStr ? BigInt(maxStr) : (onChainPerTx as bigint);
+                dailyLimit = dailyStr ? BigInt(dailyStr) : (onChainDaily as bigint);
+                spentToday = spentStr ? BigInt(spentStr) : (onChainSpent as bigint);
+                expiry = expStr ? Number(expStr) : Number(onChainExpiry as bigint);
+                allowedTarget = onChainTarget as `0x${string}`;
+            }
+
+            if (dailyLimit === 0n || maxPerTx === 0n || expiry === 0) {
+                throw new Error('Agent Firewall Blocked: No AI allowance configured. Set rules on Session Keys first.');
+            }
+            if (expiry <= Math.floor(Date.now() / 1000)) {
+                throw new Error('Agent Firewall Blocked: Session key expired.');
+            }
+            if (usdSpendUnits > maxPerTx) {
+                throw new Error(`Agent Firewall Blocked (PerTxLimitExceeded): $${(Number(usdSpendUnits) / 1e6).toFixed(2)} exceeds $${(Number(maxPerTx) / 1e6).toFixed(2)} cap.`);
+            }
+            if (spentToday + usdSpendUnits > dailyLimit) {
+                throw new Error(`Agent Firewall Blocked (DailyLimitExceeded): Exceeds $${(Number(dailyLimit) / 1e6).toFixed(2)} cap.`);
+            }
+
+            const fromMeta = resolveSepoliaSwapToken(params.fromToken);
+            const toMeta = resolveSepoliaSwapToken(params.toToken);
+            const savedSessionPk = await loadSessionPrivateKey(targetKey);
+            const { privateKeyToAccount } = await import('viem/accounts');
+            const sessionAccount = savedSessionPk ? privateKeyToAccount(savedSessionPk) : null;
+            const settlementRecipient = (params.recipient || currentAddress) as `0x${string}`;
+
+            const supportsV3Batch = await publicClient.readContract({
+                address: currentAddress as `0x${string}`,
+                abi: [{ type: 'function', name: 'supportsModule', stateMutability: 'view', inputs: [{ name: 'moduleTypeId', type: 'uint256' }], outputs: [{ type: 'bool' }] }],
+                functionName: 'supportsModule',
+                args: [1n],
+            }).catch(() => false);
+
+            const targetAllowed = allowedTarget === zeroAddr || allowedTarget.toLowerCase() === SWAP_POOL_ADDRESS.toLowerCase();
+            let userOpHash: string | null = null;
+
+            if (
+                supportsV3Batch &&
+                sessionAccount &&
+                targetKey &&
+                sessionAccount.address.toLowerCase() === targetKey.toLowerCase() &&
+                targetAllowed &&
+                params.sourceChainId === 421614 &&
+                fromMeta &&
+                toMeta &&
+                fromMeta.address.toLowerCase() !== toMeta.address.toLowerCase() &&
+                params.amount <= maxPerTx
+            ) {
+                const expectedOut = await publicClient.readContract({
+                    address: SWAP_POOL_ADDRESS,
+                    abi: SWAP_POOL_ABI,
+                    functionName: 'getAmountOut',
+                    args: [fromMeta.address, toMeta.address, params.amount],
+                }) as bigint;
+                if (expectedOut <= 0n) throw new Error('SwapPool quoted 0 output.');
+                const minAmountOut = (expectedOut * 98n) / 100n;
+                const approveData = encodeFunctionData({
+                    abi: ERC20_SWAP_ABI,
+                    functionName: 'approve',
+                    args: [SWAP_POOL_ADDRESS, params.amount],
+                });
+                const swapData = encodeFunctionData({
+                    abi: SWAP_POOL_ABI,
+                    functionName: 'swap',
+                    args: [fromMeta.address, toMeta.address, params.amount, minAmountOut, settlementRecipient],
+                });
+                const agentBatch = encodeFunctionData({
+                    abi: [{ type: 'function', name: 'executeAsAgentBatch', stateMutability: 'nonpayable', inputs: [{ name: 'key', type: 'address' }, { name: 'dest', type: 'address[]' }, { name: 'value', type: 'uint256[]' }, { name: 'func', type: 'bytes[]' }], outputs: [] }],
+                    functionName: 'executeAsAgentBatch',
+                    args: [targetKey, [fromMeta.address, SWAP_POOL_ADDRESS], [0n, 0n], [approveData, swapData]],
+                });
+                userOpHash = await submitUserOp(agentBatch, undefined, 421614, async (opHashHex) => {
+                    const rawSig = await sessionAccount.sign({ hash: opHashHex });
+                    return `0x01${rawSig.slice(2)}` as `0x${string}`;
+                });
+            }
+
+            if (!userOpHash) {
+                const targetRpc = resolveChainEndpoint(rpcUrl, params.sourceChainId);
+                const ownerCallData = await buildCrossChainSwapCallData({
+                    currentAddress: currentAddress as `0x${string}`,
+                    sourceChainId: params.sourceChainId,
+                    destChainId: params.destChainId,
+                    fromToken: params.fromToken,
+                    toToken: params.toToken,
+                    amount: params.amount,
+                    recipient: settlementRecipient,
+                    rpcEndpoint: targetRpc,
+                });
+                userOpHash = await submitUserOp(ownerCallData, undefined, params.sourceChainId);
+            }
+
+            await setPersistItem('invisible_wallet_session_spent_today', (spentToday + usdSpendUnits).toString());
+            return { userOpHash };
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
+            throw err;
+        } finally {
+            setIsPending(false);
+        }
+    };
 
     const createSessionKey = async (durationHours: number, pin?: string): Promise<{ sessionKey: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
             const { generatePrivateKey, privateKeyToAccount } = await import('viem/accounts');
@@ -1092,12 +1316,12 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 args: [currentAddress as `0x${string}`, 0n, callData],
             });
 
-            const userOpHash = await submitUserOp(walletCallData, pin);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('invisible_wallet_session_key', sessionKeyAddress);
-                localStorage.setItem('invisible_wallet_session_pk', ephemeralPk);
-                localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
-            }
+            await submitUserOp(walletCallData, pin);
+            await saveSessionPrivateKey(sessionKeyAddress, ephemeralPk);
+            await setPersistItem('invisible_wallet_session_key', sessionKeyAddress);
+            await setPersistItem('invisible_wallet_session_pk', ephemeralPk);
+            await setPersistItem('stylussafe_agent_helper_pk', ephemeralPk);
+            await setPersistItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
 
             return { sessionKey: sessionKeyAddress };
         } catch (err: unknown) {
@@ -1115,40 +1339,71 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             maxPerTx: bigint;
             dailyLimit: bigint;
             allowedTarget: `0x${string}`;
+            kind?: 0 | 1 | 2;
+            windowSeconds?: number;
         },
         pin?: string
     ): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
             const expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + params.durationHours * 3600);
+            const useExtendedPolicy = params.kind !== undefined || params.windowSeconds !== undefined;
 
-            const callData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'setAgentPolicy',
-                    inputs: [
-                        { name: 'key', type: 'address' },
-                        { name: 'expiry', type: 'uint256' },
-                        { name: 'maxPerTx', type: 'uint256' },
-                        { name: 'dailyLimit', type: 'uint256' },
-                        { name: 'allowedTarget', type: 'address' }
+            const callData = useExtendedPolicy
+                ? encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'setPolicy',
+                        inputs: [
+                            { name: 'key', type: 'address' },
+                            { name: 'kind', type: 'uint8' },
+                            { name: 'expiry', type: 'uint256' },
+                            { name: 'maxPerTx', type: 'uint256' },
+                            { name: 'dailyLimit', type: 'uint256' },
+                            { name: 'allowedTarget', type: 'address' },
+                            { name: 'windowSeconds', type: 'uint256' },
+                        ],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'setPolicy',
+                    args: [
+                        params.sessionKey,
+                        params.kind ?? 0,
+                        expiryTimestamp,
+                        params.maxPerTx,
+                        params.dailyLimit,
+                        params.allowedTarget,
+                        BigInt(params.windowSeconds ?? 86400),
                     ],
-                    outputs: [],
-                    stateMutability: 'nonpayable'
-                }],
-                functionName: 'setAgentPolicy',
-                args: [
-                    params.sessionKey,
-                    expiryTimestamp,
-                    params.maxPerTx,
-                    params.dailyLimit,
-                    params.allowedTarget
-                ],
-            });
+                })
+                : encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'setAgentPolicy',
+                        inputs: [
+                            { name: 'key', type: 'address' },
+                            { name: 'expiry', type: 'uint256' },
+                            { name: 'maxPerTx', type: 'uint256' },
+                            { name: 'dailyLimit', type: 'uint256' },
+                            { name: 'allowedTarget', type: 'address' },
+                        ],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'setAgentPolicy',
+                    args: [
+                        params.sessionKey,
+                        expiryTimestamp,
+                        params.maxPerTx,
+                        params.dailyLimit,
+                        params.allowedTarget,
+                    ],
+                });
 
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
@@ -1157,12 +1412,13 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             const userOpHash = await submitUserOp(walletCallData, pin);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('invisible_wallet_session_key', params.sessionKey);
-                localStorage.setItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
-                localStorage.setItem('invisible_wallet_session_max_per_tx', params.maxPerTx.toString());
-                localStorage.setItem('invisible_wallet_session_daily_limit', params.dailyLimit.toString());
-                localStorage.setItem('invisible_wallet_session_target', params.allowedTarget);
+            if (params.kind !== 2) {
+                await setPersistItem('invisible_wallet_session_key', params.sessionKey);
+                await setPersistItem('invisible_wallet_session_expiry', expiryTimestamp.toString());
+                await setPersistItem('invisible_wallet_session_max_per_tx', params.maxPerTx.toString());
+                await setPersistItem('invisible_wallet_session_daily_limit', params.dailyLimit.toString());
+                await setPersistItem('invisible_wallet_session_target', params.allowedTarget);
+                await setPersistItem('invisible_wallet_session_spent_today', '0');
             }
             return { userOpHash };
         } catch (err: unknown) {
@@ -1173,24 +1429,28 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    const revokeSessionKey = async (pin?: string): Promise<{ userOpHash: string } | null> => {
+    const revokeSessionKey = async (keyOrPin?: string, maybePin?: string): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            const callData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'revokeSessionKey',
-                    inputs: [],
-                    outputs: [],
-                    stateMutability: 'nonpayable'
-                }],
-                functionName: 'revokeSessionKey',
-                args: [],
-            });
+            const isAddr = Boolean(keyOrPin && /^0x[0-9a-fA-F]{40}$/.test(keyOrPin));
+            const targetKey = isAddr ? (keyOrPin as `0x${string}`) : undefined;
+            const pin = isAddr ? maybePin : keyOrPin;
+
+            const callData = targetKey
+                ? encodeFunctionData({
+                    abi: [{ type: 'function', name: 'revokeSessionKey', inputs: [{ name: 'key', type: 'address' }], outputs: [], stateMutability: 'nonpayable' }],
+                    functionName: 'revokeSessionKey',
+                    args: [targetKey],
+                })
+                : encodeFunctionData({
+                    abi: [{ type: 'function', name: 'revokeSessionKey', inputs: [], outputs: [], stateMutability: 'nonpayable' }],
+                    functionName: 'revokeSessionKey',
+                    args: [],
+                });
 
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
@@ -1199,13 +1459,14 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             const userOpHash = await submitUserOp(walletCallData, pin);
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('invisible_wallet_session_key');
-                localStorage.removeItem('invisible_wallet_session_pk');
-                localStorage.removeItem('invisible_wallet_session_expiry');
-                localStorage.removeItem('invisible_wallet_session_max_per_tx');
-                localStorage.removeItem('invisible_wallet_session_daily_limit');
-                localStorage.removeItem('invisible_wallet_session_target');
+            const activeKey = await getPersistItem('invisible_wallet_session_key');
+            if (!targetKey || (activeKey && targetKey.toLowerCase() === activeKey.toLowerCase())) {
+                await removePersistItem('invisible_wallet_session_key');
+                await removePersistItem('invisible_wallet_session_pk');
+                await removePersistItem('invisible_wallet_session_expiry');
+                await removePersistItem('invisible_wallet_session_max_per_tx');
+                await removePersistItem('invisible_wallet_session_daily_limit');
+                await removePersistItem('invisible_wallet_session_target');
             }
             return { userOpHash };
         } catch (err: unknown) {
@@ -1220,11 +1481,9 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            // StylusSafeAccount.setupSubscription reverts (InvalidPolicy) for a zero payee or the account itself.
-            // The payee must be chosen by the user; there is no default recipient.
             if (!payee || !/^0x[0-9a-fA-F]{40}$/.test(payee)) {
                 throw new Error('Enter a valid payee address (0x followed by 40 characters).');
             }
@@ -1256,7 +1515,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         setIsPending(true);
         setError(null);
         try {
-            const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
+            const currentAddress = address || (await getPersistItem('invisible_wallet_address'));
             if (!currentAddress) throw new Error('Wallet not initialized.');
             if (!intents.length) throw new Error('Intent batch is empty.');
 
@@ -1283,6 +1542,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
     return { 
         address, isPending, error, hasMounted,
         register, deploy, signAuthEntry, login, recoverWithBiometrics, disconnect,
-        sendTransaction, executeCrossChainSwap, createSessionKey, setAgentPolicy, revokeSessionKey, setupDCA, executeIntentBatch
+        sendTransaction, executeCrossChainSwap, executeAgentSwap, createSessionKey, setAgentPolicy, revokeSessionKey, setupDCA, executeIntentBatch
     };
 }

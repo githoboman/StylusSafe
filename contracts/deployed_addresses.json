@@ -1,20 +1,21 @@
 {
   "network": "arbitrum-sepolia",
   "chainId": 421614,
-  "implementation": "0x0D666af60c511a65d7fe704090632AFE05C932fA",
-  "factory": "0xd364b7339099E7633015FD5Cda7e21d4c40833f7",
-  "sampleWallet": "0x9d5EA063C233b08deBF8DC4968A209a33c589Ad6",
+  "implementation": "0x0242E382976489B6E5aceEB7507a449B01535888",
+  "factory": "0x1168B0CBc316d9194Eff58e2A27F1FfD33904465",
+  "sampleWallet": "0xa6aa360499e839D077E295EC78402BF229BdBF2c",
   "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-  "timestamp": "2026-11-01T21:34:19.502Z",
+  "timestamp": "2026-11-10T18:39:42.614Z",
   "usdg": "0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36",
-  "version": "v2",
+  "version": "v3",
   "deployTxs": {
-    "implementation": "0xbf84d82eccd43c274948af16df01e16be45762cbe23a9a4a0898519052ac89cf",
-    "factory": "0xf9c9b7e15d39c34167121315fecb09311f12bbe49557516e24da027a1aabf610"
+    "implementation": "0x2c2a1a2d248671c911f2ea9533a81e690d94364afef6046a9e3dcd77481ba666",
+    "factory": "0x0b228fc087903fa9b79fdc885f34ea8c05909b04c3ff59c1e76b2e7fc6286602"
   },
   "previous": {
-    "implementation": "0x845fBB0fA34f65204C7Cd40a03327A66Adc5E969",
-    "factory": "0xAB283BA59EA6E9448c5C105d7afB12d73727c864"
+    "implementation": "0x0D666af60c511a65d7fe704090632AFE05C932fA",
+    "factory": "0xd364b7339099E7633015FD5Cda7e21d4c40833f7",
+    "version": "v2"
   },
-  "verifiedChecks": 15
+  "verifiedChecks": 10
 }

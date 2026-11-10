@@ -82,14 +82,14 @@ export type InvisibleWallet = {
     ) => Promise<{ userOpHash: string } | null>;
     sendTransaction: (tokenAddress: `0x${string}` | null, amount: bigint, recipient: `0x${string}`, pin?: string) => Promise<{ userOpHash: string } | null>;
     createSessionKey: (durationHours: number, pin?: string) => Promise<{ sessionKey: string } | null>;
-    setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}` }, pin?: string) => Promise<{ userOpHash: string } | null>;
-    revokeSessionKey: (pin?: string) => Promise<{ userOpHash: string } | null>;
+    setAgentPolicy: (params: { sessionKey: `0x${string}`; durationHours: number; maxPerTx: bigint; dailyLimit: bigint; allowedTarget: `0x${string}`; kind?: 0 | 1 | 2; windowSeconds?: number }, pin?: string) => Promise<{ userOpHash: string } | null>;
+    revokeSessionKey: (keyOrPin?: string, pin?: string) => Promise<{ userOpHash: string } | null>;
     setupDCA: (payee: `0x${string}`, amount: bigint, frequencyDays: number, pin?: string) => Promise<boolean>;
     executeIntentBatch: (intents: any[], pin?: string) => Promise<{ userOpHash: string } | null>;
 };
 
-// ── Canonical Deployed Addresses on Arbitrum Sepolia (v2 Hardened) ────────────
-const CANONICAL_FACTORY = '0xd364b7339099E7633015FD5Cda7e21d4c40833f7' as `0x${string}`;
+// ── Canonical Deployed Addresses on Arbitrum Sepolia (v3 Multi-Policy & ERC-7579) ──
+const CANONICAL_FACTORY = '0x1168B0CBc316d9194Eff58e2A27F1FfD33904465' as `0x${string}`;
 const CANONICAL_ENTRY_POINT = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789' as `0x${string}`;
 const USDG_ADDRESS = '0xDa4D294858C44c83D72A0Cc6c1015A9e03A3BD36' as `0x${string}`;
 export const SWAP_POOL_ADDRESS = '0xD306521Ff547Ab4523f0a77cb9EaE53873be143b' as `0x${string}`;
@@ -965,6 +965,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             maxPerTx: bigint;
             dailyLimit: bigint;
             allowedTarget: `0x${string}`;
+            kind?: 0 | 1 | 2;
+            windowSeconds?: number;
         },
         pin?: string
     ): Promise<{ userOpHash: string } | null> => {
@@ -975,30 +977,59 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
             const expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + params.durationHours * 3600);
+            const useExtendedPolicy = params.kind !== undefined || params.windowSeconds !== undefined;
 
-            const callData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'setAgentPolicy',
-                    inputs: [
-                        { name: 'key', type: 'address' },
-                        { name: 'expiry', type: 'uint256' },
-                        { name: 'maxPerTx', type: 'uint256' },
-                        { name: 'dailyLimit', type: 'uint256' },
-                        { name: 'allowedTarget', type: 'address' }
+            const callData = useExtendedPolicy
+                ? encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'setPolicy',
+                        inputs: [
+                            { name: 'key', type: 'address' },
+                            { name: 'kind', type: 'uint8' },
+                            { name: 'expiry', type: 'uint256' },
+                            { name: 'maxPerTx', type: 'uint256' },
+                            { name: 'dailyLimit', type: 'uint256' },
+                            { name: 'allowedTarget', type: 'address' },
+                            { name: 'windowSeconds', type: 'uint256' },
+                        ],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'setPolicy',
+                    args: [
+                        params.sessionKey,
+                        params.kind ?? 0,
+                        expiryTimestamp,
+                        params.maxPerTx,
+                        params.dailyLimit,
+                        params.allowedTarget,
+                        BigInt(params.windowSeconds ?? 86400),
                     ],
-                    outputs: [],
-                    stateMutability: 'nonpayable'
-                }],
-                functionName: 'setAgentPolicy',
-                args: [
-                    params.sessionKey,
-                    expiryTimestamp,
-                    params.maxPerTx,
-                    params.dailyLimit,
-                    params.allowedTarget
-                ],
-            });
+                })
+                : encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'setAgentPolicy',
+                        inputs: [
+                            { name: 'key', type: 'address' },
+                            { name: 'expiry', type: 'uint256' },
+                            { name: 'maxPerTx', type: 'uint256' },
+                            { name: 'dailyLimit', type: 'uint256' },
+                            { name: 'allowedTarget', type: 'address' },
+                        ],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'setAgentPolicy',
+                    args: [
+                        params.sessionKey,
+                        expiryTimestamp,
+                        params.maxPerTx,
+                        params.dailyLimit,
+                        params.allowedTarget,
+                    ],
+                });
 
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
@@ -1023,24 +1054,40 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
         }
     };
 
-    const revokeSessionKey = async (pin?: string): Promise<{ userOpHash: string } | null> => {
+    const revokeSessionKey = async (keyOrPin?: string, maybePin?: string): Promise<{ userOpHash: string } | null> => {
         setIsPending(true);
         setError(null);
         try {
             const currentAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('invisible_wallet_address') : null);
             if (!currentAddress) throw new Error('Wallet not initialized.');
 
-            const callData = encodeFunctionData({
-                abi: [{
-                    type: 'function',
-                    name: 'revokeSessionKey',
-                    inputs: [],
-                    outputs: [],
-                    stateMutability: 'nonpayable'
-                }],
-                functionName: 'revokeSessionKey',
-                args: [],
-            });
+            const isAddr = Boolean(keyOrPin && /^0x[0-9a-fA-F]{40}$/.test(keyOrPin));
+            const targetKey = isAddr ? (keyOrPin as `0x${string}`) : undefined;
+            const pin = isAddr ? maybePin : keyOrPin;
+
+            const callData = targetKey
+                ? encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'revokeSessionKey',
+                        inputs: [{ name: 'key', type: 'address' }],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'revokeSessionKey',
+                    args: [targetKey],
+                })
+                : encodeFunctionData({
+                    abi: [{
+                        type: 'function',
+                        name: 'revokeSessionKey',
+                        inputs: [],
+                        outputs: [],
+                        stateMutability: 'nonpayable',
+                    }],
+                    functionName: 'revokeSessionKey',
+                    args: [],
+                });
 
             const walletCallData = encodeFunctionData({
                 abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'dest', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'func', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }],
@@ -1049,7 +1096,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             });
 
             const userOpHash = await submitUserOp(walletCallData, pin);
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && (!targetKey || targetKey.toLowerCase() === (localStorage.getItem('invisible_wallet_session_key') || '').toLowerCase())) {
                 localStorage.removeItem('invisible_wallet_session_key');
                 localStorage.removeItem('invisible_wallet_session_pk');
                 localStorage.removeItem('invisible_wallet_session_expiry');

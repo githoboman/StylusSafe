@@ -1,14 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPublicClient, formatUnits, http } from 'viem';
 import { useInvisibleWallet } from '@/sdk_local/src/useInvisibleWallet';
-import { useBalances } from '@/hooks/useBalances';
+import { SEPOLIA_SWAP_TOKENS, SWAP_POOL_ADDRESS, useBalances } from '@/hooks/useBalances';
 import { SignModal } from '@/components/SignModal';
 import { IconSwapVert, IconCheck, IconShield, IconFingerprint, IconArrowUpRight } from '@/components/Icons';
 import { FALLBACK_TOKEN_USD_PRICES, fetchLifiQuote, fetchLiveTokenPrices, type LifiQuote } from '@/lib/lifi';
-import { unitsToUsdg, useOnChainAgentPolicy } from '@/lib/agentPolicy';
+import { POLICY_KIND_LABELS, unitsToUsdg, useOnChainAgentPolicies } from '@/lib/agentPolicy';
+
+const SWAP_POOL_QUOTE_ABI = [
+  {
+    type: 'function',
+    name: 'getAmountOut',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'tokenIn', type: 'address' },
+      { name: 'tokenOut', type: 'address' },
+      { name: 'amountIn', type: 'uint256' },
+    ],
+    outputs: [{ name: 'amountOut', type: 'uint256' }],
+  },
+] as const;
 
 const TOKENS = [
   { symbol: 'USDG', name: 'Global Dollar (Treasury)', decimals: 6, isNative: true },
@@ -37,32 +52,41 @@ export default function TransferPage() {
   const [selectedToken, setSelectedToken] = useState(TOKENS[0]);
   const [selectedDestToken, setSelectedDestToken] = useState(TOKENS[1]);
   const [selectedSourceChain, setSelectedSourceChain] = useState(CHAINS[0]);
-  const [selectedDestChain, setSelectedDestChain] = useState(CHAINS[1]);
+  const [selectedDestChain, setSelectedDestChain] = useState(CHAINS[0]);
   const [executionMode, setExecutionMode] = useState<'personal' | 'agent'>('personal');
   const [modalPurpose, setModalPurpose] = useState<'swap' | 'login'>('swap');
 
   const { usdgBalance, ethBalance, usdcBalance, tokenBalances, refetch } = useBalances(address, 421614);
 
-  const { policy: onChainPolicy, refresh: refreshPolicy } = useOnChainAgentPolicy(address);
+  const { agentPolicies, primaryPolicy, refresh: refreshPolicy } = useOnChainAgentPolicies(address);
+  const [selectedAgentKey, setSelectedAgentKey] = useState<string>('');
+  const activeAgentPolicy = useMemo(() => {
+    if (selectedAgentKey) {
+      const m = agentPolicies.find((p) => p.sessionKey.toLowerCase() === selectedAgentKey.toLowerCase());
+      if (m) return m;
+    }
+    return primaryPolicy;
+  }, [agentPolicies, selectedAgentKey, primaryPolicy]);
+
   const [agentMaxPerTx, setAgentMaxPerTx] = useState<number>(0);
   const [agentDailyLimit, setAgentDailyLimit] = useState<number>(0);
   const [agentSpentToday, setAgentSpentToday] = useState<number>(0);
 
   const syncAgentLimits = useCallback(() => {
-    if (onChainPolicy) {
-      setAgentMaxPerTx(Number(unitsToUsdg(onChainPolicy.maxPerTx)));
-      setAgentDailyLimit(Number(unitsToUsdg(onChainPolicy.dailyLimit)));
-      setAgentSpentToday(Number(unitsToUsdg(onChainPolicy.effectiveSpentToday)));
+    if (activeAgentPolicy) {
+      setAgentMaxPerTx(Number(unitsToUsdg(activeAgentPolicy.maxPerTx)));
+      setAgentDailyLimit(Number(unitsToUsdg(activeAgentPolicy.dailyLimit)));
+      setAgentSpentToday(Number(unitsToUsdg(activeAgentPolicy.effectiveSpentToday)));
       return;
     }
     if (typeof window === 'undefined') return;
     const maxStr = localStorage.getItem('invisible_wallet_session_max_per_tx');
     const dailyStr = localStorage.getItem('invisible_wallet_session_daily_limit');
     const spentStr = localStorage.getItem('invisible_wallet_session_spent_today');
-    if (maxStr) setAgentMaxPerTx(Number(maxStr) / 1e6);
-    if (dailyStr) setAgentDailyLimit(Number(dailyStr) / 1e6);
-    if (spentStr) setAgentSpentToday(Number(spentStr) / 1e6);
-  }, [onChainPolicy]);
+    setAgentMaxPerTx(maxStr ? Number(maxStr) / 1e6 : 0);
+    setAgentDailyLimit(dailyStr ? Number(dailyStr) / 1e6 : 0);
+    setAgentSpentToday(spentStr ? Number(spentStr) / 1e6 : 0);
+  }, [activeAgentPolicy]);
 
   useEffect(() => {
     syncAgentLimits();
@@ -100,32 +124,60 @@ export default function TransferPage() {
   const priceOf = (token: { symbol: string }) =>
     livePrices[token.symbol] ?? FALLBACK_TOKEN_USD_PRICES[token.symbol] ?? 1.0;
 
-  const computeEstimatedOutput = () => {
-    const parsed = parseFloat(amount || '0');
-    if (!parsed || parsed <= 0) return '0.00';
-    const destPrice = priceOf(selectedDestToken);
-    // Prefer the live Li.Fi quote (already net of every fee); otherwise a plain price-ratio estimate.
-    const outTokens = quote ? quote.toAmount : (parsed * priceOf(selectedToken)) / destPrice;
-    const decimalsToShow = destPrice >= 1000 ? 5 : destPrice < 0.1 ? 0 : 2;
-    return outTokens.toFixed(decimalsToShow);
-  };
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [quote, setQuote] = useState<LifiQuote | null>(null);
+  const [poolQuoteOut, setPoolQuoteOut] = useState<number | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const computeEstimatedOutput = () => {
+    const parsed = parseFloat(amount || '0');
+    if (!parsed || parsed <= 0) return '0.00';
+    const destPrice = priceOf(selectedDestToken);
+    const outTokens =
+      selectedSourceChain.id === 421614 && poolQuoteOut !== null
+        ? poolQuoteOut
+        : quote
+          ? quote.toAmount
+          : (parsed * priceOf(selectedToken)) / destPrice;
+    const decimalsToShow = destPrice >= 1000 ? 5 : destPrice < 0.1 ? 0 : 2;
+    return outTokens.toFixed(decimalsToShow);
+  };
+
   useEffect(() => {
     const parsed = parseFloat(amount);
     if (!parsed || parsed <= 0) {
       setQuote(null);
+      setPoolQuoteOut(null);
       return;
     }
     const controller = new AbortController();
     setQuoteLoading(true);
     const timer = setTimeout(async () => {
+      let nextPoolOut: number | null = null;
+      if (selectedSourceChain.id === 421614 && selectedToken.symbol !== selectedDestToken.symbol) {
+        const fromMeta = (SEPOLIA_SWAP_TOKENS as Record<string, { address: `0x${string}`; decimals: number }>)[selectedToken.symbol];
+        const toMeta = (SEPOLIA_SWAP_TOKENS as Record<string, { address: `0x${string}`; decimals: number }>)[selectedDestToken.symbol];
+        if (fromMeta && toMeta) {
+          try {
+            const rpc = typeof window !== 'undefined' ? `${window.location.origin}/api/rpc` : 'https://sepolia-rollup.arbitrum.io/rpc';
+            const pc = createPublicClient({ chain: { id: 421614 } as any, transport: http(rpc) });
+            const rawIn = BigInt(Math.round(parsed * 10 ** fromMeta.decimals));
+            const rawOut = (await pc.readContract({
+              address: SWAP_POOL_ADDRESS,
+              abi: SWAP_POOL_QUOTE_ABI,
+              functionName: 'getAmountOut',
+              args: [fromMeta.address, toMeta.address, rawIn],
+            })) as bigint;
+            nextPoolOut = Number(formatUnits(rawOut, toMeta.decimals));
+          } catch {
+            nextPoolOut = null;
+          }
+        }
+      }
+
       const q = await fetchLifiQuote({
         fromChainId: selectedSourceChain.id,
         toChainId: selectedDestChain.id,
@@ -138,10 +190,11 @@ export default function TransferPage() {
         signal: controller.signal,
       });
       if (!controller.signal.aborted) {
+        setPoolQuoteOut(nextPoolOut);
         setQuote(q);
         setQuoteLoading(false);
       }
-    }, 400);
+    }, 350);
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -247,6 +300,7 @@ export default function TransferPage() {
         amount: amountRaw,
         fromDecimals: selectedToken.decimals,
         recipient: (recipient || address) as `0x${string}`,
+        sessionKey: activeAgentPolicy?.sessionKey,
       });
 
       if (result) {
@@ -576,7 +630,9 @@ export default function TransferPage() {
               <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-6 space-y-4 text-sm">
                 <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
                   <span className="font-semibold text-white">Swap Details</span>
-                  <span className="text-[#c4c4cc] font-mono text-xs">Arbitrum Sepolia Solver</span>
+                  <span className="text-[#c4c4cc] font-mono text-xs">
+                    {selectedSourceChain.id === 421614 ? 'StylusSafeSwapPool (421614)' : `Li.Fi (${selectedSourceChain.name})`}
+                  </span>
                 </div>
 
                 <div className="space-y-3 text-xs text-[#8e8e98]">
@@ -589,29 +645,42 @@ export default function TransferPage() {
                   <div className="flex justify-between">
                     <span>Route</span>
                     <span className="text-white font-mono">
-                      {quoteLoading ? 'Fetching live quote...' : quote ? `via ${quote.tool}` : 'No live route (price estimate)'}
+                      {quoteLoading
+                        ? 'Fetching quote...'
+                        : selectedSourceChain.id === 421614 && poolQuoteOut !== null
+                          ? 'On-Chain SwapPool (0xD306...143b)'
+                          : quote
+                            ? `Li.Fi (${quote.tool})`
+                            : 'Price estimate'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Settlement Time</span>
                     <span className="text-white tabular-nums">
-                      {quote ? `~${Math.max(quote.durationSec, 1)} seconds` : 'Unavailable'}
+                      {selectedSourceChain.id === 421614
+                        ? '~1 block (Arbitrum Sepolia)'
+                        : quote
+                          ? `~${Math.max(quote.durationSec, 1)} seconds`
+                          : 'Unavailable'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Network Fees</span>
                     <span className="text-white font-medium">
-                      {quote ? `$${quote.feeUsd.toFixed(2)} fees + $${quote.gasUsd.toFixed(2)} gas` : 'Unavailable'}
+                      {selectedSourceChain.id === 421614
+                        ? '0.00% Pool Spread'
+                        : quote
+                          ? `$${quote.feeUsd.toFixed(2)} fees + $${quote.gasUsd.toFixed(2)} gas`
+                          : 'Unavailable'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Your Gas</span>
                     <span className="text-white font-medium">Sponsored ($0.00)</span>
                   </div>
-                  {quote?.indicative && (
+                  {selectedSourceChain.id === 421614 && selectedDestChain.id !== 421614 && (
                     <p className="text-[11px] leading-relaxed text-zinc-500">
-                      Li.Fi only routes real networks, so this is the live quote for the matching Arbitrum One route.
-                      Testnet swaps still settle through the Arbitrum Sepolia solver.
+                      Destination chain balances settle natively into your smart account via Arbitrum Sepolia <code className="text-zinc-300">StylusSafeSwapPool</code>. Switch Origin Network to a live L2/Mainnet to route via Li.Fi.
                     </p>
                   )}
                   <div className="pt-2.5 border-t border-white/[0.06] flex justify-between text-white font-medium">
@@ -623,17 +692,37 @@ export default function TransferPage() {
                 </div>
               </div>
 
-              {/* Guardrail Policy Status */}
+              {/* Guardrail Policy Status (Multi-Policy v3 Selector) */}
               <div className="bg-[#141418] border border-white/[0.08] rounded-2xl p-6 space-y-3 text-xs">
                 <div className="flex items-center justify-between pb-2.5 border-b border-white/[0.06]">
-                  <span className="font-semibold text-white text-sm">AI Spending Rules</span>
+                  <span className="font-semibold text-white text-sm">
+                    AI Spending Rules {agentPolicies.length > 0 ? `(${agentPolicies.length} active)` : ''}
+                  </span>
                   <Link href="/trading" className="text-[#ff4500] hover:underline font-medium">
-                    Edit Rules
+                    Manage Rules
                   </Link>
                 </div>
                 <p className="text-[#8e8e98] leading-relaxed">
-                  In <strong className="text-white">Guarded Agent Mode</strong>, swaps run immediately without a FaceID prompt as long as they stay under your per-trade and 24-hour limits.
+                  In <strong className="text-white">Guarded Agent Mode</strong>, swaps run passwordlessly under the selected ERC-7579 session key without FaceID prompts.
                 </p>
+
+                {agentPolicies.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] text-[#8e8e98]">Active Agent Key</label>
+                    <select
+                      value={activeAgentPolicy?.sessionKey || ''}
+                      onChange={(e) => setSelectedAgentKey(e.target.value)}
+                      className="w-full h-9 bg-[#09090b] border border-white/[0.08] rounded-xl px-3 text-xs font-mono text-white outline-none focus:border-[#ff4500]"
+                    >
+                      {agentPolicies.map((p) => (
+                        <option key={p.sessionKey} value={p.sessionKey}>
+                          {p.label || POLICY_KIND_LABELS[p.kind]} ({p.sessionKey.slice(0, 6)}...{p.sessionKey.slice(-4)}) · ${unitsToUsdg(p.maxPerTx)}/tx
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="pt-2 space-y-2 text-[#8e8e98]">
                   <div className="flex justify-between">
                     <span>Max Per Trade</span>
@@ -642,7 +731,7 @@ export default function TransferPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Remaining 24h Allowance</span>
+                    <span>Remaining Window Cap</span>
                     <span className="text-white font-mono font-semibold">
                       {agentDailyLimit > 0 ? `$${remainingDailyCap.toFixed(2)} / $${agentDailyLimit.toFixed(2)} USDG` : 'Not configured'}
                     </span>
