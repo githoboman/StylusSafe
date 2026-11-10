@@ -65,15 +65,17 @@ export type DeployResult = {
     alreadyDeployed: boolean;
 };
 
+export type BiometricAuthMethod = 'faceid' | 'biometric_prompt' | 'pin';
+
 export type InvisibleWallet = {
     address: string | null;
     isPending: boolean;
     error: string | null;
     hasMounted: boolean;
-    register: (username: string, pin?: string) => Promise<RegisterResult>;
+    register: (username: string, pin?: string, authMethod?: BiometricAuthMethod) => Promise<RegisterResult>;
     deploy: (relayerAccount?: any, publicKeyBytes?: Uint8Array) => Promise<DeployResult>;
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
-    login: () => Promise<void>;
+    login: (authMethod?: BiometricAuthMethod) => Promise<void>;
     disconnect: () => void;
     executeCrossChainSwap: (
         arg1: number,
@@ -271,11 +273,25 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     // ── register ──────────────────────────────────────────────────────────────
 
-    const register = async (username: string, pin?: string): Promise<RegisterResult> => {
+    const register = async (
+        username: string,
+        pin?: string,
+        authMethod?: BiometricAuthMethod
+    ): Promise<RegisterResult> => {
         setIsPending(true);
         setError(null);
         try {
-            if (!pin && typeof window !== 'undefined') {
+            const effectiveMethod: BiometricAuthMethod =
+                authMethod ??
+                (pin
+                    ? 'pin'
+                    : (typeof window !== 'undefined'
+                        ? (localStorage.getItem('invisible_wallet_last_auth_method') as BiometricAuthMethod | null)
+                        : null) || 'faceid');
+
+            // Only re-attach an existing Face vault during registration when registering via OpenBR Face Camera.
+            // Fingerprint ('biometric_prompt') or PIN registration must always create a fresh wallet keypair.
+            if (!pin && effectiveMethod === 'faceid' && typeof window !== 'undefined') {
                 const faceProbe = getLastVerifiedFaceDescriptor();
                 if (faceProbe) {
                     const matchedByFace = findVaultByFaceDescriptor(faceProbe);
@@ -294,16 +310,20 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
             let publicKeyHex: string;
             let encryptedJwk = '';
             let iv = '';
-            
+            const hwCredId =
+                effectiveMethod === 'biometric_prompt' && typeof window !== 'undefined'
+                    ? localStorage.getItem('invisible_wallet_hw_biometric_cred_id')
+                    : null;
+
             if (pin) {
                 const keypair = await generateP256Keypair();
                 const wrapped = await encryptPrivateKey(keypair.privateKey, pin);
                 encryptedJwk = wrapped.encryptedJwk;
                 iv = wrapped.iv;
-                
+
                 publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
                 publicKeyHex = bufferToHex(publicKeyBytes);
-                
+
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
                     localStorage.setItem('invisible_wallet_key_iv', iv);
@@ -319,11 +339,16 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('invisible_wallet_encrypted_key', encryptedJwk);
                     localStorage.setItem('invisible_wallet_key_iv', iv);
-                    localStorage.setItem('invisible_wallet_key_id', 'faceid-biometric-key-' + Date.now());
+                    localStorage.setItem(
+                        'invisible_wallet_key_id',
+                        effectiveMethod === 'biometric_prompt'
+                            ? hwCredId || `fingerprint-enclave-${Date.now()}`
+                            : 'faceid-biometric-key-' + Date.now()
+                    );
                     localStorage.setItem('invisible_wallet_mode', 'webauthn');
                 }
             }
-            
+
             if (typeof window !== 'undefined') {
                 localStorage.setItem('invisible_wallet_rp_id', window.location.hostname);
                 localStorage.setItem('invisible_wallet_origin', window.location.origin);
@@ -340,6 +365,8 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                     encryptedJwk,
                     iv,
                     mode: pin ? 'pin' : 'webauthn',
+                    faceDescriptor: effectiveMethod === 'biometric_prompt' ? null : undefined,
+                    hardwareCredentialId: hwCredId,
                 });
             }
             setAddress(walletAddress);
@@ -389,8 +416,26 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     // ── login ─────────────────────────────────────────────────────────────────
 
-    const login = async () => {
+    const login = async (authMethod?: BiometricAuthMethod) => {
         if (typeof window !== 'undefined') {
+            const effectiveMethod =
+                authMethod ??
+                (localStorage.getItem('invisible_wallet_last_auth_method') as BiometricAuthMethod | null) ??
+                'faceid';
+
+            const hwCredId = localStorage.getItem('invisible_wallet_hw_biometric_cred_id');
+            if (effectiveMethod === 'biometric_prompt' && hwCredId) {
+                const matchedByHw = findVaultByHardwareCredentialId(hwCredId);
+                if (matchedByHw) {
+                    activateBiometricVaultSession(matchedByHw);
+                    const resolved = await resolveCanonicalAddress(matchedByHw.publicKeyHex);
+                    localStorage.setItem('invisible_wallet_address', resolved.walletAddress);
+                    setAddress(resolved.walletAddress);
+                    void ensureTestnetUsdgFunded(resolved.walletAddress);
+                    return;
+                }
+            }
+
             const stored = localStorage.getItem('invisible_wallet_address');
             if (stored) {
                 setAddress(stored);
@@ -411,7 +456,6 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 }
             }
 
-            const hwCredId = localStorage.getItem('invisible_wallet_hw_biometric_cred_id');
             if (hwCredId) {
                 const matchedByHw = findVaultByHardwareCredentialId(hwCredId);
                 if (matchedByHw) {
@@ -435,7 +479,7 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 return;
             }
 
-            await register('stylussafe-biometric-owner');
+            await register('stylussafe-biometric-owner', undefined, effectiveMethod);
         }
     };
 

@@ -99,11 +99,7 @@ export function findVaultByHardwareCredentialId(
 ): BiometricVaultEntry | null {
   if (!credentialId) return null;
   const registry = loadVaultRegistry();
-  return (
-    registry.find((e) => e.hardwareCredentialId === credentialId) ||
-    registry[0] ||
-    null
-  );
+  return registry.find((e) => e.hardwareCredentialId === credentialId) ?? null;
 }
 
 /**
@@ -146,7 +142,10 @@ export async function bindWalletToBiometrics(params: {
   const registry = loadVaultRegistry();
   const now = new Date().toISOString();
 
-  const desc = params.faceDescriptor ?? getLastVerifiedFaceDescriptor();
+  const desc =
+    params.faceDescriptor !== undefined
+      ? params.faceDescriptor
+      : getLastVerifiedFaceDescriptor();
   const tplHash = desc ? await computeTemplateHash(desc) : null;
   const hwId =
     params.hardwareCredentialId ??

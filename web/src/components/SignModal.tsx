@@ -14,7 +14,7 @@ import { getEnrolledBiometricTemplate } from '@/lib/faceverify/openbrEngine';
 type SignModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSign?: (pin: string) => Promise<void>;
+  onSign?: (pin: string, authMode?: 'faceid' | 'biometric_prompt' | 'pin') => Promise<void>;
   actionText?: string;
   amountText?: string;
   defaultMode?: 'faceid' | 'biometric_prompt' | 'pin';
@@ -57,8 +57,11 @@ export function SignModal({
     setStatus('scanning');
     setError(null);
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('invisible_wallet_last_auth_method', 'faceid');
+      }
       if (onSign) {
-        await onSign('');
+        await onSign('', 'faceid');
       }
       setStatus('success');
       setTimeout(() => {
@@ -79,13 +82,14 @@ export function SignModal({
     setError(null);
     try {
       await triggerHardwareBiometricPrompt(actionText, {
+        forceNewEnrollment: enrollmentMode,
         onUsePassword: () => {
           setStatus('idle');
           setMode('pin');
         },
       });
       if (onSign) {
-        await onSign('');
+        await onSign('', 'biometric_prompt');
       }
       setStatus('success');
       setTimeout(() => {
@@ -120,8 +124,11 @@ export function SignModal({
     setStatus('scanning');
     setError(null);
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('invisible_wallet_last_auth_method', 'pin');
+      }
       if (onSign) {
-        await onSign(pin);
+        await onSign(pin, 'pin');
       }
       setStatus('success');
       setTimeout(() => {
@@ -356,7 +363,11 @@ export function SignModal({
                   ) : (
                     <>
                       <IconShield size={15} />
-                      <span>Authenticate with Device BiometricPrompt</span>
+                      <span>
+                        {enrollmentMode
+                          ? 'Enroll Fingerprint / Device Biometrics'
+                          : 'Authenticate with Fingerprint / Device Bio'}
+                      </span>
                     </>
                   )}
                 </button>

@@ -31,10 +31,13 @@ export type BiometricCapabilities = {
 };
 
 export interface OnBiometricIdentifyCallback {
+  /** Forces navigator.credentials.create even if a prior hardware credential ID exists (wallet creation). */
+  forceNewEnrollment?: boolean;
   onUsePassword?: () => void;
   onSucceeded?: (result: {
     credentialId?: string;
     biometryType: BiometryHardwareType;
+    publicKeyHex?: string;
     timestamp: number;
   }) => void;
   onFailed?: () => void;
@@ -123,7 +126,7 @@ export async function detectBiometricCapabilities(): Promise<BiometricCapabiliti
 export async function triggerHardwareBiometricPrompt(
   reason: string,
   callbacks?: OnBiometricIdentifyCallback,
-): Promise<{ verified: boolean; credentialId?: string; biometryType: BiometryHardwareType }> {
+): Promise<{ verified: boolean; credentialId?: string; biometryType: BiometryHardwareType; publicKeyHex?: string }> {
   const caps = await detectBiometricCapabilities();
 
   if (typeof window === 'undefined' || !navigator.credentials) {
@@ -136,7 +139,7 @@ export async function triggerHardwareBiometricPrompt(
   const challenge = crypto.getRandomValues(new Uint8Array(32));
 
   try {
-    if (existingCredId) {
+    if (existingCredId && !callbacks?.forceNewEnrollment) {
       // Authenticate against existing hardware credential (BiometricPrompt.authenticate)
       const credIdBin = atob(existingCredId.replace(/-/g, '+').replace(/_/g, '/'));
       const credIdBytes = Uint8Array.from(credIdBin, (c) => c.charCodeAt(0));
@@ -155,6 +158,9 @@ export async function triggerHardwareBiometricPrompt(
         throw new Error('Biometric verification did not return an assertion.');
       }
 
+      localStorage.setItem(HW_CREDENTIAL_KEY, assertion.id);
+      localStorage.setItem('invisible_wallet_last_auth_method', 'biometric_prompt');
+
       const res = {
         credentialId: assertion.id,
         biometryType: caps.biometryType,
@@ -163,7 +169,7 @@ export async function triggerHardwareBiometricPrompt(
       callbacks?.onSucceeded?.(res);
       return { verified: true, credentialId: assertion.id, biometryType: caps.biometryType };
     } else {
-      // Enroll new hardware secp256r1 (alg: -7) biometric key (BiometricPromptApi28.generateKeyPair)
+      // Enroll new hardware secp256r1 (alg: -7) biometric passkey (Fingerprint / TouchID / Windows Hello)
       const userId = crypto.getRandomValues(new Uint8Array(16));
       const credential = (await navigator.credentials.create({
         publicKey: {
@@ -171,12 +177,11 @@ export async function triggerHardwareBiometricPrompt(
           rp: { name: 'StylusSafe Arbitrum Vault' },
           user: {
             id: userId,
-            name: 'vault-owner@stylussafe.xyz',
-            displayName: reason || 'StylusSafe Biometric Enclave',
+            name: `fingerprint-${Date.now()}@stylussafe.xyz`,
+            displayName: reason || 'StylusSafe Fingerprint Vault',
           },
           pubKeyCredParams: [
             { type: 'public-key', alg: -7 }, // ES256 (NIST P-256 / secp256r1)
-            { type: 'public-key', alg: -257 },
           ],
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
@@ -192,14 +197,37 @@ export async function triggerHardwareBiometricPrompt(
         throw new Error('Hardware biometric enrollment was not completed.');
       }
 
+      let publicKeyHex: string | undefined;
+      try {
+        const att = credential.response as AuthenticatorAttestationResponse;
+        const spki = typeof att.getPublicKey === 'function' ? att.getPublicKey() : null;
+        if (spki) {
+          const imported = await crypto.subtle.importKey(
+            'spki',
+            spki,
+            { name: 'ECDSA', namedCurve: 'P-256' },
+            true,
+            ['verify'],
+          );
+          const raw = new Uint8Array(await crypto.subtle.exportKey('raw', imported));
+          if (raw.length === 65 && raw[0] === 0x04) {
+            publicKeyHex = Array.from(raw, (b) => b.toString(16).padStart(2, '0')).join('');
+          }
+        }
+      } catch {
+        // Non-SPKI or non-P256 authenticator; credential ID still gates the enclave session key.
+      }
+
       localStorage.setItem(HW_CREDENTIAL_KEY, credential.id);
+      localStorage.setItem('invisible_wallet_last_auth_method', 'biometric_prompt');
       const res = {
         credentialId: credential.id,
         biometryType: caps.biometryType,
+        publicKeyHex,
         timestamp: Date.now(),
       };
       callbacks?.onSucceeded?.(res);
-      return { verified: true, credentialId: credential.id, biometryType: caps.biometryType };
+      return { verified: true, credentialId: credential.id, biometryType: caps.biometryType, publicKeyHex };
     }
   } catch (err: any) {
     const name = err?.name || 'BiometricError';

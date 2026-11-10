@@ -43,9 +43,9 @@ export default function PortfolioScreen() {
 
   const bioStatus = getMobileBiometricStatus();
 
-  const openBiometricModal = (mode: 'enroll' | 'recover') => {
+  const openBiometricModal = (mode: 'enroll' | 'recover', initialStage: 'face' | 'fingerprint' = 'face') => {
     setBioMode(mode);
-    setBioStage('face');
+    setBioStage(initialStage);
     setStatusMessage(null);
     setBioModalVisible(true);
   };
@@ -56,14 +56,16 @@ export default function PortfolioScreen() {
 
   const handleBindHardwareEnclave = async () => {
     try {
-      setStatusMessage('Binding OpenBR 64-D template + secp256r1 hardware enclave...');
+      setStatusMessage('Binding P-256 hardware enclave keypair...');
       if (bioMode === 'enroll') {
-        await register('MobileBiometricOwner');
+        const created = await register('MobileBiometricOwner', undefined, bioStage === 'fingerprint' ? 'fingerprint' : 'face');
+        setBioStage('complete');
+        setStatusMessage(`Vault ${created.walletAddress.slice(0, 8)}...${created.walletAddress.slice(-6)} created on Arbitrum Sepolia.`);
       } else {
-        await recoverWithBiometrics();
+        const addr = await recoverWithBiometrics();
+        setBioStage('complete');
+        setStatusMessage(addr ? `Unlocked vault ${addr.slice(0, 8)}...${addr.slice(-6)}.` : 'Biometric vault unlocked.');
       }
-      setBioStage('complete');
-      setStatusMessage('1,000.00 Testnet USDG funded to your biometric vault.');
       setTimeout(() => {
         setBioModalVisible(false);
         refetch();
@@ -324,24 +326,33 @@ export default function PortfolioScreen() {
             <View style={styles.actionsRow}>
               <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: Colors.accentOrange }]}
-                onPress={() => openBiometricModal('enroll')}
+                onPress={() => openBiometricModal('enroll', 'fingerprint')}
                 disabled={isPending}
                 activeOpacity={0.85}
               >
-                <Ionicons name="scan-outline" size={17} color="#FFF" />
-                <Text style={styles.primaryButtonText}>Enroll Biometric Vault</Text>
+                <Ionicons name="finger-print-outline" size={17} color="#FFF" />
+                <Text style={styles.primaryButtonText}>Create with Fingerprint</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secondaryButton}
-                onPress={() => openBiometricModal('recover')}
+                onPress={() => openBiometricModal('enroll', 'face')}
                 disabled={isPending}
                 activeOpacity={0.85}
               >
-                <Ionicons name="finger-print-outline" size={17} color={Colors.textPrimary} />
-                <Text style={styles.secondaryButtonText}>Recover Vault</Text>
+                <Ionicons name="scan-outline" size={17} color={Colors.textPrimary} />
+                <Text style={styles.secondaryButtonText}>Face + Fingerprint</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={[styles.secondaryButton, { width: '100%' }]}
+              onPress={() => openBiometricModal('recover', 'fingerprint')}
+              disabled={isPending}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="key-outline" size={17} color={Colors.textPrimary} />
+              <Text style={styles.secondaryButtonText}>Unlock / Recover Existing Vault</Text>
+            </TouchableOpacity>
           </View>
         )}
 

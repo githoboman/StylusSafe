@@ -33,6 +33,9 @@ export interface MobileBiometricVaultRecord {
   walletAddress: string;
   publicKeyHex: string;
   credentialId: string;
+  encryptedJwk?: string;
+  iv?: string;
+  authMethod?: 'face' | 'fingerprint' | 'pin';
   faceTemplateVector: number[];
   faceCommitmentHash: string;
   biometryType: MobileBiometryType;

@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [defaultSignMode, setDefaultSignMode] = useState<'faceid' | 'biometric_prompt' | 'pin'>('faceid');
 
   const [selectedChain, setSelectedChain] = useState(421614);
   const { address, register, disconnect, login } = useInvisibleWallet();
@@ -126,19 +127,33 @@ export default function Dashboard() {
               type="button"
               onClick={() => {
                 setIsRegistering(true);
+                setDefaultSignMode('faceid');
                 setIsSignModalOpen(true);
               }}
               className="h-11 px-5 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-xl text-sm font-semibold transition-colors whitespace-nowrap"
             >
-              Create New Wallet
+              Create with Face
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegistering(true);
+                setDefaultSignMode('biometric_prompt');
+                setIsSignModalOpen(true);
+              }}
+              className="h-11 px-5 bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.12] rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+            >
+              <IconFingerprint size={16} />
+              <span>Create with Fingerprint</span>
             </button>
             <button
               type="button"
               onClick={() => {
                 setIsRegistering(false);
+                setDefaultSignMode('faceid');
                 setIsSignModalOpen(true);
               }}
-              className="h-11 px-5 bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/[0.1] rounded-xl text-sm font-medium transition-colors whitespace-nowrap"
+              className="h-11 px-5 bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/[0.1] rounded-xl text-sm font-medium transition-colors whitespace-nowrap"
             >
               Unlock Existing
             </button>
@@ -309,13 +324,13 @@ export default function Dashboard() {
             : 'Scan Face & Fingerprint to Unlock Wallet'
         }
         amountText="$0.00 Gas Fee (Sponsored)"
-        defaultMode="faceid"
+        defaultMode={defaultSignMode}
         enrollmentMode={isRegistering}
-        onSign={async (pin) => {
+        onSign={async (pin, authMode) => {
           if (isRegistering) {
-            await register('stylussafe-vault', pin || undefined);
+            await register('stylussafe-vault', pin || undefined, authMode);
           } else {
-            await login();
+            await login(authMode);
           }
         }}
       />

@@ -18,7 +18,8 @@ import {
     encryptPrivateKey,
     decryptPrivateKey,
     getRawPublicKeyBytes,
-    sha256
+    sha256,
+    signP256Message
 } from './utils';
 import { createPublicClient as _createPublicClient, http as _http } from 'viem';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -72,7 +73,7 @@ export type InvisibleWallet = {
     isPending: boolean;
     error: string | null;
     hasMounted: boolean;
-    register: (username: string, pin?: string) => Promise<RegisterResult>;
+    register: (username: string, pin?: string, authMethod?: 'face' | 'fingerprint') => Promise<RegisterResult>;
     deploy: (relayerAccount?: any, publicKeyBytes?: Uint8Array) => Promise<DeployResult>;
     signAuthEntry: (signaturePayload: Uint8Array, pin?: string) => Promise<WebAuthnSignature | null>;
     login: () => Promise<void>;
@@ -196,76 +197,100 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
     // ── register ──────────────────────────────────────────────────────────────
 
-    const register = async (username: string, pin?: string): Promise<RegisterResult> => {
+    const register = async (username: string, pin?: string, authMethod: 'face' | 'fingerprint' = 'fingerprint'): Promise<RegisterResult> => {
         setIsPending(true);
         setError(null);
         try {
             let publicKeyBytes: Uint8Array;
             let publicKeyHex: string;
-            let credentialId = `mobile-bio-${Date.now()}`;
+            let credentialId = `mobile-${authMethod}-${Date.now()}`;
+            let storedEncJwk: string | undefined;
+            let storedIv: string | undefined;
             const effectivePin = pin || 'biometric-enclave-default-pin';
-            
+
             if (pin) {
                 const keypair = await generateP256Keypair();
                 const { encryptedJwk, iv } = await encryptPrivateKey(keypair.privateKey, pin);
-                
+
                 publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
                 publicKeyHex = bufferToHex(publicKeyBytes);
-                
+                storedEncJwk = encryptedJwk;
+                storedIv = iv;
+
                 await setPersistItem('invisible_wallet_encrypted_key', encryptedJwk);
                 await setPersistItem('invisible_wallet_key_iv', iv);
                 await setPersistItem('invisible_wallet_mode', 'pin');
-            } else if (typeof navigator !== 'undefined' && navigator.credentials && typeof navigator.credentials.create === 'function') {
-                try {
-                    const challenge = crypto.getRandomValues(new Uint8Array(32));
-                    const credential = await navigator.credentials.create({
-                        publicKey: {
-                            challenge,
-                            rp: { name: 'StylusSafe' },
-                            user: {
-                                id: new TextEncoder().encode(username),
-                                name: username,
-                                displayName: username,
-                            },
-                            pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-                            timeout: 60_000,
-                            authenticatorSelection: {
-                                residentKey: 'preferred',
-                                userVerification: 'required',
-                            },
-                        },
-                    }) as PublicKeyCredential;
-
-                    if (!credential) throw new Error('Credential creation cancelled');
-
-                    const response = credential.response as AuthenticatorAttestationResponse;
-                    publicKeyBytes = await extractP256PublicKey(response);
-                    publicKeyHex = bufferToHex(publicKeyBytes);
-                    credentialId = credential.id;
-                    
-                    await setPersistItem('invisible_wallet_key_id', credential.id);
-                    await setPersistItem('invisible_wallet_mode', 'webauthn');
-                } catch {
-                    // Fallback to hardware-bound P-256 CryptoObject keypair
-                    const keypair = await generateP256Keypair();
-                    const { encryptedJwk, iv } = await encryptPrivateKey(keypair.privateKey, effectivePin);
-                    publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
-                    publicKeyHex = bufferToHex(publicKeyBytes);
-                    await setPersistItem('invisible_wallet_encrypted_key', encryptedJwk);
-                    await setPersistItem('invisible_wallet_key_iv', iv);
-                    await setPersistItem('invisible_wallet_mode', 'biometric_enclave');
-                }
             } else {
-                // Native Mobile Biometric Enclave P-256 Keypair
+                // Attempt native hardware passkey (react-native-passkeys) or WebAuthn prompt when supported
+                // for OS Fingerprint / FaceID confirmation, then bind/encrypt the P-256 enclave keypair
+                // (works across Web AND native iOS/Android Hermes without requiring an external web RP domain).
+                let hwCredId: string | null = null;
+                if (typeof navigator !== 'undefined' && navigator.credentials && typeof navigator.credentials.create === 'function') {
+                    try {
+                        const challenge = crypto.getRandomValues(new Uint8Array(32));
+                        const credential = await navigator.credentials.create({
+                            publicKey: {
+                                challenge,
+                                rp: { name: 'StylusSafe' },
+                                user: {
+                                    id: new TextEncoder().encode(`${username}-${Date.now()}`),
+                                    name: username,
+                                    displayName: username,
+                                },
+                                pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+                                timeout: 45_000,
+                                authenticatorSelection: {
+                                    authenticatorAttachment: 'platform',
+                                    residentKey: 'preferred',
+                                    userVerification: 'required',
+                                },
+                            },
+                        }) as PublicKeyCredential | null;
+                        if (credential?.id) hwCredId = credential.id;
+                    } catch {
+                        // Fall through to native/software enclave keypair
+                    }
+                } else {
+                    try {
+                        const passkeys = await import('react-native-passkeys');
+                        if (typeof passkeys.isSupported === 'function' && passkeys.isSupported()) {
+                            const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
+                            const created = await passkeys.create({
+                                challenge: bytesToBase64Url(challengeBytes),
+                                rp: { id: 'stylussafe.xyz', name: 'StylusSafe' },
+                                user: {
+                                    id: bytesToBase64Url(new TextEncoder().encode(`${username}-${Date.now()}`)),
+                                    name: username,
+                                    displayName: username,
+                                },
+                                pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+                                authenticatorSelection: {
+                                    authenticatorAttachment: 'platform',
+                                    residentKey: 'preferred',
+                                    userVerification: 'required',
+                                },
+                            });
+                            if (created?.id) hwCredId = created.id;
+                        }
+                    } catch {
+                        // Expo Go / Simulator without associated domain: proceed with P-256 enclave keypair
+                    }
+                }
+
                 const keypair = await generateP256Keypair();
                 const { encryptedJwk, iv } = await encryptPrivateKey(keypair.privateKey, effectivePin);
                 publicKeyBytes = await getRawPublicKeyBytes(keypair.publicKey);
                 publicKeyHex = bufferToHex(publicKeyBytes);
+                storedEncJwk = encryptedJwk;
+                storedIv = iv;
+                if (hwCredId) credentialId = hwCredId;
+
+                await setPersistItem('invisible_wallet_key_id', credentialId);
                 await setPersistItem('invisible_wallet_encrypted_key', encryptedJwk);
                 await setPersistItem('invisible_wallet_key_iv', iv);
                 await setPersistItem('invisible_wallet_mode', 'biometric_enclave');
             }
-            
+
             // Resolve canonical CREATE2 wallet address from factory
             let walletAddress: string;
             try {
@@ -297,21 +322,42 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
 
             await setPersistItem('invisible_wallet_address', walletAddress);
             await setPersistItem('invisible_wallet_public_key', publicKeyHex);
-            await setPersistItem(`usdg_faucet_grant_${walletAddress.toLowerCase()}`, '1000.00');
 
-            // Bind OpenBR 64-D facial template + Hardware Biometric Enclave record
+            // Attempt live testnet USDG mint if faucet API endpoint is configured
+            let faucetFunded = false;
+            const apiBase =
+                process.env.EXPO_PUBLIC_API_URL ||
+                (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+            if (apiBase) {
+                try {
+                    const fRes = await fetch(`${apiBase.replace(/\/$/, '')}/api/faucet`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address: walletAddress, amount: 1000, onlyIfZero: true }),
+                    });
+                    const fJson = await fRes.json().catch(() => null);
+                    faucetFunded = Boolean(fJson?.ok);
+                } catch {
+                    // ignore if running offline without web backend
+                }
+            }
+
+            // Bind OpenBR 64-D facial template + Hardware Biometric Enclave record (with encrypted key for unlock)
             const bioStatus = getMobileBiometricStatus();
             const openbr = generateMobileOpenBRTemplate(`${username}-${walletAddress}`);
             await saveMobileBiometricVault({
                 walletAddress,
                 publicKeyHex,
                 credentialId,
+                encryptedJwk: storedEncJwk,
+                iv: storedIv,
+                authMethod: pin ? 'pin' : authMethod,
                 faceTemplateVector: openbr.vector,
                 faceCommitmentHash: openbr.commitmentHash,
                 biometryType: bioStatus.biometryType,
                 createdAt: Date.now(),
                 lastVerifiedAt: Date.now(),
-                faucetFunded: true,
+                faucetFunded,
             });
 
             setAddress(walletAddress);
@@ -366,7 +412,11 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 await setPersistItem('invisible_wallet_address', matchedVault.walletAddress);
                 await setPersistItem('invisible_wallet_public_key', matchedVault.publicKeyHex);
                 await setPersistItem('invisible_wallet_key_id', matchedVault.credentialId);
-                await setPersistItem(`usdg_faucet_grant_${matchedVault.walletAddress.toLowerCase()}`, '1000.00');
+                if (matchedVault.encryptedJwk && matchedVault.iv) {
+                    await setPersistItem('invisible_wallet_encrypted_key', matchedVault.encryptedJwk);
+                    await setPersistItem('invisible_wallet_key_iv', matchedVault.iv);
+                    await setPersistItem('invisible_wallet_mode', 'biometric_enclave');
+                }
                 setAddress(matchedVault.walletAddress);
                 return matchedVault.walletAddress;
             }
@@ -460,17 +510,13 @@ export function useInvisibleWallet(config: Partial<WalletConfig> = {}): Invisibl
                 messageToSign.set(mockAuthData, 0);
                 messageToSign.set(clientDataHash, mockAuthData.length);
 
-                const rawSignatureBuf = await crypto.subtle.sign(
-                    { name: 'ECDSA', hash: 'SHA-256' },
-                    privateKey,
-                    messageToSign as any
-                );
-                
+                const rawSigBytes = await signP256Message(privateKey, messageToSign);
+
                 return {
                     publicKey: hexToUint8Array(publicKeyHex),
                     authData: mockAuthData,
                     clientDataJSON: mockClientDataJSON,
-                    signature: new Uint8Array(rawSignatureBuf),
+                    signature: rawSigBytes,
                 };
             } else {
                 const keyId = await getPersistItem('invisible_wallet_key_id');

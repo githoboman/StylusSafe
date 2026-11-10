@@ -80,7 +80,7 @@ export default function SecurityPage() {
   const handleRegisterNewDevice = async () => {
     if (!newDeviceName.trim()) return;
     try {
-      const result = await register(newDeviceName.trim());
+      const result = await register(newDeviceName.trim(), undefined, 'biometric_prompt');
       const newDevice: SignerDevice = {
         id: 'device-' + Date.now(),
         name: newDeviceName.trim(),
