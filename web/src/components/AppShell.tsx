@@ -79,9 +79,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             key={item.href}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               active
-                ? 'bg-white/[0.08] text-white shadow-sm'
+                ? 'bg-white/[0.07] text-white'
                 : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
             }`}
           >

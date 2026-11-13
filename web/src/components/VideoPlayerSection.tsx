@@ -10,11 +10,13 @@ interface SceneTimestamp {
 }
 
 const SCENES: SceneTimestamp[] = [
-  { label: 'The AI Vulnerability', time: 0, badge: 'Raw Keys' },
-  { label: 'RIP-7212 Enclave', time: 6, badge: 'Hardware' },
-  { label: '1-Click USDG Intent', time: 12, badge: 'Cross-Chain' },
-  { label: 'Agent Policy Firewall', time: 18, badge: 'Zero-Trust' },
-  { label: 'Live Deployments', time: 24, badge: 'Arbitrum' },
+  { label: 'Seed & Key Risk', time: 0, badge: '0:00' },
+  { label: 'StylusSafe v3', time: 10, badge: '0:10' },
+  { label: 'RIP-7212 Passkeys', time: 20, badge: '0:20' },
+  { label: '$1,000 USDG + $0 Gas', time: 32, badge: '0:32' },
+  { label: '3D Agent Firewall', time: 44, badge: '0:44' },
+  { label: 'Multi-Policy ERC-7579', time: 58, badge: '0:58' },
+  { label: 'Live SwapPool', time: 71, badge: '1:11' },
 ];
 
 export const VideoPlayerSection: React.FC = () => {
@@ -22,7 +24,7 @@ export const VideoPlayerSection: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(90);
 
   const togglePlay = () => {
     if (!videoRef.current) return;

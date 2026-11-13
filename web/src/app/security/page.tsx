@@ -146,9 +146,9 @@ export default function SecurityPage() {
   };
 
   return (
-    <div className="p-5 sm:p-8 md:p-12 w-full max-w-4xl mx-auto space-y-8 sm:space-y-10 font-sans">
+    <div className="p-4 sm:p-6 lg:p-8 w-full max-w-5xl mx-auto space-y-6 font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
         <div className="flex items-start gap-4">
           <Link
             href="/dashboard"
@@ -158,10 +158,10 @@ export default function SecurityPage() {
             <IconArrowLeft size={17} />
           </Link>
           <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
               Biometric Keys &amp; Security
             </h1>
-            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+            <p className="text-sm text-zinc-400 leading-relaxed">
               Manage the face, fingerprint, and hardware keys that unlock your wallet.
             </p>
           </div>
@@ -173,7 +173,7 @@ export default function SecurityPage() {
             setAddingKey(true);
             setNewDeviceName('');
           }}
-          className="h-11 px-5 bg-[#ff4500] hover:bg-[#e03d00] active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-all shadow-sm self-start sm:self-auto shrink-0"
+          className="h-10 px-4 bg-[#ff4500] hover:bg-[#e03d00] text-white rounded-lg text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors self-start sm:self-auto shrink-0"
         >
           <IconPlus size={16} />
           <span>Add Backup Device</span>

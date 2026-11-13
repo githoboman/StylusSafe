@@ -186,7 +186,7 @@ export default function IntentsPage() {
             <IconArrowLeft size={16} />
           </Link>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
               Atomic Action Batching
             </h1>
             <p className="text-[#8e8e98] text-sm mt-1">
@@ -207,12 +207,9 @@ export default function IntentsPage() {
       )}
 
       {status === 'success' ? (
-        <div className="bg-[#141418] border border-white/[0.1] rounded-2xl p-8 max-w-lg mx-auto w-full text-center space-y-5">
-          <div className="w-14 h-14 rounded-2xl bg-[#ff4500]/15 border border-[#ff4500]/30 flex items-center justify-center mx-auto text-[#ff4500]">
-            <IconCheck size={28} />
-          </div>
+        <div className="bg-[#141418] border border-white/[0.1] rounded-2xl p-7 max-w-lg mx-auto w-full text-center space-y-5">
           <div>
-            <h2 className="text-xl font-bold text-white">Batch Executed Atomically</h2>
+            <h2 className="text-xl font-semibold text-white">Batch Executed Atomically</h2>
             <p className="text-sm text-[#8e8e98] mt-1.5">
               All {steps.length} contract calls succeeded in a single `executeBatch` transaction on Arbitrum Sepolia.
             </p>

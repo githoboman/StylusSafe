@@ -59,12 +59,12 @@ export default function Dashboard() {
   const shortAddr = address ? `${address.slice(0, 8)}...${address.slice(-6)}` : '';
 
   return (
-    <div className="p-5 sm:p-8 md:p-12 w-full max-w-5xl mx-auto space-y-8 sm:space-y-10">
+    <div className="p-4 sm:p-6 lg:p-8 w-full max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08] w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/[0.08] w-full">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            My Biometric Wallet
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">
+            Biometric Wallet
           </h1>
           <p className="text-sm sm:text-base text-zinc-400">
             {address ? (

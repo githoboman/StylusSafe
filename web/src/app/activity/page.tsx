@@ -221,10 +221,10 @@ export default function ActivityPage() {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="p-5 sm:p-8 md:p-10 w-full max-w-5xl mx-auto flex flex-col gap-8"
+      className="p-4 sm:p-6 lg:p-8 w-full max-w-6xl mx-auto flex flex-col gap-6"
     >
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/[0.08] pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
         <div className="flex items-center gap-4">
           <Link
             href="/dashboard"
@@ -234,7 +234,7 @@ export default function ActivityPage() {
             <IconArrowLeft size={16} />
           </Link>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
               Activity Log
             </h1>
             <p className="text-[#8e8e98] text-sm mt-1">
