@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen w-full bg-[#09090b] flex flex-col md:flex-row text-white selection:bg-[#ff4500] selection:text-white font-sans">
+    <div className="min-h-dvh w-full bg-[#09090b] flex flex-col md:flex-row text-white selection:bg-[#ff4500] selection:text-white font-sans">
       {/* First-Time User Onboarding Swiper */}
       <FirstTimeOnboardingOverlay />
 
@@ -150,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content Area — No overflow-x-hidden so native mobile vertical scroll works smoothly */}
-      <main className="flex-1 flex flex-col min-h-screen w-full min-w-0 pb-24 md:pb-0">
+      <main className="flex-1 flex flex-col min-h-dvh w-full min-w-0 pb-24 md:pb-0">
         {/* Top App Header */}
         <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-4 sm:px-8 h-16 flex items-center justify-between gap-3 shrink-0 w-full">
           <div className="flex items-center gap-3 min-w-0">
